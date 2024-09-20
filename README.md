@@ -1,4 +1,4 @@
-# 🍵 PyStou: Python Scripts for Streamlining Your Filesystem 🗂️
+# 🌿 PyStou: Python Scripts for Streamlining Your Filesystem 🗂️
 
 ![PyStou Banner](https://github.com/yourusername/pystou/raw/main/banner.png)
 
