@@ -1,6 +1,4 @@
-# 🌿 PyStou: Python Scripts for Streamlining Your Filesystem 🗂️
-
-![PyStou Banner](https://github.com/yourusername/pystou/raw/main/banner.png)
+# 🌿 PyStou
 
 Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy and organized! Whether you're a developer drowning in duplicate folders or someone who loves archiving files but hates the clutter, PyStou is here to rescue you from chaos with style and efficiency.
 
