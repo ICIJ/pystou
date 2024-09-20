@@ -20,11 +20,11 @@ jobs:
         uses: chartboost/ruff-action@v1
 
   test:
-    name: Run Unit Tests on Multiple Python Versions
+    name: Run Unit Tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.8, 3.9, 3.10, 3.11]  # Python versions to test
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
