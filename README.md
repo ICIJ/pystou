@@ -36,7 +36,7 @@ Getting started with PyStou is a breeze! Follow the steps below to install and s
 
 ### Prerequisites
 
-- **Python 3.6 or higher** is required.
+- **Python 3.7 or higher** is required.
 - **Command-Line Tools:**
   - **`pst-utils`**: Required for extracting `.pst` files.
   - **`zstd`**: Required for handling `.zst` files.
