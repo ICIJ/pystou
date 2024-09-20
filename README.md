@@ -29,7 +29,6 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
 - **Dry Run Mode:** Preview actions without making any changes – perfect for cautious users!
 - **Comprehensive Logging:** Keep track of all actions with detailed JSON-formatted logs for easy troubleshooting.
 - **No External Dependencies:** Pure Python scripts ready to run out-of-the-box (except for necessary command-line tools like `readpst`).
-- **Code Quality:** Adheres to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) standards and uses [Ruff](https://github.com/charliermarsh/ruff) for linting and formatting.
 
 ## 🚀 Installation
 
