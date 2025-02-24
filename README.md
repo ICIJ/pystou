@@ -23,12 +23,11 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
 
 ## ✨ Features
 
-- **Deduplicate Folders:** Automatically identify and manage duplicate directories, ensuring you only keep what you need.
-- **Unarchive Files:** Effortlessly extract a wide range of archive formats, including `.zip`, `.tar.gz`, `.zst`, and `.pst`.
-- **Interactive & Automated Modes:** Choose to interact with each file/archive or set default actions for seamless automation.
-- **Dry Run Mode:** Preview actions without making any changes – perfect for cautious users!
-- **Comprehensive Logging:** Keep track of all actions with detailed JSON-formatted logs for easy troubleshooting.
-- **No External Dependencies:** Pure Python scripts ready to run out-of-the-box (except for necessary command-line tools like `readpst`).
+- Automatically identify and manage duplicate directories, ensuring you only keep what you need.
+- Effortlessly extract a wide range of archive formats, including `.zip`, `.tar.gz`, `.zst`, and `.pst`.
+- Choose to interact with each file/archive or set default actions for seamless automation.
+- Keep track of all actions with detailed JSON-formatted logs for easy troubleshooting.
+- Pure native Python scripts ready to run out-of-the-box (except for necessary command-line tools like `readpst`).
 
 ## 🚀 Installation
 
