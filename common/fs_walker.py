@@ -64,8 +64,8 @@ def scan_dir(
             for entry in entries:
                 full_path = Path(entry.path)
                 if entry.is_dir(follow_symlinks=False):
-                    mtime = entry.stat(follow_symlinks=False).st_mtime
-                    dir_entries.append((str(full_path), str(current_dir), mtime))
+                    stat_info = entry.stat(follow_symlinks=False)
+                    dir_entries.append((str(full_path), str(current_dir), stat_info.st_mtime))
                     dir_count += 1
                     update_live_output(dir_count, file_count)
                     if recursive and (level is None or current_level < level):
@@ -79,9 +79,8 @@ def scan_dir(
                             file_count,
                         )
                 elif entry.is_file(follow_symlinks=False):
-                    mtime = entry.stat(follow_symlinks=False).st_mtime
-                    size = entry.stat(follow_symlinks=False).st_size
-                    file_entries.append((str(current_dir), entry.name, size, mtime))
+                    stat_info = entry.stat(follow_symlinks=False)
+                    file_entries.append((str(current_dir), entry.name, stat_info.st_size, stat_info.st_mtime))
                     file_count += 1
                     update_live_output(dir_count, file_count)
             insert_entries(conn, dir_entries, file_entries)
