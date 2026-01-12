@@ -7,7 +7,7 @@ lint:
 	ruff check .
 
 test:
-	python -m unittest discover tests
+	python3 -m unittest discover tests
 
 clean:
 	rm -rf build/
