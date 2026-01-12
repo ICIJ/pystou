@@ -11,6 +11,7 @@ from typing import List, Optional, Set
 
 from common.logger import setup_logging
 from common.cli import add_common_arguments
+from common.cursor import hide_cursor, show_cursor
 
 # Default junk file patterns
 JUNK_FILES: Set[str] = {
@@ -93,14 +94,17 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
             junk_files.add(pattern)
 
     # Find junk files
+    hide_cursor()
     try:
         junk_items = find_junk(
             args.directory, args.recursive, junk_files, junk_dirs
         )
     except KeyboardInterrupt:
+        show_cursor()
         print("\nScan interrupted by user.")
         logging.info({"action": "scan_interrupted"})
         sys.exit(130)
+    show_cursor()
 
     if not junk_items:
         print("No junk files found.")
@@ -127,12 +131,15 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         return
 
     # Remove junk files
+    hide_cursor()
     try:
         removed_count, skipped_count = remove_junk(junk_items)
     except KeyboardInterrupt:
+        show_cursor()
         print("\nRemoval interrupted by user.")
         logging.info({"action": "removal_interrupted"})
         sys.exit(130)
+    show_cursor()
 
     print(f"\nRemoved {removed_count}/{len(junk_items)} item(s)")
     if skipped_count > 0:
@@ -184,7 +191,7 @@ def find_junk(
 
             # Progress indicator every 1000 directories
             if scanned % 1000 == 0:
-                print(f"  Scanned {scanned} directories...", end="\r")
+                print(f"Scanned {scanned} directories...", end="\r")
 
             # Check for junk directories
             for dir_name in dirs[:]:  # Copy to allow modification
@@ -219,7 +226,7 @@ def find_junk(
             logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
 
     if scanned >= 1000:
-        print(f"  Scanned {scanned} directories.    ")  # Clear progress line
+        print(f"Scanned {scanned} directories.    ")  # Clear progress line
 
     return junk_items
 
@@ -261,7 +268,7 @@ def remove_junk(junk_items: List[Path]) -> tuple:
     for i, item in enumerate(junk_items, 1):
         # Progress indicator
         if total > 10 and i % 10 == 0:
-            print(f"  Removing {i}/{total}...", end="\r")
+            print(f"Removing {i}/{total}...", end="\r")
 
         try:
             if not item.exists():
@@ -319,7 +326,7 @@ def remove_junk(junk_items: List[Path]) -> tuple:
             skipped += 1
 
     if total > 10:
-        print(f"  Removed {removed}/{total} items.    ")  # Clear progress line
+        print(f"Removed {removed}/{total} items.    ")  # Clear progress line
 
     return removed, skipped
 

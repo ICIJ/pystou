@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from common.logger import setup_logging
 from common.cli import add_common_arguments
+from common.cursor import hide_cursor, show_cursor
 
 # File signatures (magic bytes) for common file types
 FILE_SIGNATURES: Dict[bytes, str] = {
@@ -131,12 +132,15 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         }
 
     # Collect files to analyze
+    hide_cursor()
     try:
         files = collect_files(args.directory, args.recursive, extensions_filter)
     except KeyboardInterrupt:
+        show_cursor()
         print("\nScan interrupted by user.")
         logging.info({"action": "scan_interrupted"})
         sys.exit(130)
+    show_cursor()
 
     print(f"Found {len(files)} files to analyze.")
     logging.info({"action": "files_found", "count": len(files)})
@@ -148,6 +152,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     issues: List[Tuple[Path, str]] = []
 
     # Run checks
+    hide_cursor()
     try:
         if args.check_mismatch:
             print("Checking for extension mismatches...")
@@ -159,9 +164,11 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
             encrypted_issues = check_encrypted_archives(files)
             issues.extend(encrypted_issues)
     except KeyboardInterrupt:
+        show_cursor()
         print("\nAnalysis interrupted by user.")
         logging.info({"action": "analysis_interrupted"})
         sys.exit(130)
+    show_cursor()
 
     # Report results
     if not issues:
@@ -217,7 +224,7 @@ def collect_files(
 
             # Progress indicator every 1000 directories
             if scanned % 1000 == 0:
-                print(f"  Scanned {scanned} directories...", end="\r")
+                print(f"Scanned {scanned} directories...", end="\r")
 
             for filename in filenames:
                 file_path = root_path / filename
@@ -241,7 +248,7 @@ def collect_files(
             logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
 
     if scanned >= 1000:
-        print(f"  Scanned {scanned} directories.    ")  # Clear progress line
+        print(f"Scanned {scanned} directories.    ")  # Clear progress line
 
     return files
 
@@ -306,7 +313,7 @@ def check_extension_mismatches(files: List[Path]) -> List[Tuple[Path, str]]:
     for i, file_path in enumerate(files, 1):
         # Progress indicator
         if total > 100 and i % 100 == 0:
-            print(f"  Checked {i}/{total} files...", end="\r")
+            print(f"Checked {i}/{total} files...", end="\r")
 
         ext = file_path.suffix.lower()
         if ext not in EXTENSION_TYPE_MAP:
@@ -330,7 +337,7 @@ def check_extension_mismatches(files: List[Path]) -> List[Tuple[Path, str]]:
             })
 
     if total > 100:
-        print(f"  Checked {total} files.           ")  # Clear progress line
+        print(f"Checked {total} files.           ")  # Clear progress line
 
     return issues
 
@@ -358,7 +365,7 @@ def check_encrypted_archives(files: List[Path]) -> List[Tuple[Path, str]]:
 
         # Progress indicator
         if checked > 100 and checked % 100 == 0:
-            print(f"  Checked {checked} archives...", end="\r")
+            print(f"Checked {checked} archives...", end="\r")
 
         try:
             with zipfile.ZipFile(file_path, "r") as zf:
@@ -383,7 +390,7 @@ def check_encrypted_archives(files: List[Path]) -> List[Tuple[Path, str]]:
             logging.warning({"action": "check_encrypted", "status": "error", "path": str(file_path), "error": str(e)})
 
     if checked > 100:
-        print(f"  Checked {checked} archives.      ")  # Clear progress line
+        print(f"Checked {checked} archives.      ")  # Clear progress line
 
     return issues
 

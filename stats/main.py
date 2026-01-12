@@ -12,6 +12,7 @@ from typing import Dict, Optional
 
 from common.logger import setup_logging
 from common.cli import add_common_arguments
+from common.cursor import hide_cursor, show_cursor
 
 
 def add_stats_arguments(parser: argparse.ArgumentParser) -> None:
@@ -71,12 +72,15 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         sys.exit(1)
 
     # Collect statistics
+    hide_cursor()
     try:
         stats = collect_stats(args.directory, args.recursive, args.top)
     except KeyboardInterrupt:
+        show_cursor()
         print("\nScan interrupted by user.")
         logging.info({"action": "scan_interrupted"})
         sys.exit(130)
+    show_cursor()
 
     if args.json:
         output_json(stats, args.top)
@@ -138,7 +142,7 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:
 
             # Progress indicator every 1000 directories
             if scanned % 1000 == 0:
-                print(f"  Scanned {scanned} directories, {stats['summary']['total_files']} files...", end="\r")
+                print(f"Scanned {scanned} directories, {stats['summary']['total_files']} files...", end="\r")
 
             stats["summary"]["total_dirs"] += len(dirs)
 
@@ -195,7 +199,7 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:
             stats["summary"]["errors"] += 1
 
     if scanned >= 1000:
-        print(f"  Scanned {scanned} directories, {stats['summary']['total_files']} files.    ")
+        print(f"Scanned {scanned} directories, {stats['summary']['total_files']} files.    ")
 
     # Convert heap to sorted list (largest first)
     stats["largest_files"] = [

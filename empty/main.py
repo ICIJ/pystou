@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from common.logger import setup_logging
 from common.cli import add_common_arguments
+from common.cursor import hide_cursor, show_cursor
 
 
 def add_empty_arguments(parser: argparse.ArgumentParser) -> None:
@@ -57,14 +58,17 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         sys.exit(1)
 
     # Find empty directories
+    hide_cursor()
     try:
         empty_dirs = find_empty_directories(
             args.directory, args.recursive, args.include_hidden
         )
     except KeyboardInterrupt:
+        show_cursor()
         print("\nScan interrupted by user.")
         logging.info({"action": "scan_interrupted"})
         sys.exit(130)
+    show_cursor()
 
     if not empty_dirs:
         print("No empty directories found.")
@@ -91,12 +95,15 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         return
 
     # Remove empty directories
+    hide_cursor()
     try:
         removed_count, skipped_count = remove_empty_directories(empty_dirs)
     except KeyboardInterrupt:
+        show_cursor()
         print("\nRemoval interrupted by user.")
         logging.info({"action": "removal_interrupted"})
         sys.exit(130)
+    show_cursor()
 
     print(f"\nRemoved {removed_count}/{len(empty_dirs)} directory(ies)")
     if skipped_count > 0:
@@ -148,7 +155,7 @@ def find_empty_directories(
 
             # Progress indicator every 1000 directories
             if scanned % 1000 == 0:
-                print(f"  Scanned {scanned} directories...", end="\r")
+                print(f"Scanned {scanned} directories...", end="\r")
 
             # Skip the root directory itself
             if root_path == directory_path:
@@ -186,7 +193,7 @@ def find_empty_directories(
             logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
 
     if scanned >= 1000:
-        print(f"  Scanned {scanned} directories.    ")  # Clear progress line
+        print(f"Scanned {scanned} directories.    ")  # Clear progress line
 
     # Sort by depth (deepest first) for safe removal
     empty_dirs.sort(key=lambda p: len(p.parts), reverse=True)
@@ -240,7 +247,7 @@ def remove_empty_directories(empty_dirs: List[Path]) -> tuple:
     for i, dir_path in enumerate(empty_dirs, 1):
         # Progress indicator
         if total > 10 and i % 10 == 0:
-            print(f"  Removing {i}/{total}...", end="\r")
+            print(f"Removing {i}/{total}...", end="\r")
 
         try:
             # Check if it still exists and is still empty
@@ -309,7 +316,7 @@ def remove_empty_directories(empty_dirs: List[Path]) -> tuple:
             skipped += 1
 
     if total > 10:
-        print(f"  Removed {removed}/{total} directories.    ")  # Clear progress line
+        print(f"Removed {removed}/{total} directories.    ")  # Clear progress line
 
     return removed, skipped
 
