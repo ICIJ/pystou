@@ -24,7 +24,7 @@ def initialize_database(
 
 
 def create_tables(conn: sqlite3.Connection) -> None:
-    """Creates necessary tables in the database.
+    """Creates necessary tables and indexes in the database.
 
     Args:
         conn (sqlite3.Connection): SQLite database connection.
@@ -50,6 +50,16 @@ def create_tables(conn: sqlite3.Connection) -> None:
             mtime REAL
         )
     """
+    )
+    # Create indexes for faster queries
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_directories_parent ON directories(parent_path)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_files_directory ON files(directory_path)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_files_name ON files(name)"
     )
     conn.commit()
 
