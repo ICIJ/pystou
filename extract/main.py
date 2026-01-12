@@ -49,6 +49,19 @@ def add_extract_arguments(parser: argparse.ArgumentParser) -> None:
         metavar="N",
         help="Number of parallel extraction workers (default: 1, requires -c flag)",
     )
+    parser.add_argument(
+        "-N",
+        "--nested",
+        action="store_true",
+        help="Recursively extract archives found inside extracted content",
+    )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Maximum nesting depth for --nested (default: 10)",
+    )
 
 
 def main(args: Optional[argparse.Namespace] = None) -> None:
@@ -240,13 +253,16 @@ def prompt_delete_action(
             print("Invalid input. Please enter 1 or 2.")
 
 
-def extract_and_update_index(archive_file: Path, args, conn) -> None:
+def extract_and_update_index(
+    archive_file: Path, args, conn, depth: int = 0
+) -> None:
     """Extracts the archive and updates the index.
 
     Args:
         archive_file (Path): The archive file to extract.
         args: Parsed command-line arguments.
         conn: SQLite database connection.
+        depth (int): Current nesting depth for nested extraction.
     """
     if args.dry_run:
         print(f"Dry run: would extract {archive_file}")
@@ -261,6 +277,11 @@ def extract_and_update_index(archive_file: Path, args, conn) -> None:
             )
             # Update index with new files/directories
             update_index_after_extraction(conn, archive_file.parent)
+
+            # Handle nested extraction if enabled
+            if args.nested and depth < args.max_depth:
+                process_nested_archives(archive_file.parent, args, conn, depth + 1)
+
             # Prompt to delete the archive
             delete_action = prompt_delete_action(
                 archive_file, args.default_delete_choice
@@ -274,6 +295,34 @@ def extract_and_update_index(archive_file: Path, args, conn) -> None:
             logging.error(
                 {"action": "extract", "status": "error", "archive": str(archive_file)}
             )
+
+
+def process_nested_archives(
+    directory: Path, args, conn, depth: int
+) -> None:
+    """Processes nested archives found in the extracted directory.
+
+    Args:
+        directory (Path): Directory to scan for nested archives.
+        args: Parsed command-line arguments.
+        conn: SQLite database connection.
+        depth (int): Current nesting depth.
+    """
+    nested_archives = get_archive_files(directory, recursive=True)
+    if not nested_archives:
+        return
+
+    print(f"\n[Depth {depth}] Found {len(nested_archives)} nested archive(s)")
+    logging.info({
+        "action": "nested_archives_found",
+        "directory": str(directory),
+        "count": len(nested_archives),
+        "depth": depth,
+    })
+
+    for archive in nested_archives:
+        print(f"[Depth {depth}] Extracting nested archive: {archive}")
+        extract_and_update_index(archive, args, conn, depth)
 
 
 def update_index_after_extraction(conn, directory: Path) -> None:
