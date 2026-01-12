@@ -7,7 +7,7 @@ from typing import Optional
 
 # Import common modules
 from common.logger import setup_logging
-from common.utils import get_archive_files, extract_archive
+from common.utils import get_archive_files, extract_archive, get_split_archive_parts
 from common.indexer import (
     initialize_database,
     prompt_use_existing_index,
@@ -202,43 +202,52 @@ def update_index_after_extraction(conn, directory: Path) -> None:
 def delete_archive_file(archive_file: Path, conn, dry_run: bool) -> None:
     """Deletes the archive file and updates the index.
 
+    For split archives, also deletes all split parts (.z01, .z02, etc.).
+
     Args:
         archive_file (Path): The archive file to delete.
         conn: SQLite database connection.
         dry_run (bool): Whether to perform a dry run.
     """
+    # Get all files to delete (includes split parts if applicable)
+    split_parts = get_split_archive_parts(archive_file)
+    files_to_delete = split_parts if split_parts else [archive_file]
+
     if dry_run:
-        print(f"Dry run: would delete archive: {archive_file}")
+        for f in files_to_delete:
+            print(f"Dry run: would delete archive: {f}")
         logging.info(
             {
                 "action": "delete_archive",
                 "status": "dry_run",
                 "archive": str(archive_file),
+                "parts_count": len(files_to_delete),
             }
         )
     else:
-        try:
-            print(f"Deleting archive: {archive_file}")
-            archive_file.unlink()
-            logging.info(
-                {
-                    "action": "delete_archive",
-                    "status": "success",
-                    "archive": str(archive_file),
-                }
-            )
-            # Update index
-            update_index_after_change(conn, "delete_file", archive_file)
-        except Exception as e:
-            print(f"Error deleting archive {archive_file}: {e}")
-            logging.error(
-                {
-                    "action": "delete_archive",
-                    "status": "error",
-                    "archive": str(archive_file),
-                    "error": str(e),
-                }
-            )
+        for f in files_to_delete:
+            try:
+                print(f"Deleting archive: {f}")
+                f.unlink()
+                logging.info(
+                    {
+                        "action": "delete_archive",
+                        "status": "success",
+                        "archive": str(f),
+                    }
+                )
+                # Update index
+                update_index_after_change(conn, "delete_file", f)
+            except Exception as e:
+                print(f"Error deleting archive {f}: {e}")
+                logging.error(
+                    {
+                        "action": "delete_archive",
+                        "status": "error",
+                        "archive": str(f),
+                        "error": str(e),
+                    }
+                )
 
 
 if __name__ == "__main__":
