@@ -60,7 +60,7 @@ class TestExtract(unittest.TestCase):
         args = type(
             "Args",
             (),
-            {"dry_run": False, "default_choice": None, "default_delete_choice": None},
+            {"dry_run": False, "default_choice": None, "default_delete_choice": None, "nested": False, "max_depth": 10},
         )
         archive_files = get_archive_files(self.test_dir, recursive=False)
         self.assertEqual(len(archive_files), 1)
@@ -81,7 +81,7 @@ class TestExtract(unittest.TestCase):
         args = type(
             "Args",
             (),
-            {"dry_run": False, "default_choice": None, "default_delete_choice": None},
+            {"dry_run": False, "default_choice": None, "default_delete_choice": None, "nested": False, "max_depth": 10},
         )
         archive_files = get_archive_files(self.test_dir, recursive=False)
         self.assertEqual(len(archive_files), 1)
@@ -100,7 +100,7 @@ class TestExtract(unittest.TestCase):
         args = type(
             "Args",
             (),
-            {"dry_run": False, "default_choice": None, "default_delete_choice": None},
+            {"dry_run": False, "default_choice": None, "default_delete_choice": None, "nested": False, "max_depth": 10},
         )
         archive_files = get_archive_files(self.test_dir, recursive=False)
         self.assertEqual(len(archive_files), 1)
@@ -122,7 +122,7 @@ class TestExtract(unittest.TestCase):
         args = type(
             "Args",
             (),
-            {"dry_run": False, "default_choice": None, "default_delete_choice": None},
+            {"dry_run": False, "default_choice": None, "default_delete_choice": None, "nested": False, "max_depth": 10},
         )
         with patch("builtins.input", side_effect=["1", "2"]):
             archive_files = get_archive_files(self.test_dir, recursive=False)
@@ -142,7 +142,7 @@ class TestExtract(unittest.TestCase):
         args = type(
             "Args",
             (),
-            {"dry_run": True, "default_choice": None, "default_delete_choice": None},
+            {"dry_run": True, "default_choice": None, "default_delete_choice": None, "nested": False, "max_depth": 10},
         )
         with patch("builtins.input", side_effect=["1", "1"]):
             archive_files = get_archive_files(self.test_dir, recursive=False)
@@ -167,6 +167,8 @@ class TestExtract(unittest.TestCase):
                 "dry_run": False,
                 "default_choice": 1,  # Extract
                 "default_delete_choice": 1,  # Delete after extraction
+                "nested": False,
+                "max_depth": 10,
             },
         )
         with patch("builtins.input", return_value="1"):
@@ -193,6 +195,8 @@ class TestExtract(unittest.TestCase):
                 "dry_run": False,
                 "default_choice": 1,  # Extract
                 "default_delete_choice": 2,  # Keep after extraction
+                "nested": False,
+                "max_depth": 10,
             },
         )
         with patch("builtins.input", return_value="2"):
@@ -215,7 +219,7 @@ class TestExtract(unittest.TestCase):
         args = type(
             "Args",
             (),
-            {"dry_run": False, "default_choice": None, "default_delete_choice": None},
+            {"dry_run": False, "default_choice": None, "default_delete_choice": None, "nested": False, "max_depth": 10},
         )
         archive_files = get_archive_files(self.test_dir, recursive=False)
         self.assertEqual(len(archive_files), 1)
@@ -234,7 +238,7 @@ class TestExtract(unittest.TestCase):
         args = type(
             "Args",
             (),
-            {"dry_run": False, "default_choice": None, "default_delete_choice": None},
+            {"dry_run": False, "default_choice": None, "default_delete_choice": None, "nested": False, "max_depth": 10},
         )
         archive_files = get_archive_files(self.test_dir, recursive=False)
         self.assertEqual(len(archive_files), 1)
