@@ -4,12 +4,12 @@ import shutil
 import os
 from pathlib import Path
 from unittest.mock import patch
-from unarchive.main import process_archive
+from extract.main import process_archive
 from common.indexer import initialize_database, close_database
 from common.utils import get_archive_files
 
 
-class TestUnarchive(unittest.TestCase):
+class TestExtract(unittest.TestCase):
     def setUp(self):
         """
         Set up a temporary directory and initialize the database.
