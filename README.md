@@ -16,9 +16,6 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
   - [Deduplicate Folders](#deduplicate-folders)
   - [Unarchive Files](#unarchive-files)
 - [🧪 Running Tests](#-running-tests)
-- [🤝 Contributing](#-contributing)
-  - [How to Contribute](#how-to-contribute)
-  - [Guidelines](#guidelines)
 - [📄 License](#-license)
 
 ## ✨ Features
@@ -176,57 +173,6 @@ PyStou includes a suite of unit tests to ensure everything works smoothly. Here'
    ```
 
 > **Note:** Ensure you have all necessary command-line tools installed (`readpst`, `zstd`) before running tests that involve archive extraction.
-
-## 🤝 Contributing
-
-We love contributions! Whether it's reporting bugs, suggesting features, or submitting pull requests, your help is invaluable.
-
-### How to Contribute
-
-1. **Fork the Repository:**
-
-   Click the "Fork" button at the top-right corner of the repository page.
-
-2. **Clone Your Fork:**
-
-   ```bash
-   git clone https://github.com/yourusername/pystou.git
-   cd pystou
-   ```
-
-3. **Create a New Branch:**
-
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-4. **Make Your Changes:**
-
-   Implement your feature or fix.
-
-5. **Commit Your Changes:**
-
-   ```bash
-   git commit -m "Add your descriptive commit message"
-   ```
-
-6. **Push to Your Fork:**
-
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-7. **Create a Pull Request:**
-
-   Navigate to your fork on GitHub and click the "Compare & pull request" button.
-
-### Guidelines
-
-- **Commit Messages:** Follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification for clear and consistent commit messages.
-- **Code Style:** We use [Ruff](https://github.com/astral-sh/ruff) for linting and formatting. Ensure your code adheres to PEP 8 standards.
-- **Documentation:** Update the README and docstrings as necessary.
-- **Testing:** Ensure all new features are accompanied by relevant tests.
-- **Code Reviews:** All pull requests will undergo a review process to maintain code quality and integrity.
 
 ## 📄 License
 
