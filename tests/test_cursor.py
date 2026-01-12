@@ -1,7 +1,6 @@
 import unittest
 import signal
 from unittest.mock import patch, MagicMock
-from io import StringIO
 
 from common.cursor import (
     hide_cursor,
