@@ -113,18 +113,17 @@ def update_index_after_change(
             "DELETE FROM files WHERE directory_path LIKE ?", (str(path) + "%",)
         )
     elif action == "add_file":
-        mtime = path.stat().st_mtime
-        size = path.stat().st_size
+        stat_info = path.stat()
         cursor.execute(
             "INSERT OR IGNORE INTO files (directory_path, name, size, mtime) VALUES (?, ?, ?, ?)",
-            (str(path.parent), path.name, size, mtime),
+            (str(path.parent), path.name, stat_info.st_size, stat_info.st_mtime),
         )
     elif action == "add_directory":
-        mtime = path.stat().st_mtime
+        stat_info = path.stat()
         parent_path = str(path.parent)
         cursor.execute(
             "INSERT OR IGNORE INTO directories (path, parent_path, mtime) VALUES (?, ?, ?)",
-            (str(path), parent_path, mtime),
+            (str(path), parent_path, stat_info.st_mtime),
         )
     conn.commit()
 
