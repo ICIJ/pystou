@@ -99,20 +99,27 @@ def get_archive_files(directory: Union[str, Path], recursive: bool) -> List[Path
         ".zst",
         ".pst",
     ]
+    # Pattern to match split archive parts (.z01, .z02, etc.)
+    split_part_pattern = re.compile(r"\.z\d+$", re.IGNORECASE)
+
     archive_files: List[Path] = []
     directory_path = Path(directory)
+
+    def is_archive(filename: str) -> bool:
+        # Skip split archive parts - they'll be processed with their .zip
+        if split_part_pattern.search(filename):
+            return False
+        return any(filename.endswith(ext) for ext in archive_extensions)
 
     if recursive:
         for root, _, files in os.walk(directory_path):
             for file in files:
-                if any(file.endswith(ext) for ext in archive_extensions):
+                if is_archive(file):
                     archive_files.append(Path(root) / file)
     else:
         for file in os.listdir(directory_path):
             file_path = directory_path / file
-            if file_path.is_file() and any(
-                file.endswith(ext) for ext in archive_extensions
-            ):
+            if file_path.is_file() and is_archive(file):
                 archive_files.append(file_path)
     return archive_files
 
@@ -129,6 +136,10 @@ def extract_archive(archive_path: Path) -> bool:
     try:
         suffixes = "".join(archive_path.suffixes)
         if suffixes.endswith(".zip"):
+            # Check if this is a split archive
+            split_parts = get_split_archive_parts(archive_path)
+            if split_parts:
+                return extract_split_zip_archive(archive_path)
             return extract_zip_archive(archive_path)
         elif (
             suffixes.endswith(".tar.gz")
@@ -190,6 +201,47 @@ def extract_zip_archive(archive_path: Path) -> bool:
         logging.error(
             {
                 "action": "extract_zip",
+                "status": "error",
+                "archive": str(archive_path),
+                "error": str(e),
+            }
+        )
+        return False
+
+
+def extract_split_zip_archive(archive_path: Path) -> bool:
+    """Extracts a split ZIP archive using 7z command.
+
+    Args:
+        archive_path (Path): The path to the main .zip file of the split archive.
+
+    Returns:
+        bool: True if extraction was successful, False otherwise.
+    """
+    if shutil.which("7z") is None:
+        print(
+            "7z command not found. Please install p7zip-full to extract split ZIP archives."
+        )
+        logging.error(
+            {
+                "action": "extract_split_zip",
+                "status": "missing_dependency",
+                "archive": str(archive_path),
+            }
+        )
+        return False
+
+    try:
+        output_dir = archive_path.parent
+        cmd = ["7z", "x", str(archive_path), f"-o{output_dir}", "-y"]
+        subprocess.run(cmd, check=True, capture_output=True)
+        print(f"Extracted split ZIP archive: {archive_path}")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error extracting split ZIP archive {archive_path}: {e}")
+        logging.error(
+            {
+                "action": "extract_split_zip",
                 "status": "error",
                 "archive": str(archive_path),
                 "error": str(e),
@@ -429,6 +481,42 @@ def extract_pst_archive(archive_path: Path) -> bool:
             }
         )
         return False
+
+
+def get_split_archive_parts(archive_path: Path) -> List[Path]:
+    """Finds all parts of a split ZIP archive.
+
+    Given a .zip file, finds all related split parts (.z01, .z02, etc.).
+    Returns sorted list of all parts (including the .zip), or empty list if not a split archive.
+
+    Args:
+        archive_path (Path): The path to the .zip file.
+
+    Returns:
+        List[Path]: Sorted list of all split archive parts, or empty list if not split.
+    """
+    if not archive_path.suffix.lower() == ".zip":
+        return []
+
+    base_name = archive_path.stem
+    parent_dir = archive_path.parent
+
+    # Find all .zXX parts
+    parts = []
+    pattern = re.compile(rf"^{re.escape(base_name)}\.z(\d+)$", re.IGNORECASE)
+
+    for file in parent_dir.iterdir():
+        if file.is_file():
+            match = pattern.match(file.name)
+            if match:
+                parts.append((int(match.group(1)), file))
+
+    if not parts:
+        return []  # Not a split archive
+
+    # Sort by part number and return just the paths
+    parts.sort(key=lambda x: x[0])
+    return [p[1] for p in parts] + [archive_path]
 
 
 def get_unique_folder_name(base_dir: Path) -> Path:
