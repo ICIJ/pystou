@@ -7,6 +7,7 @@ import sys
 from dedup_folders.main import main as dedup_main, add_dedup_arguments
 from extract.main import main as extract_main, add_extract_arguments
 from cleanup.main import main as cleanup_main, add_cleanup_arguments
+from identify.main import main as identify_main, add_identify_arguments
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -58,6 +59,15 @@ def create_parser() -> argparse.ArgumentParser:
     )
     add_cleanup_arguments(cleanup_parser)
     cleanup_parser.set_defaults(func=cleanup_main)
+
+    # identify subcommand
+    identify_parser = subparsers.add_parser(
+        "identify",
+        help="Identify file types and detect issues",
+        description="Detect file types and find mismatched extensions or encrypted archives.",
+    )
+    add_identify_arguments(identify_parser)
+    identify_parser.set_defaults(func=identify_main)
 
     return parser
 
