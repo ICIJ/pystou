@@ -89,6 +89,7 @@ def scan_dir(
         with os.scandir(current_dir) as entries:
             dir_entries: List[Tuple[str, str, float]] = []
             file_entries: List[Tuple[str, str, int, float]] = []
+            subdirs: List[Path] = []
             for entry in entries:
                 full_path = Path(entry.path)
                 if entry.is_dir(follow_symlinks=False):
@@ -96,19 +97,15 @@ def scan_dir(
                     dir_entries.append((str(full_path), str(current_dir), stat_info.st_mtime))
                     ctx.increment_dirs()
                     if recursive and (level is None or current_level < level):
-                        scan_dir(
-                            full_path,
-                            current_level + 1,
-                            conn,
-                            recursive,
-                            level,
-                            ctx,
-                        )
+                        subdirs.append(full_path)
                 elif entry.is_file(follow_symlinks=False):
                     stat_info = entry.stat(follow_symlinks=False)
                     file_entries.append((str(current_dir), entry.name, stat_info.st_size, stat_info.st_mtime))
                     ctx.increment_files()
             insert_entries(conn, dir_entries, file_entries)
+            # Process subdirectories after current directory is committed
+            for subdir in subdirs:
+                scan_dir(subdir, current_level + 1, conn, recursive, level, ctx)
     except PermissionError as e:
         print(f"\nPermission denied: {current_dir}")
         logging.error(
