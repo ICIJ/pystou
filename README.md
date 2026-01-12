@@ -13,7 +13,7 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
   - [Install the Package](#install-the-package)
 - [Usage](#usage)
   - [Deduplicate Folders](#deduplicate-folders)
-  - [Unarchive Files](#unarchive-files)
+  - [Extract Archives](#unarchive-files)
 - [Running Tests](#running-tests)
 - [License](#license)
 
@@ -63,7 +63,7 @@ PyStou provides a unified command-line interface with two subcommands: `dedup` a
 ```bash
 pystou --help
 pystou dedup --help
-pystou unarchive --help
+pystou extract --help
 ```
 
 ### Deduplicate Folders
@@ -114,7 +114,7 @@ pystou dedup [directory] [options]
   pystou dedup /path/to/your/folders -r -n
   ```
 
-### Unarchive Files
+### Extract Archives
 
 **Purpose:** Extract various archive formats efficiently and manage them post-extraction.
 
@@ -127,7 +127,7 @@ pystou dedup [directory] [options]
 **Command:**
 
 ```bash
-pystou unarchive [directory] [options]
+pystou extract [directory] [options]
 ```
 
 **Parameters:**
@@ -153,7 +153,7 @@ pystou unarchive [directory] [options]
 - **Interactive Mode:**
 
   ```bash
-  pystou unarchive /path/to/archives -r
+  pystou extract /path/to/archives -r
   ```
 
   *The script will prompt you for each archive found, asking whether to extract or skip.*
@@ -161,19 +161,19 @@ pystou unarchive [directory] [options]
 - **Automated Mode with Default Choices (Extract and Delete Archives):**
 
   ```bash
-  pystou unarchive /path/to/archives -r -c 1 -dc 1
+  pystou extract /path/to/archives -r -c 1 -dc 1
   ```
 
 - **Parallel Extraction (4 workers):**
 
   ```bash
-  pystou unarchive /path/to/archives -r -c 1 -dc 2 -p 4
+  pystou extract /path/to/archives -r -c 1 -dc 2 -p 4
   ```
 
 - **Dry Run Mode:**
 
   ```bash
-  pystou unarchive /path/to/archives -r -n
+  pystou extract /path/to/archives -r -n
   ```
 
 ## Running Tests
