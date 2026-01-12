@@ -5,7 +5,7 @@ import argparse
 import sys
 
 from dedup_folders.main import main as dedup_main, add_dedup_arguments
-from unarchive.main import main as unarchive_main, add_unarchive_arguments
+from extract.main import main as extract_main, add_extract_arguments
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -40,14 +40,14 @@ def create_parser() -> argparse.ArgumentParser:
     add_dedup_arguments(dedup_parser)
     dedup_parser.set_defaults(func=dedup_main)
 
-    # unarchive subcommand
-    unarchive_parser = subparsers.add_parser(
-        "unarchive",
+    # extract subcommand
+    extract_parser = subparsers.add_parser(
+        "extract",
         help="Extract archive files",
         description="Find and extract archive files (zip, tar, etc.).",
     )
-    add_unarchive_arguments(unarchive_parser)
-    unarchive_parser.set_defaults(func=unarchive_main)
+    add_extract_arguments(extract_parser)
+    extract_parser.set_defaults(func=extract_main)
 
     return parser
 
