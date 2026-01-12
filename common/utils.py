@@ -51,10 +51,12 @@ def get_directory_size(conn, dir_path: Path) -> tuple:
         tuple: Total size in bytes and number of files.
     """
     cursor = conn.cursor()
-    cursor.execute("SELECT size FROM files WHERE directory_path = ?", (str(dir_path),))
-    sizes = cursor.fetchall()
-    total_size = sum(size[0] for size in sizes)
-    num_files = len(sizes)
+    # Use SQL aggregate functions instead of fetching all rows
+    cursor.execute(
+        "SELECT COALESCE(SUM(size), 0), COUNT(*) FROM files WHERE directory_path = ?",
+        (str(dir_path),)
+    )
+    total_size, num_files = cursor.fetchone()
     return total_size, num_files
 
 
