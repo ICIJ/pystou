@@ -13,7 +13,11 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
   - [Install the Package](#install-the-package)
 - [Usage](#usage)
   - [Deduplicate Folders](#deduplicate-folders)
-  - [Extract Archives](#unarchive-files)
+  - [Extract Archives](#extract-archives)
+  - [Cleanup Junk Files](#cleanup-junk-files)
+  - [Identify File Types](#identify-file-types)
+  - [Directory Statistics](#directory-statistics)
+  - [Empty Directories](#empty-directories)
 - [Running Tests](#running-tests)
 - [License](#license)
 
@@ -22,7 +26,12 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
 - Automatically identify and manage duplicate directories, ensuring you only keep what you need.
 - Effortlessly extract a wide range of archive formats, including `.zip`, `.tar.gz`, `.zst`, and `.pst`.
 - Support for split ZIP archives (`.z01`, `.z02`, etc.) with automatic detection.
+- Nested archive extraction for archives containing other archives.
 - Parallel archive extraction for faster processing of multiple archives.
+- Remove junk files (`.DS_Store`, `Thumbs.db`, `__MACOSX`, etc.) with a single command.
+- Detect file type mismatches and encrypted archives.
+- Get comprehensive directory statistics including file counts, sizes, and types.
+- Find and remove empty directories safely.
 - Choose to interact with each file/archive or set default actions for seamless automation.
 - Keep track of all actions with detailed JSON-formatted logs for easy troubleshooting.
 - Pure native Python scripts ready to run out-of-the-box (except for necessary command-line tools).
@@ -58,12 +67,16 @@ pip install .
 
 ## Usage
 
-PyStou provides a unified command-line interface with two subcommands: `dedup` and `unarchive`.
+PyStou provides a unified command-line interface with several subcommands.
 
 ```bash
 pystou --help
 pystou dedup --help
 pystou extract --help
+pystou cleanup --help
+pystou identify --help
+pystou stats --help
+pystou empty --help
 ```
 
 ### Deduplicate Folders
@@ -182,6 +195,160 @@ pystou extract [directory] [options]
 
   ```bash
   pystou extract /path/to/archives -r -n
+  ```
+
+### Cleanup Junk Files
+
+**Purpose:** Remove common junk files created by operating systems and applications.
+
+**Removed by default:**
+- macOS: `.DS_Store`, `._.DS_Store`, `._*` files, `__MACOSX`, `.AppleDouble`, `.Spotlight-V100`, `.Trashes`, `.fseventsd`, `.TemporaryItems`, `.LSOverride`
+- Windows: `Thumbs.db`, `ehthumbs.db`, `ehthumbs_vista.db`, `desktop.ini`
+
+**Command:**
+
+```bash
+pystou cleanup [directory] [options]
+```
+
+**Options:**
+
+- `-r`, `--recursive`: Recursively process subdirectories.
+- `--include PATTERN`: Additional file/directory names to remove (can be used multiple times).
+- `--list-only`: Only list junk files without removing them.
+- `-n`, `--dry-run`: Perform a dry run without making any changes.
+
+**Examples:**
+
+- **List junk files:**
+
+  ```bash
+  pystou cleanup /path/to/folder -r --list-only
+  ```
+
+- **Remove junk files:**
+
+  ```bash
+  pystou cleanup /path/to/folder -r
+  ```
+
+- **Remove additional patterns:**
+
+  ```bash
+  pystou cleanup /path/to/folder -r --include ".gitkeep" --include "*.bak"
+  ```
+
+### Identify File Types
+
+**Purpose:** Detect file types and find potential issues like mismatched extensions or encrypted archives.
+
+**Command:**
+
+```bash
+pystou identify [directory] [options]
+```
+
+**Options:**
+
+- `-r`, `--recursive`: Recursively process subdirectories.
+- `--check-mismatch`: Check for files with mismatched extensions.
+- `--check-encrypted`: Check for encrypted ZIP archives.
+- `--check-all`: Run all checks.
+- `--extensions EXT`: Comma-separated list of extensions to check (e.g., `.zip,.pdf`).
+
+**Examples:**
+
+- **Find mismatched extensions:**
+
+  ```bash
+  pystou identify /path/to/folder -r --check-mismatch
+  ```
+
+- **Find encrypted archives:**
+
+  ```bash
+  pystou identify /path/to/folder -r --check-encrypted
+  ```
+
+- **Run all checks on specific extensions:**
+
+  ```bash
+  pystou identify /path/to/folder -r --check-all --extensions ".zip,.pdf,.docx"
+  ```
+
+### Directory Statistics
+
+**Purpose:** Display comprehensive statistics about files and directories.
+
+**Command:**
+
+```bash
+pystou stats [directory] [options]
+```
+
+**Options:**
+
+- `-r`, `--recursive`: Recursively process subdirectories.
+- `--top N`: Number of top items to show (default: 10).
+- `--by-extension`: Show breakdown by file extension.
+- `--by-size`: Show largest files.
+- `--json`: Output statistics in JSON format.
+
+**Examples:**
+
+- **Show directory statistics:**
+
+  ```bash
+  pystou stats /path/to/folder -r
+  ```
+
+- **Show largest files:**
+
+  ```bash
+  pystou stats /path/to/folder -r --by-size --top 20
+  ```
+
+- **Output as JSON:**
+
+  ```bash
+  pystou stats /path/to/folder -r --json
+  ```
+
+### Empty Directories
+
+**Purpose:** Find and remove empty directories.
+
+**Command:**
+
+```bash
+pystou empty [directory] [options]
+```
+
+**Options:**
+
+- `-r`, `--recursive`: Recursively process subdirectories.
+- `--list-only`: Only list empty directories without removing them.
+- `--include-hidden`: Include hidden directories (starting with `.`).
+- `-n`, `--dry-run`: Perform a dry run without making any changes.
+
+**Examples:**
+
+- **List empty directories:**
+
+  ```bash
+  pystou empty /path/to/folder -r --list-only
+  ```
+
+- **Remove empty directories:**
+
+  ```bash
+  pystou empty /path/to/folder -r
+  ```
+
+- **Include hidden directories:**
+
+  ```bash
+  pystou empty /path/to/folder -r --include-hidden
   ```
 
 ## Running Tests
