@@ -24,7 +24,9 @@ def group_directories(conn) -> dict:
     pattern = re.compile(r"^(.*?)(?: \((\d+)\))?$")
     cursor.execute("SELECT path, parent_path FROM directories")
     groups = defaultdict(list)
-    for path_str, parent_path_str in cursor.fetchall():
+    # Iterate over cursor directly instead of fetchall() to reduce memory usage
+    for row in cursor:
+        path_str, parent_path_str = row
         dir_path = Path(path_str)
         parent_dir = Path(parent_path_str)
         dir_name = dir_path.name
