@@ -20,8 +20,8 @@ from common.fs_walker import collect_directories
 from common.cli import add_common_arguments
 
 
-def add_unarchive_arguments(parser: argparse.ArgumentParser) -> None:
-    """Adds unarchive-specific arguments to the parser.
+def add_extract_arguments(parser: argparse.ArgumentParser) -> None:
+    """Adds extract-specific arguments to the parser.
 
     Args:
         parser: ArgumentParser to add arguments to.
@@ -52,17 +52,17 @@ def add_unarchive_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def main(args: Optional[argparse.Namespace] = None) -> None:
-    """Main entry point for unarchive.
+    """Main entry point for extract.
 
     Args:
         args: Parsed arguments. If None, parses from command line.
     """
     if args is None:
-        parser = argparse.ArgumentParser(description="Unarchive script.")
-        add_unarchive_arguments(parser)
+        parser = argparse.ArgumentParser(description="Extract archives script.")
+        add_extract_arguments(parser)
         args = parser.parse_args()
 
-    setup_logging("unarchive", args.log_dir)
+    setup_logging("extract", args.log_dir)
     log_configuration(args)
 
     conn = initialize_database(args.db_dir)
