@@ -70,9 +70,10 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
 
 def log_configuration(args) -> None:
     """Logs the configuration used to run the script."""
-    config = vars(args).copy()
-    config.pop("func", None)
-    config.pop("command", None)
+    config = {
+        k: v for k, v in vars(args).items()
+        if not k.startswith("_") and k not in ("func", "command")
+    }
     config["action"] = "configuration"
     logging.info(config)
 
