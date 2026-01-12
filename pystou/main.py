@@ -6,6 +6,7 @@ import sys
 
 from dedup_folders.main import main as dedup_main, add_dedup_arguments
 from extract.main import main as extract_main, add_extract_arguments
+from cleanup.main import main as cleanup_main, add_cleanup_arguments
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -48,6 +49,15 @@ def create_parser() -> argparse.ArgumentParser:
     )
     add_extract_arguments(extract_parser)
     extract_parser.set_defaults(func=extract_main)
+
+    # cleanup subcommand
+    cleanup_parser = subparsers.add_parser(
+        "cleanup",
+        help="Remove junk files (.DS_Store, Thumbs.db, etc.)",
+        description="Find and remove junk files from directories.",
+    )
+    add_cleanup_arguments(cleanup_parser)
+    cleanup_parser.set_defaults(func=cleanup_main)
 
     return parser
 
