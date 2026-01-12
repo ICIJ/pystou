@@ -1,16 +1,12 @@
 import argparse
 
 
-def parse_arguments(script_name: str) -> argparse.ArgumentParser:
-    """Creates and returns an ArgumentParser with common arguments.
+def add_common_arguments(parser: argparse.ArgumentParser) -> None:
+    """Adds common arguments to an ArgumentParser.
 
     Args:
-        script_name (str): The name of the script.
-
-    Returns:
-        argparse.ArgumentParser: The configured ArgumentParser instance.
+        parser: ArgumentParser to add arguments to.
     """
-    parser = argparse.ArgumentParser(description=f"{script_name} script.")
     parser.add_argument(
         "directory",
         nargs="?",
@@ -39,4 +35,3 @@ def parse_arguments(script_name: str) -> argparse.ArgumentParser:
         default=".",
         help="Directory to store index database (default: current directory)",
     )
-    return parser

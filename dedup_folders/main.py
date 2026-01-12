@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 from pathlib import Path
 from typing import Optional, List, Tuple
 import logging
@@ -19,11 +20,16 @@ from common.indexer import (
 )
 from common.fs_walker import collect_directories
 from common.utils import group_directories, summarize_group
-from common.cli import parse_arguments
+from common.cli import add_common_arguments
 
 
-def main() -> None:
-    parser = parse_arguments("dedup_folders")
+def add_dedup_arguments(parser: argparse.ArgumentParser) -> None:
+    """Adds dedup_folders-specific arguments to the parser.
+
+    Args:
+        parser: ArgumentParser to add arguments to.
+    """
+    add_common_arguments(parser)
     parser.add_argument(
         "-l",
         "--level",
@@ -38,7 +44,19 @@ def main() -> None:
         choices=[1, 2, 3],
         help="Default choice to apply to all groups (1: delete duplicates, 2: merge and delete duplicates, 3: skip)",
     )
-    args = parser.parse_args()
+
+
+def main(args: Optional[argparse.Namespace] = None) -> None:
+    """Main entry point for dedup_folders.
+
+    Args:
+        args: Parsed arguments. If None, parses from command line.
+    """
+    if args is None:
+        parser = argparse.ArgumentParser(description="Deduplicate folders script.")
+        add_dedup_arguments(parser)
+        args = parser.parse_args()
+
     setup_logging("dedup_folders", args.log_dir)
     log_configuration(args)
 
@@ -72,7 +90,10 @@ def log_configuration(args) -> None:
     Args:
         args: Parsed command-line arguments.
     """
-    config = vars(args)
+    config = vars(args).copy()
+    # Remove non-serializable and internal keys
+    config.pop("func", None)
+    config.pop("command", None)
     config["action"] = "configuration"
     logging.info(config)
 

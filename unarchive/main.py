@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -16,11 +17,16 @@ from common.indexer import (
     update_index_after_change,
 )
 from common.fs_walker import collect_directories
-from common.cli import parse_arguments
+from common.cli import add_common_arguments
 
 
-def main():
-    parser = parse_arguments("unarchive")
+def add_unarchive_arguments(parser: argparse.ArgumentParser) -> None:
+    """Adds unarchive-specific arguments to the parser.
+
+    Args:
+        parser: ArgumentParser to add arguments to.
+    """
+    add_common_arguments(parser)
     parser.add_argument(
         "-c",
         "--default-choice",
@@ -43,7 +49,19 @@ def main():
         metavar="N",
         help="Number of parallel extraction workers (default: 1, requires -c flag)",
     )
-    args = parser.parse_args()
+
+
+def main(args: Optional[argparse.Namespace] = None) -> None:
+    """Main entry point for unarchive.
+
+    Args:
+        args: Parsed arguments. If None, parses from command line.
+    """
+    if args is None:
+        parser = argparse.ArgumentParser(description="Unarchive script.")
+        add_unarchive_arguments(parser)
+        args = parser.parse_args()
+
     setup_logging("unarchive", args.log_dir)
     log_configuration(args)
 
@@ -75,6 +93,9 @@ def main():
 def log_configuration(args):
     """Logs the configuration used to run the script."""
     config = vars(args).copy()
+    # Remove non-serializable and internal keys
+    config.pop("func", None)
+    config.pop("command", None)
     config["action"] = "configuration"
     logging.info(config)
 
