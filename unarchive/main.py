@@ -2,8 +2,9 @@
 
 import os
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 # Import common modules
 from common.logger import setup_logging
@@ -34,6 +35,14 @@ def main():
         choices=[1, 2],
         help="Default choice to apply when prompted to delete after extraction (1: delete, 2: keep)",
     )
+    parser.add_argument(
+        "-p",
+        "--parallel",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of parallel extraction workers (default: 1, requires -c flag)",
+    )
     args = parser.parse_args()
     setup_logging("unarchive", args.log_dir)
     log_configuration(args)
@@ -52,8 +61,12 @@ def main():
         close_database(conn)
         return
 
-    for archive_file in archive_files:
-        process_archive(archive_file, args, conn)
+    # Use parallel extraction when enabled and in automatic mode
+    if args.parallel > 1 and args.default_choice == 1:
+        process_archives_parallel(archive_files, args, conn)
+    else:
+        for archive_file in archive_files:
+            process_archive(archive_file, args, conn)
 
     logging.info({"action": "script_complete"})
     close_database(conn)
@@ -61,9 +74,63 @@ def main():
 
 def log_configuration(args):
     """Logs the configuration used to run the script."""
-    config = vars(args)
+    config = vars(args).copy()
     config["action"] = "configuration"
     logging.info(config)
+
+
+def process_archives_parallel(archive_files: List[Path], args, conn) -> None:
+    """Processes multiple archives in parallel.
+
+    Args:
+        archive_files (List[Path]): List of archive files to process.
+        args: Parsed command-line arguments.
+        conn: SQLite database connection.
+    """
+    print(f"Extracting {len(archive_files)} archives with {args.parallel} workers...")
+
+    # Extract archives in parallel
+    results = []
+    with ThreadPoolExecutor(max_workers=args.parallel) as executor:
+        future_to_archive = {
+            executor.submit(extract_archive, archive): archive
+            for archive in archive_files
+        }
+        for future in as_completed(future_to_archive):
+            archive = future_to_archive[future]
+            try:
+                success = future.result()
+                results.append((archive, success))
+                status = "success" if success else "failed"
+                print(f"Extracted ({status}): {archive}")
+            except Exception as e:
+                results.append((archive, False))
+                print(f"Error extracting {archive}: {e}")
+                logging.error(
+                    {"action": "extract", "status": "error", "archive": str(archive), "error": str(e)}
+                )
+
+    # Update index and handle deletion sequentially (database operations)
+    successful = [(archive, success) for archive, success in results if success]
+    print(f"\nSuccessfully extracted {len(successful)}/{len(archive_files)} archives.")
+
+    for archive, _ in successful:
+        logging.info({"action": "extract", "status": "success", "archive": str(archive)})
+        update_index_after_extraction(conn, archive.parent)
+
+        if args.default_delete_choice == 1:
+            delete_archive_file(archive, conn, args.dry_run)
+        elif args.default_delete_choice == 2:
+            print(f"Keeping archive: {archive}")
+            logging.info({"action": "keep_archive", "archive": str(archive)})
+        else:
+            # Prompt for each successful extraction
+            delete_action = prompt_delete_action(archive, None)
+            if delete_action == "1":
+                delete_archive_file(archive, conn, args.dry_run)
+            else:
+                print(f"Keeping archive: {archive}")
+                logging.info({"action": "keep_archive", "archive": str(archive)})
 
 
 def manage_index(conn, args):
