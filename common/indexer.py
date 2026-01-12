@@ -139,7 +139,8 @@ def load_directories_from_index(conn: sqlite3.Connection) -> List[Path]:
     """
     cursor = conn.cursor()
     cursor.execute("SELECT path FROM directories")
-    directories = [Path(row[0]) for row in cursor.fetchall()]
+    # Iterate over cursor directly for better memory efficiency
+    directories = [Path(row[0]) for row in cursor]
     return directories
 
 
