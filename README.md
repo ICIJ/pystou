@@ -144,6 +144,8 @@ pystou extract [directory] [options]
   - `1`: Delete the archive after extraction.
   - `2`: Keep the archive after extraction.
 - `-p N`, `--parallel N`: Number of parallel extraction workers (default: 1). Requires `-c` flag.
+- `-N`, `--nested`: Recursively extract archives found inside extracted content.
+- `--max-depth N`: Maximum nesting depth for `--nested` (default: 10).
 - `-n`, `--dry-run`: Perform a dry run without making any changes.
 - `--log-dir LOG_DIR`: Directory to store log files (default: current directory).
 - `--db-dir DB_DIR`: Directory to store index database (default: current directory).
@@ -168,6 +170,12 @@ pystou extract [directory] [options]
 
   ```bash
   pystou extract /path/to/archives -r -c 1 -dc 2 -p 4
+  ```
+
+- **Nested Extraction (archives inside archives):**
+
+  ```bash
+  pystou extract /path/to/archives -r -c 1 -dc 1 --nested
   ```
 
 - **Dry Run Mode:**
