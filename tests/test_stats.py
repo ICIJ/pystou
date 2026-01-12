@@ -111,10 +111,10 @@ class TestStatsCollectStats(unittest.TestCase):
 
     def test_collect_stats_files_by_size(self):
         """Test that files are sorted by size."""
-        stats = collect_stats(self.test_dir, recursive=True)
+        stats = collect_stats(self.test_dir, recursive=True, top_n=10)
 
         # Files should be sorted by size descending
-        sizes = [size for _, size in stats["files_by_size"]]
+        sizes = [size for _, size in stats["largest_files"]]
         self.assertEqual(sizes, sorted(sizes, reverse=True))
 
     def test_collect_stats_empty_directories(self):
@@ -147,16 +147,17 @@ class TestStatsProcessFile(unittest.TestCase):
                 "total_files": 0,
                 "total_size": 0,
                 "archive_files": 0,
+                "errors": 0,
             },
             "by_extension": defaultdict(lambda: {"count": 0, "size": 0}),
-            "files_by_size": [],
+            "largest_files": [],
         }
         archive_extensions = {".zip"}
 
         file_path = self.test_path / "test.txt"
         file_path.write_bytes(b"x" * 100)
 
-        process_file(file_path, stats, archive_extensions)
+        process_file(file_path, stats, archive_extensions, top_n=10)
 
         self.assertEqual(stats["summary"]["total_files"], 1)
         self.assertEqual(stats["summary"]["total_size"], 100)
@@ -171,9 +172,10 @@ class TestStatsProcessFile(unittest.TestCase):
                 "total_files": 0,
                 "total_size": 0,
                 "archive_files": 0,
+                "errors": 0,
             },
             "by_extension": defaultdict(lambda: {"count": 0, "size": 0}),
-            "files_by_size": [],
+            "largest_files": [],
         }
         archive_extensions = {".zip", ".tar"}
 
@@ -181,7 +183,7 @@ class TestStatsProcessFile(unittest.TestCase):
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("test.txt", "content")
 
-        process_file(zip_path, stats, archive_extensions)
+        process_file(zip_path, stats, archive_extensions, top_n=10)
 
         self.assertEqual(stats["summary"]["archive_files"], 1)
 
@@ -200,9 +202,11 @@ class TestStatsOutputJson(unittest.TestCase):
                 "total_size": 1000,
                 "empty_dirs": 1,
                 "archive_files": 2,
+                "symlinks_skipped": 0,
+                "errors": 0,
             },
             "by_extension": defaultdict(lambda: {"count": 0, "size": 0}),
-            "files_by_size": [("/path/file1.txt", 500), ("/path/file2.txt", 300)],
+            "largest_files": [("/path/file1.txt", 500), ("/path/file2.txt", 300)],
             "empty_directories": ["/path/empty"],
         }
         stats["by_extension"][".txt"] = {"count": 5, "size": 800}

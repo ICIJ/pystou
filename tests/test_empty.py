@@ -160,9 +160,10 @@ class TestEmptyRemoveEmptyDirectories(unittest.TestCase):
         empty_dir = self.test_path / "empty"
         empty_dir.mkdir()
 
-        removed = remove_empty_directories([empty_dir])
+        removed, skipped = remove_empty_directories([empty_dir])
 
         self.assertEqual(removed, 1)
+        self.assertEqual(skipped, 0)
         self.assertFalse(empty_dir.exists())
 
     def test_remove_multiple_empty(self):
@@ -172,9 +173,10 @@ class TestEmptyRemoveEmptyDirectories(unittest.TestCase):
         empty1.mkdir()
         empty2.mkdir()
 
-        removed = remove_empty_directories([empty1, empty2])
+        removed, skipped = remove_empty_directories([empty1, empty2])
 
         self.assertEqual(removed, 2)
+        self.assertEqual(skipped, 0)
         self.assertFalse(empty1.exists())
         self.assertFalse(empty2.exists())
 
@@ -188,9 +190,10 @@ class TestEmptyRemoveEmptyDirectories(unittest.TestCase):
 
         # Must be sorted deepest first for correct removal
         empty_dirs = [c, b, a]
-        removed = remove_empty_directories(empty_dirs)
+        removed, skipped = remove_empty_directories(empty_dirs)
 
         self.assertEqual(removed, 3)
+        self.assertEqual(skipped, 0)
         self.assertFalse(a.exists())
 
     def test_remove_non_empty_fails_gracefully(self):
@@ -199,18 +202,20 @@ class TestEmptyRemoveEmptyDirectories(unittest.TestCase):
         non_empty.mkdir()
         (non_empty / "file.txt").touch()
 
-        removed = remove_empty_directories([non_empty])
+        removed, skipped = remove_empty_directories([non_empty])
 
         self.assertEqual(removed, 0)
+        self.assertEqual(skipped, 1)
         self.assertTrue(non_empty.exists())
 
     def test_remove_nonexistent_fails_gracefully(self):
         """Test that removing nonexistent directory fails gracefully."""
         nonexistent = self.test_path / "nonexistent"
 
-        removed = remove_empty_directories([nonexistent])
+        removed, skipped = remove_empty_directories([nonexistent])
 
         self.assertEqual(removed, 0)
+        self.assertEqual(skipped, 1)
 
 
 class TestEmptyMain(unittest.TestCase):

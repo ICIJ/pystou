@@ -2,8 +2,10 @@
 """Stats subcommand for displaying directory statistics."""
 
 import argparse
+import heapq
 import logging
 import os
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Optional
@@ -57,8 +59,24 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     setup_logging("stats", args.log_dir)
     log_configuration(args)
 
+    # Validate directory
+    directory_path = Path(args.directory)
+    if not directory_path.exists():
+        print(f"Error: Directory does not exist: {args.directory}")
+        logging.error({"action": "error", "message": "Directory not found", "path": args.directory})
+        sys.exit(1)
+    if not directory_path.is_dir():
+        print(f"Error: Not a directory: {args.directory}")
+        logging.error({"action": "error", "message": "Not a directory", "path": args.directory})
+        sys.exit(1)
+
     # Collect statistics
-    stats = collect_stats(args.directory, args.recursive)
+    try:
+        stats = collect_stats(args.directory, args.recursive, args.top)
+    except KeyboardInterrupt:
+        print("\nScan interrupted by user.")
+        logging.info({"action": "scan_interrupted"})
+        sys.exit(130)
 
     if args.json:
         output_json(stats, args.top)
@@ -78,12 +96,13 @@ def log_configuration(args) -> None:
     logging.info(config)
 
 
-def collect_stats(directory: str, recursive: bool) -> Dict:
+def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:
     """Collects statistics from the directory.
 
     Args:
         directory: Directory to analyze.
         recursive: Whether to analyze recursively.
+        top_n: Number of top files to track (for memory efficiency).
 
     Returns:
         Dictionary with collected statistics.
@@ -95,9 +114,11 @@ def collect_stats(directory: str, recursive: bool) -> Dict:
             "total_size": 0,
             "empty_dirs": 0,
             "archive_files": 0,
+            "symlinks_skipped": 0,
+            "errors": 0,
         },
         "by_extension": defaultdict(lambda: {"count": 0, "size": 0}),
-        "files_by_size": [],
+        "largest_files": [],  # Will be a heap of (size, path) tuples
         "empty_directories": [],
     }
 
@@ -107,56 +128,102 @@ def collect_stats(directory: str, recursive: bool) -> Dict:
     }
 
     directory_path = Path(directory)
+    scanned = 0
 
     if recursive:
-        for root, dirs, files in os.walk(directory_path):
+        # followlinks=False prevents infinite loops from symlink cycles
+        for root, dirs, files in os.walk(directory_path, followlinks=False):
             root_path = Path(root)
+            scanned += 1
+
+            # Progress indicator every 1000 directories
+            if scanned % 1000 == 0:
+                print(f"  Scanned {scanned} directories, {stats['summary']['total_files']} files...", end="\r")
+
             stats["summary"]["total_dirs"] += len(dirs)
 
             # Check for empty directories
             for d in dirs:
                 dir_path = root_path / d
+                # Skip symlinks
+                if dir_path.is_symlink():
+                    stats["summary"]["symlinks_skipped"] += 1
+                    continue
                 try:
                     if not any(dir_path.iterdir()):
                         stats["summary"]["empty_dirs"] += 1
-                        stats["empty_directories"].append(str(dir_path))
+                        if len(stats["empty_directories"]) < top_n:
+                            stats["empty_directories"].append(str(dir_path))
                 except PermissionError:
+                    stats["summary"]["errors"] += 1
+                except FileNotFoundError:
+                    # Directory deleted between listing and checking
                     pass
 
             # Process files
             for filename in files:
                 file_path = root_path / filename
-                process_file(file_path, stats, archive_extensions)
+                # Skip symlinks
+                if file_path.is_symlink():
+                    stats["summary"]["symlinks_skipped"] += 1
+                    continue
+                process_file(file_path, stats, archive_extensions, top_n)
     else:
-        for entry in os.scandir(directory_path):
-            if entry.is_dir():
-                stats["summary"]["total_dirs"] += 1
-                try:
-                    if not any(Path(entry.path).iterdir()):
-                        stats["summary"]["empty_dirs"] += 1
-                        stats["empty_directories"].append(entry.path)
-                except PermissionError:
-                    pass
-            elif entry.is_file():
-                process_file(Path(entry.path), stats, archive_extensions)
+        try:
+            for entry in os.scandir(directory_path):
+                # Skip symlinks
+                if entry.is_symlink():
+                    stats["summary"]["symlinks_skipped"] += 1
+                    continue
 
-    # Sort files by size descending
-    stats["files_by_size"].sort(key=lambda x: x[1], reverse=True)
+                if entry.is_dir(follow_symlinks=False):
+                    stats["summary"]["total_dirs"] += 1
+                    try:
+                        if not any(Path(entry.path).iterdir()):
+                            stats["summary"]["empty_dirs"] += 1
+                            if len(stats["empty_directories"]) < top_n:
+                                stats["empty_directories"].append(entry.path)
+                    except PermissionError:
+                        stats["summary"]["errors"] += 1
+                    except FileNotFoundError:
+                        pass
+                elif entry.is_file(follow_symlinks=False):
+                    process_file(Path(entry.path), stats, archive_extensions, top_n)
+        except PermissionError as e:
+            print(f"Permission denied: {directory_path}")
+            logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
+            stats["summary"]["errors"] += 1
+
+    if scanned >= 1000:
+        print(f"  Scanned {scanned} directories, {stats['summary']['total_files']} files.    ")
+
+    # Convert heap to sorted list (largest first)
+    stats["largest_files"] = [
+        (path, size) for size, path in sorted(stats["largest_files"], reverse=True)
+    ]
 
     return stats
 
 
-def process_file(file_path: Path, stats: Dict, archive_extensions: set) -> None:
+def process_file(file_path: Path, stats: Dict, archive_extensions: set, top_n: int) -> None:
     """Processes a single file and updates statistics.
 
     Args:
         file_path: Path to the file.
         stats: Statistics dictionary to update.
         archive_extensions: Set of archive file extensions.
+        top_n: Number of largest files to track.
     """
     try:
         size = file_path.stat().st_size
-    except (OSError, PermissionError):
+    except FileNotFoundError:
+        # File deleted between listing and stat
+        return
+    except PermissionError:
+        stats["summary"]["errors"] += 1
+        return
+    except OSError:
+        stats["summary"]["errors"] += 1
         return
 
     stats["summary"]["total_files"] += 1
@@ -169,7 +236,12 @@ def process_file(file_path: Path, stats: Dict, archive_extensions: set) -> None:
     if ext in archive_extensions:
         stats["summary"]["archive_files"] += 1
 
-    stats["files_by_size"].append((str(file_path), size))
+    # Use a min-heap to efficiently track top N largest files
+    # We store (size, path) and keep only the largest N
+    if len(stats["largest_files"]) < top_n:
+        heapq.heappush(stats["largest_files"], (size, str(file_path)))
+    elif size > stats["largest_files"][0][0]:
+        heapq.heapreplace(stats["largest_files"], (size, str(file_path)))
 
 
 def format_size(size: int) -> str:
@@ -211,6 +283,11 @@ def output_text(
     print(f"Archive files:     {summary['archive_files']:,}")
     print(f"Empty directories: {summary['empty_dirs']:,}")
 
+    if summary["symlinks_skipped"] > 0:
+        print(f"Symlinks skipped:  {summary['symlinks_skipped']:,}")
+    if summary["errors"] > 0:
+        print(f"Errors:            {summary['errors']:,}")
+
     # Show extension breakdown if requested or by default
     if show_by_extension or (not show_by_extension and not show_by_size):
         print(f"\n--- Top {top_n} Extensions by Count ---\n")
@@ -226,7 +303,7 @@ def output_text(
     # Show largest files if requested
     if show_by_size:
         print(f"\n--- Top {top_n} Largest Files ---\n")
-        for file_path, size in stats["files_by_size"][:top_n]:
+        for file_path, size in stats["largest_files"][:top_n]:
             print(f"  {format_size(size):>10}  {file_path}")
 
     # Show empty directories if any
@@ -250,7 +327,7 @@ def output_json(stats: Dict, top_n: int) -> None:
         "by_extension": dict(stats["by_extension"]),
         "largest_files": [
             {"path": path, "size": size}
-            for path, size in stats["files_by_size"][:top_n]
+            for path, size in stats["largest_files"][:top_n]
         ],
         "empty_directories": stats["empty_directories"][:top_n],
     }

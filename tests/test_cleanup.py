@@ -129,9 +129,10 @@ class TestCleanupRemoveJunk(unittest.TestCase):
         junk_file = self.test_path / ".DS_Store"
         junk_file.touch()
 
-        removed = remove_junk([junk_file])
+        removed, skipped = remove_junk([junk_file])
 
         self.assertEqual(removed, 1)
+        self.assertEqual(skipped, 0)
         self.assertFalse(junk_file.exists())
 
     def test_remove_junk_directory(self):
@@ -140,9 +141,10 @@ class TestCleanupRemoveJunk(unittest.TestCase):
         junk_dir.mkdir()
         (junk_dir / "file.txt").touch()
 
-        removed = remove_junk([junk_dir])
+        removed, skipped = remove_junk([junk_dir])
 
         self.assertEqual(removed, 1)
+        self.assertEqual(skipped, 0)
         self.assertFalse(junk_dir.exists())
 
     def test_remove_junk_mixed(self):
@@ -152,9 +154,10 @@ class TestCleanupRemoveJunk(unittest.TestCase):
         junk_dir = self.test_path / "__MACOSX"
         junk_dir.mkdir()
 
-        removed = remove_junk([junk_file, junk_dir])
+        removed, skipped = remove_junk([junk_file, junk_dir])
 
         self.assertEqual(removed, 2)
+        self.assertEqual(skipped, 0)
         self.assertFalse(junk_file.exists())
         self.assertFalse(junk_dir.exists())
 
@@ -162,9 +165,10 @@ class TestCleanupRemoveJunk(unittest.TestCase):
         """Test handling of nonexistent files."""
         nonexistent = self.test_path / "nonexistent"
 
-        removed = remove_junk([nonexistent])
+        removed, skipped = remove_junk([nonexistent])
 
         self.assertEqual(removed, 0)
+        self.assertEqual(skipped, 1)
 
 
 class TestCleanupMain(unittest.TestCase):
