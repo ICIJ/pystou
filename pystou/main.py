@@ -9,6 +9,7 @@ from extract.main import main as extract_main, add_extract_arguments
 from cleanup.main import main as cleanup_main, add_cleanup_arguments
 from identify.main import main as identify_main, add_identify_arguments
 from stats.main import main as stats_main, add_stats_arguments
+from empty.main import main as empty_main, add_empty_arguments
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -78,6 +79,15 @@ def create_parser() -> argparse.ArgumentParser:
     )
     add_stats_arguments(stats_parser)
     stats_parser.set_defaults(func=stats_main)
+
+    # empty subcommand
+    empty_parser = subparsers.add_parser(
+        "empty",
+        help="Find and remove empty directories",
+        description="Find and remove empty directories.",
+    )
+    add_empty_arguments(empty_parser)
+    empty_parser.set_defaults(func=empty_main)
 
     return parser
 
