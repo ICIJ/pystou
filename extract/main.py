@@ -62,6 +62,14 @@ def add_extract_arguments(parser: argparse.ArgumentParser) -> None:
         metavar="N",
         help="Maximum nesting depth for --nested (default: 10)",
     )
+    parser.add_argument(
+        "-t",
+        "--type",
+        action="append",
+        dest="types",
+        metavar="TYPE",
+        help="Only extract archives of this type (e.g., pst, zip, tar.gz). Can be used multiple times.",
+    )
 
 
 def main(args: Optional[argparse.Namespace] = None) -> None:
@@ -81,7 +89,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     conn = initialize_database(args.db_dir)
     manage_index(conn, args)
 
-    archive_files = get_archive_files(args.directory, args.recursive)
+    archive_files = get_archive_files(args.directory, args.recursive, args.types)
     total_archives = len(archive_files)
     print(f"Found {total_archives} archive files.")
     logging.info({"action": "archives_found", "total_archives": total_archives})

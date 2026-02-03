@@ -6,7 +6,7 @@ import tarfile
 import zipfile
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 import logging
 
@@ -79,17 +79,23 @@ def summarize_group(group_key, dir_paths: List[Path], conn) -> None:
         )
 
 
-def get_archive_files(directory: Union[str, Path], recursive: bool) -> List[Path]:
+def get_archive_files(
+    directory: Union[str, Path],
+    recursive: bool,
+    filter_types: Optional[List[str]] = None,
+) -> List[Path]:
     """Returns a list of archive files in the directory.
 
     Args:
         directory (str or Path): The directory to search for archive files.
         recursive (bool): Whether to search recursively.
+        filter_types (List[str], optional): List of archive types to include
+            (e.g., ["pst", "zip", "tar.gz"]). If None, all types are included.
 
     Returns:
         List[Path]: A list of Paths to archive files.
     """
-    archive_extensions = [
+    all_extensions = [
         ".zip",
         ".tar",
         ".tar.gz",
@@ -103,6 +109,13 @@ def get_archive_files(directory: Union[str, Path], recursive: bool) -> List[Path
         ".zst",
         ".pst",
     ]
+
+    if filter_types:
+        # Normalize filter types to have leading dot
+        normalized = [t if t.startswith(".") else f".{t}" for t in filter_types]
+        archive_extensions = [ext for ext in all_extensions if ext in normalized]
+    else:
+        archive_extensions = all_extensions
     # Pattern to match split archive parts (.z01, .z02, etc.)
     split_part_pattern = re.compile(r"\.z\d+$", re.IGNORECASE)
 
