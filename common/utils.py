@@ -10,6 +10,9 @@ from typing import Any, List, Optional, Union
 
 import logging
 
+from common.safe_extract import safe_extract_zip, safe_extract_tar
+from common.safe_ops import unique_path
+
 
 def group_directories(conn) -> dict:
     """Groups duplicate sibling directories based on their base names and parent directories.
@@ -186,7 +189,7 @@ def extract_archive(archive_path: Path) -> bool:
                 }
             )
             return False
-    except Exception as e:
+    except (OSError, zipfile.BadZipFile, tarfile.TarError, subprocess.CalledProcessError) as e:
         print(f"Error extracting archive {archive_path}: {e}")
         logging.error(
             {
@@ -200,7 +203,7 @@ def extract_archive(archive_path: Path) -> bool:
 
 
 def extract_zip_archive(archive_path: Path) -> bool:
-    """Extracts a ZIP archive.
+    """Extracts a ZIP archive with path-traversal protection.
 
     Args:
         archive_path (Path): The path to the ZIP archive.
@@ -210,18 +213,15 @@ def extract_zip_archive(archive_path: Path) -> bool:
     """
     try:
         with zipfile.ZipFile(archive_path, "r") as zip_ref:
-            zip_ref.extractall(archive_path.parent)
+            if not safe_extract_zip(zip_ref, archive_path.parent):
+                print(f"Refused unsafe ZIP archive (path traversal): {archive_path}")
+                return False
         print(f"Extracted ZIP archive: {archive_path}")
         return True
-    except Exception as e:
+    except (zipfile.BadZipFile, OSError) as e:
         print(f"Error extracting ZIP archive {archive_path}: {e}")
         logging.error(
-            {
-                "action": "extract_zip",
-                "status": "error",
-                "archive": str(archive_path),
-                "error": str(e),
-            }
+            {"action": "extract_zip", "status": "error", "archive": str(archive_path), "error": str(e)}
         )
         return False
 
@@ -268,7 +268,7 @@ def extract_split_zip_archive(archive_path: Path) -> bool:
 
 
 def extract_tar_archive(archive_path: Path) -> bool:
-    """Extracts a TAR archive.
+    """Extracts a TAR archive with member validation.
 
     Args:
         archive_path (Path): The path to the TAR archive.
@@ -278,24 +278,21 @@ def extract_tar_archive(archive_path: Path) -> bool:
     """
     try:
         with tarfile.open(archive_path, "r:*") as tar_ref:
-            tar_ref.extractall(archive_path.parent)
+            if not safe_extract_tar(tar_ref, archive_path.parent):
+                print(f"Refused unsafe TAR archive (unsafe member): {archive_path}")
+                return False
         print(f"Extracted TAR archive: {archive_path}")
         return True
-    except Exception as e:
+    except (tarfile.TarError, OSError) as e:
         print(f"Error extracting TAR archive {archive_path}: {e}")
         logging.error(
-            {
-                "action": "extract_tar",
-                "status": "error",
-                "archive": str(archive_path),
-                "error": str(e),
-            }
+            {"action": "extract_tar", "status": "error", "archive": str(archive_path), "error": str(e)}
         )
         return False
 
 
 def extract_compressed_file(archive_path: Path) -> bool:
-    """Extracts a compressed file (e.g., .gz, .bz2).
+    """Extracts a compressed file (.gz, .bz2) to a non-clobbering target.
 
     Args:
         archive_path (Path): The path to the compressed file.
@@ -307,38 +304,27 @@ def extract_compressed_file(archive_path: Path) -> bool:
         if archive_path.suffix == ".gz":
             import gzip
 
-            target_path = archive_path.with_suffix("")
-            with gzip.open(archive_path, "rb") as f_in, open(
-                target_path, "wb"
-            ) as f_out:
+            target_path = unique_path(archive_path.with_suffix(""))
+            with gzip.open(archive_path, "rb") as f_in, open(target_path, "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
         elif archive_path.suffix == ".bz2":
             import bz2
 
-            target_path = archive_path.with_suffix("")
+            target_path = unique_path(archive_path.with_suffix(""))
             with bz2.open(archive_path, "rb") as f_in, open(target_path, "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
         else:
             print(f"Unsupported compressed file format: {archive_path}")
             logging.error(
-                {
-                    "action": "extract_compressed_file",
-                    "status": "unsupported_format",
-                    "archive": str(archive_path),
-                }
+                {"action": "extract_compressed_file", "status": "unsupported_format", "archive": str(archive_path)}
             )
             return False
         print(f"Extracted compressed file: {archive_path}")
         return True
-    except Exception as e:
+    except OSError as e:
         print(f"Error extracting compressed file {archive_path}: {e}")
         logging.error(
-            {
-                "action": "extract_compressed_file",
-                "status": "error",
-                "archive": str(archive_path),
-                "error": str(e),
-            }
+            {"action": "extract_compressed_file", "status": "error", "archive": str(archive_path), "error": str(e)}
         )
         return False
 
@@ -385,38 +371,41 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
-    try:
-        if ".tar.zst" in "".join(archive_path.suffixes) or ".tzst" in "".join(
-            archive_path.suffixes
-        ):
-            # Extract TAR.ZST archive
-            temp_tar_path = archive_path.with_suffix(".tar")
+    suffixes = "".join(archive_path.suffixes)
+    is_tar = ".tar.zst" in suffixes or ".tzst" in suffixes
+    if is_tar:
+        temp_tar_path = unique_path(archive_path.with_suffix(".tar"))
+        try:
             with open(archive_path, "rb") as f_in, open(temp_tar_path, "wb") as f_out:
-                dctx = zstd.ZstdDecompressor()
-                dctx.copy_stream(f_in, f_out)
+                zstd.ZstdDecompressor().copy_stream(f_in, f_out)
             with tarfile.open(temp_tar_path, "r") as tar_ref:
-                tar_ref.extractall(archive_path.parent)
-            temp_tar_path.unlink()
+                if not safe_extract_tar(tar_ref, archive_path.parent):
+                    print(f"Refused unsafe TAR.ZST archive: {archive_path}")
+                    return False
             print(f"Extracted TAR.ZST archive: {archive_path}")
-        else:
-            # Decompress .zst file
-            target_path = archive_path.with_suffix("")
+            return True
+        except (OSError, tarfile.TarError) as e:
+            print(f"Error extracting ZST archive {archive_path}: {e}")
+            logging.error(
+                {"action": "extract_zst_module", "status": "error", "archive": str(archive_path), "error": str(e)}
+            )
+            return False
+        finally:
+            if temp_tar_path.exists():
+                temp_tar_path.unlink()
+    else:
+        try:
+            target_path = unique_path(archive_path.with_suffix(""))
             with open(archive_path, "rb") as f_in, open(target_path, "wb") as f_out:
-                dctx = zstd.ZstdDecompressor()
-                dctx.copy_stream(f_in, f_out)
+                zstd.ZstdDecompressor().copy_stream(f_in, f_out)
             print(f"Decompressed ZST file: {archive_path}")
-        return True
-    except Exception as e:
-        print(f"Error extracting ZST archive {archive_path}: {e}")
-        logging.error(
-            {
-                "action": "extract_zst_module",
-                "status": "error",
-                "archive": str(archive_path),
-                "error": str(e),
-            }
-        )
-        return False
+            return True
+        except OSError as e:
+            print(f"Error extracting ZST archive {archive_path}: {e}")
+            logging.error(
+                {"action": "extract_zst_module", "status": "error", "archive": str(archive_path), "error": str(e)}
+            )
+            return False
 
 
 def _extract_zst_with_command(archive_path: Path) -> bool:
@@ -428,30 +417,29 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
+    suffixes = "".join(archive_path.suffixes)
+    is_tar = ".tar.zst" in suffixes or ".tzst" in suffixes
+    output_path = unique_path(archive_path.with_suffix(""))
     try:
-        cmd = ["zstd", "-d", str(archive_path), "-o", str(archive_path.with_suffix(""))]
-        subprocess.run(cmd, check=True)
-        if ".tar.zst" in "".join(archive_path.suffixes) or ".tzst" in "".join(
-            archive_path.suffixes
-        ):
-            # Extract the resulting .tar file
-            temp_tar_path = archive_path.with_suffix(".tar")
-            with tarfile.open(temp_tar_path, "r") as tar_ref:
-                tar_ref.extractall(archive_path.parent)
-            temp_tar_path.unlink()
-            print(f"Extracted TAR.ZST archive using zstd command: {archive_path}")
-        else:
-            print(f"Decompressed ZST file using zstd command: {archive_path}")
+        cmd = ["zstd", "-d", str(archive_path), "-o", str(output_path)]
+        subprocess.run(cmd, check=True, capture_output=True)
+        if is_tar:
+            try:
+                with tarfile.open(output_path, "r") as tar_ref:
+                    if not safe_extract_tar(tar_ref, archive_path.parent):
+                        print(f"Refused unsafe TAR.ZST archive: {archive_path}")
+                        return False
+                print(f"Extracted TAR.ZST archive using zstd command: {archive_path}")
+                return True
+            finally:
+                if output_path.exists():
+                    output_path.unlink()
+        print(f"Decompressed ZST file using zstd command: {archive_path}")
         return True
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, tarfile.TarError, OSError) as e:
         print(f"Error extracting ZST archive with zstd command {archive_path}: {e}")
         logging.error(
-            {
-                "action": "extract_zst_command",
-                "status": "error",
-                "archive": str(archive_path),
-                "error": str(e),
-            }
+            {"action": "extract_zst_command", "status": "error", "archive": str(archive_path), "error": str(e)}
         )
         return False
 
@@ -480,7 +468,7 @@ def extract_pst_archive(archive_path: Path) -> bool:
 
     try:
         base_output_dir = archive_path.parent / archive_path.stem
-        unique_output_dir = get_unique_folder_name(base_output_dir)
+        unique_output_dir = unique_path(base_output_dir)
         # Create the output directory if it does not exist
         os.makedirs(unique_output_dir, exist_ok=True)
         cmd = ["readpst", "-reD", "-o", str(unique_output_dir), str(archive_path)]
@@ -537,7 +525,7 @@ def get_split_archive_parts(archive_path: Path) -> List[Path]:
 
 
 def get_unique_folder_name(base_dir: Path) -> Path:
-    """Generates a unique folder name by appending '(n)' suffix if necessary.
+    """Deprecated alias for :func:`common.safe_ops.unique_path`.
 
     Args:
         base_dir (Path): The initial desired directory path.
@@ -545,12 +533,4 @@ def get_unique_folder_name(base_dir: Path) -> Path:
     Returns:
         Path: A unique directory path that does not already exist.
     """
-    if not base_dir.exists():
-        return base_dir
-
-    counter = 1
-    while True:
-        new_dir = Path(f"{base_dir} ({counter})")
-        if not new_dir.exists():
-            return new_dir
-        counter += 1
+    return unique_path(base_dir)
