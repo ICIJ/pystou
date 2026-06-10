@@ -12,6 +12,10 @@ def _safe_target(dest: Path, member_name: str) -> Optional[Path]:
 
     Rejects absolute member names and ``..`` traversal by comparing absolute paths.
 
+    Note: the check is lexical (``os.path.abspath``); if ``dest`` itself is a symlink,
+    the check and the actual extraction share the same relative members, but the
+    resolved base differs — acceptable, documented limitation.
+
     Args:
         dest (Path): Destination directory.
         member_name (str): Archive member name.
@@ -28,6 +32,10 @@ def _safe_target(dest: Path, member_name: str) -> Optional[Path]:
 
 def safe_extract_zip(zip_ref, dest) -> bool:
     """Extracts a ZIP only if every member stays inside ``dest``.
+
+    By design this is fail-closed: the whole archive is rejected if ANY member is
+    unsafe — even members that Python's ``zipfile`` would itself sanitize — so that
+    callers never receive a partial extraction from a tampered archive.
 
     Args:
         zip_ref (zipfile.ZipFile): Open ZIP file.
