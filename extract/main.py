@@ -18,6 +18,9 @@ from common.indexer import (
 )
 from common.fs_walker import collect_directories
 from common.cli import add_common_arguments
+from common.validation import validate_directory_or_exit
+from common.interrupt import scanning
+from common.safe_ops import verify_then_delete
 
 
 def add_extract_arguments(parser: argparse.ArgumentParser) -> None:
@@ -86,10 +89,13 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     setup_logging("extract", args.log_dir)
     log_configuration(args)
 
+    validate_directory_or_exit(args.directory)
+
     conn = initialize_database(args.db_dir)
     manage_index(conn, args)
 
-    archive_files = get_archive_files(args.directory, args.recursive, args.types)
+    with scanning("scan"):
+        archive_files = get_archive_files(args.directory, args.recursive, args.types)
     total_archives = len(archive_files)
     print(f"Found {total_archives} archive files.")
     logging.info({"action": "archives_found", "total_archives": total_archives})
@@ -100,12 +106,12 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         close_database(conn)
         return
 
-    # Use parallel extraction when enabled and in automatic mode
-    if args.parallel > 1 and args.default_choice == 1:
-        process_archives_parallel(archive_files, args, conn)
-    else:
-        for archive_file in archive_files:
-            process_archive(archive_file, args, conn)
+    with scanning("extraction"):
+        if args.parallel > 1 and args.default_choice == 1:
+            process_archives_parallel(archive_files, args, conn)
+        else:
+            for archive_file in archive_files:
+                process_archive(archive_file, args, conn)
 
     logging.info({"action": "script_complete"})
     close_database(conn)
@@ -156,20 +162,28 @@ def process_archives_parallel(archive_files: List[Path], args, conn) -> None:
     successful = [(archive, success) for archive, success in results if success]
     print(f"\nSuccessfully extracted {len(successful)}/{len(archive_files)} archives.")
 
-    for archive, _ in successful:
-        logging.info({"action": "extract", "status": "success", "archive": str(archive)})
-        update_index_after_extraction(conn, archive.parent)
+    for archive, success in results:
+        if success:
+            logging.info({"action": "extract", "status": "success", "archive": str(archive)})
+            update_index_after_extraction(conn, archive.parent)
 
         if args.default_delete_choice == 1:
-            delete_archive_file(archive, conn, args.dry_run)
+            verify_then_delete(
+                archive,
+                success,
+                lambda a=archive: delete_archive_file(a, conn, args.dry_run),
+            )
         elif args.default_delete_choice == 2:
             print(f"Keeping archive: {archive}")
             logging.info({"action": "keep_archive", "archive": str(archive)})
         else:
-            # Prompt for each successful extraction
-            delete_action = prompt_delete_action(archive, None)
-            if delete_action == "1":
-                delete_archive_file(archive, conn, args.dry_run)
+            if success:
+                delete_action = prompt_delete_action(archive, None)
+                if delete_action == "1":
+                    delete_archive_file(archive, conn, args.dry_run)
+                else:
+                    print(f"Keeping archive: {archive}")
+                    logging.info({"action": "keep_archive", "archive": str(archive)})
             else:
                 print(f"Keeping archive: {archive}")
                 logging.info({"action": "keep_archive", "archive": str(archive)})

@@ -250,5 +250,29 @@ class TestExtract(unittest.TestCase):
         self.assertTrue((Path(self.test_dir) / "archive.zip").exists())
 
 
+    @patch("builtins.print")
+    def test_parallel_keeps_archive_when_extraction_fails(self, mock_print):
+        """A failed extraction must not delete the source archive in parallel mode."""
+        from extract.main import process_archives_parallel
+        from pathlib import Path as _P
+
+        bad = _P(self.test_dir) / "broken.zip"
+        bad.write_bytes(b"not a real zip")
+        args = type(
+            "Args",
+            (),
+            {
+                "dry_run": False,
+                "default_choice": 1,
+                "default_delete_choice": 1,
+                "parallel": 2,
+                "nested": False,
+                "max_depth": 10,
+            },
+        )
+        process_archives_parallel([bad], args, self.conn)
+        self.assertTrue(bad.exists())  # kept because extraction failed
+
+
 if __name__ == "__main__":
     unittest.main()
