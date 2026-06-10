@@ -5,14 +5,20 @@ import argparse
 import logging
 import sys
 
+from cleanup.main import add_cleanup_arguments
+from cleanup.main import main as cleanup_main
 from common.errors import PystouError
-
-from dedup_folders.main import main as dedup_main, add_dedup_arguments
-from extract.main import main as extract_main, add_extract_arguments
-from cleanup.main import main as cleanup_main, add_cleanup_arguments
-from identify.main import main as identify_main, add_identify_arguments
-from stats.main import main as stats_main, add_stats_arguments
-from empty.main import main as empty_main, add_empty_arguments
+from dedup_folders.main import add_dedup_arguments
+from dedup_folders.main import main as dedup_main
+from empty.main import add_empty_arguments
+from empty.main import main as empty_main
+from extract.main import add_extract_arguments
+from extract.main import main as extract_main
+from identify.main import add_identify_arguments
+from identify.main import main as identify_main
+from pystou import __version__
+from stats.main import add_stats_arguments
+from stats.main import main as stats_main
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -28,7 +34,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 0.1.0",
+        version=f"%(prog)s {__version__}",
     )
 
     subparsers = parser.add_subparsers(
@@ -113,7 +119,7 @@ def main() -> None:
         print(f"Error: {e}")
         logging.error({"action": "fatal", "error": str(e)})
         sys.exit(1)
-    except Exception as e:  # noqa: BLE001 - top-level safety net
+    except Exception as e:
         logging.error({"action": "unexpected_error", "error": str(e)}, exc_info=True)
         print(f"Unexpected error: {e}\nSee the log file for details.")
         sys.exit(1)
