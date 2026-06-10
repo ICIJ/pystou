@@ -132,7 +132,7 @@ def get_archive_files(
         return any(filename.endswith(ext) for ext in archive_extensions)
 
     if recursive:
-        for root, _, files in os.walk(directory_path):
+        for root, _, files in os.walk(directory_path, followlinks=False):
             for file in files:
                 if is_archive(file):
                     archive_files.append(Path(root) / file)

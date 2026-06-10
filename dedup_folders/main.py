@@ -10,7 +10,7 @@ import shutil
 import sqlite3
 
 # Import modules from the package
-from common.logger import setup_logging
+from common.logger import setup_logging, log_configuration
 from common.indexer import (
     initialize_database,
     prompt_use_existing_index,
@@ -80,26 +80,12 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         close_database(conn)
         return
 
-    with scanning("scan"):
+    with scanning("processing"):
         for group_key, dir_paths in groups.items():
             process_group(group_key, dir_paths, args, conn)
 
     logging.info({"action": "script_complete"})
     close_database(conn)
-
-
-def log_configuration(args) -> None:
-    """Logs the configuration used to run the script.
-
-    Args:
-        args: Parsed command-line arguments.
-    """
-    config = vars(args).copy()
-    # Remove non-serializable and internal keys
-    config.pop("func", None)
-    config.pop("command", None)
-    config["action"] = "configuration"
-    logging.info(config)
 
 
 def manage_index(conn: sqlite3.Connection, args) -> None:

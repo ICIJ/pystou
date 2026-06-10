@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import List, Optional
 
 # Import common modules
-from common.logger import setup_logging
+from common.logger import setup_logging, log_configuration
 from common.utils import get_archive_files, extract_archive, get_split_archive_parts
 from common.indexer import (
     initialize_database,
@@ -115,16 +115,6 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
 
     logging.info({"action": "script_complete"})
     close_database(conn)
-
-
-def log_configuration(args):
-    """Logs the configuration used to run the script."""
-    config = {
-        k: v for k, v in vars(args).items()
-        if not k.startswith("_") and k not in ("func", "command")
-    }
-    config["action"] = "configuration"
-    logging.info(config)
 
 
 def process_archives_parallel(archive_files: List[Path], args, conn) -> None:
