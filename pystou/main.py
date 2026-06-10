@@ -2,7 +2,10 @@
 """Main entry point for pystou CLI with subcommands."""
 
 import argparse
+import logging
 import sys
+
+from common.errors import PystouError
 
 from dedup_folders.main import main as dedup_main, add_dedup_arguments
 from extract.main import main as extract_main, add_extract_arguments
@@ -93,7 +96,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    """Main entry point."""
+    """Main entry point with a top-level error boundary."""
     parser = create_parser()
     args = parser.parse_args()
 
@@ -101,8 +104,19 @@ def main() -> None:
         parser.print_help()
         sys.exit(1)
 
-    # Call the subcommand function with parsed args
-    args.func(args)
+    try:
+        args.func(args)
+    except KeyboardInterrupt:
+        print("\nInterrupted by user.")
+        sys.exit(130)
+    except PystouError as e:
+        print(f"Error: {e}")
+        logging.error({"action": "fatal", "error": str(e)})
+        sys.exit(1)
+    except Exception as e:  # noqa: BLE001 - top-level safety net
+        logging.error({"action": "unexpected_error", "error": str(e)}, exc_info=True)
+        print(f"Unexpected error: {e}\nSee the log file for details.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
