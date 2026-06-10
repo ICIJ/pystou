@@ -9,8 +9,8 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
 - [Features](#features)
 - [Installation](#installation)
   - [Prerequisites](#prerequisites)
-  - [Clone the Repository](#clone-the-repository)
-  - [Install the Package](#install-the-package)
+  - [Install from PyPI](#install-from-pypi)
+  - [Install from source](#install-from-source)
 - [Usage](#usage)
   - [Deduplicate Folders](#deduplicate-folders)
   - [Extract Archives](#extract-archives)
@@ -38,32 +38,53 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
 
 ## Installation
 
-Getting started with PyStou is a breeze! Follow the steps below to install and set up the project on your machine.
+PyStou is published on [PyPI](https://pypi.org/project/pystou/) and installs in a single command.
 
 ### Prerequisites
 
-- **Python 3.7 or higher** is required.
-- **Command-Line Tools:**
+- **Python 3.9 or higher** is required.
+- **Command-Line Tools** (only needed for the matching archive formats):
   - **`p7zip-full`**: Required for extracting split ZIP archives (`.z01`, `.z02`, etc.).
   - **`pst-utils`**: Required for extracting `.pst` files.
   - **`zstd`**: Required for handling `.zst` files.
 
-### Clone the Repository
+### Install from PyPI
+
+Pick whichever tool you prefer.
+
+With [**pip**](https://pip.pypa.io/):
+
+```bash
+pip install pystou
+```
+
+With [**pipx**](https://pipx.pypa.io/) (installs the CLI into its own isolated environment — recommended):
+
+```bash
+pipx install pystou
+```
+
+With [**uv**](https://docs.astral.sh/uv/):
+
+```bash
+uv tool install pystou
+```
+
+Once installed, the `pystou` command is available on your `PATH`:
+
+```bash
+pystou --help
+```
+
+### Install from source
+
+For development, clone the repository and sync the environment with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 git clone https://github.com/ICIJ/pystou.git
 cd pystou
+make install
 ```
-
-### Install the Package
-
-PyStou can be installed using `pip`. It includes all necessary components without additional dependencies.
-
-```bash
-pip install .
-```
-
-> **Note:** You might need to use `pip3` and/or `sudo` depending on your system configuration.
 
 ## Usage
 
