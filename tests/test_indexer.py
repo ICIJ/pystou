@@ -1,16 +1,16 @@
 # tests/test_indexer.py
 import os
-import tempfile
 import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
+from common.errors import PystouError
 from common.indexer import (
+    close_database,
     initialize_database,
     update_index_after_change,
-    close_database,
 )
-from common.errors import PystouError
 
 
 class TestIndexerDeleteDirectory(unittest.TestCase):

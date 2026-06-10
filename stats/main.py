@@ -7,12 +7,12 @@ import logging
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
-from common.logger import setup_logging, log_configuration
 from common.cli import add_common_arguments
-from common.validation import validate_directory_or_exit
 from common.interrupt import scanning
+from common.logger import log_configuration, setup_logging
+from common.validation import validate_directory_or_exit
 
 
 def add_stats_arguments(parser: argparse.ArgumentParser) -> None:
@@ -74,7 +74,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     logging.info({"action": "stats_complete", **stats["summary"]})
 
 
-def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:
+def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> dict:
     """Collects statistics from the directory.
 
     Args:
@@ -180,15 +180,11 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:
                     process_file(Path(entry.path), stats, archive_extensions, top_n)
         except PermissionError as e:
             print(f"Permission denied: {directory_path}")
-            logging.warning(
-                {"action": "scan_error", "path": str(directory_path), "error": str(e)}
-            )
+            logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
             stats["summary"]["errors"] += 1
 
     if scanned >= 1000:
-        print(
-            f"Scanned {scanned} directories, {stats['summary']['total_files']} files.    "
-        )
+        print(f"Scanned {scanned} directories, {stats['summary']['total_files']} files.    ")
 
     # Convert heap to sorted list (largest first)
     stats["largest_files"] = [
@@ -198,9 +194,7 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:
     return stats
 
 
-def process_file(
-    file_path: Path, stats: Dict, archive_extensions: set, top_n: int
-) -> None:
+def process_file(file_path: Path, stats: dict, archive_extensions: set, top_n: int) -> None:
     """Processes a single file and updates statistics.
 
     Args:
@@ -256,7 +250,7 @@ def format_size(size: int) -> str:
 
 
 def output_text(
-    stats: Dict,
+    stats: dict,
     top_n: int,
     show_by_extension: bool,
     show_by_size: bool,
@@ -293,9 +287,7 @@ def output_text(
         )[:top_n]
 
         for ext, data in sorted_by_count:
-            print(
-                f"  {ext:15} {data['count']:>8,} files  ({format_size(data['size']):>10})"
-            )
+            print(f"  {ext:15} {data['count']:>8,} files  ({format_size(data['size']):>10})")
 
     # Show largest files if requested
     if show_by_size:
@@ -310,7 +302,7 @@ def output_text(
             print(f"  {dir_path}")
 
 
-def output_json(stats: Dict, top_n: int) -> None:
+def output_json(stats: dict, top_n: int) -> None:
     """Outputs statistics in JSON format.
 
     Args:
@@ -323,8 +315,7 @@ def output_json(stats: Dict, top_n: int) -> None:
         "summary": stats["summary"],
         "by_extension": dict(stats["by_extension"]),
         "largest_files": [
-            {"path": path, "size": size}
-            for path, size in stats["largest_files"][:top_n]
+            {"path": path, "size": size} for path, size in stats["largest_files"][:top_n]
         ],
         "empty_directories": stats["empty_directories"][:top_n],
     }

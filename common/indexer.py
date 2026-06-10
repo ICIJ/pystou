@@ -1,8 +1,7 @@
-import sqlite3
 import logging
 import os
+import sqlite3
 from pathlib import Path
-from typing import List
 
 from common.errors import PystouError
 
@@ -64,12 +63,8 @@ def create_tables(conn: sqlite3.Connection) -> None:
     """
     )
     # Create indexes for faster queries
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_directories_parent ON directories(parent_path)"
-    )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_files_directory ON files(directory_path)"
-    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_directories_parent ON directories(parent_path)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_directory ON files(directory_path)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_name ON files(name)")
     conn.commit()
 
@@ -82,9 +77,7 @@ def prompt_use_existing_index() -> bool:
     """
     while True:
         choice = (
-            input(
-                "An index file was found. Do you want to use the existing index? (Y/n): "
-            )
+            input("An index file was found. Do you want to use the existing index? (Y/n): ")
             .strip()
             .lower()
         )
@@ -100,9 +93,7 @@ def _escape_like(text: str) -> str:
     return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def update_index_after_change(
-    conn: sqlite3.Connection, action: str, path: Path
-) -> None:
+def update_index_after_change(conn: sqlite3.Connection, action: str, path: Path) -> None:
     """Updates the index after files/directories are changed.
 
     Args:
@@ -161,7 +152,7 @@ def update_index_after_change(
     conn.commit()
 
 
-def load_directories_from_index(conn: sqlite3.Connection) -> List[Path]:
+def load_directories_from_index(conn: sqlite3.Connection) -> list[Path]:
     """Loads directory paths from the database.
 
     Args:

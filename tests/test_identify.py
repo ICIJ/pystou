@@ -1,15 +1,15 @@
-import unittest
-import tempfile
 import shutil
+import tempfile
+import unittest
 import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
 from identify.main import (
-    detect_file_type,
-    check_extension_mismatches,
     check_encrypted_archives,
+    check_extension_mismatches,
     collect_files,
+    detect_file_type,
     main,
 )
 
@@ -224,9 +224,7 @@ class TestIdentifyCollectFiles(unittest.TestCase):
 
     def test_collect_files_multiple_extensions(self):
         """Test collecting files with multiple extensions filter."""
-        files = collect_files(
-            self.test_dir, recursive=True, extensions_filter={".zip", ".pdf"}
-        )
+        files = collect_files(self.test_dir, recursive=True, extensions_filter={".zip", ".pdf"})
 
         self.assertEqual(len(files), 3)
 
@@ -268,9 +266,7 @@ class TestIdentifyMain(unittest.TestCase):
 
         # Should print a message about 0 files
         calls = [str(call) for call in mock_print.call_args_list]
-        found_zero_files = any(
-            "0 files" in call or "No files" in call for call in calls
-        )
+        found_zero_files = any("0 files" in call or "No files" in call for call in calls)
         self.assertTrue(found_zero_files, f"Expected '0 files' message, got: {calls}")
 
     @patch("builtins.print")
@@ -325,9 +321,7 @@ class TestIdentifyMain(unittest.TestCase):
 
         # Check that issues were found
         calls = [str(call) for call in mock_print.call_args_list]
-        found_issue = any(
-            "issue" in call.lower() or "mismatch" in call.lower() for call in calls
-        )
+        found_issue = any("issue" in call.lower() or "mismatch" in call.lower() for call in calls)
         self.assertTrue(found_issue)
 
     @patch("builtins.print")

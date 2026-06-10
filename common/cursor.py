@@ -1,6 +1,7 @@
 """Cursor utilities for terminal progress display."""
 
 import atexit
+import contextlib
 import signal
 import sys
 from typing import Optional
@@ -56,24 +57,18 @@ def show_cursor() -> None:
     _cursor_hidden = False
 
     # Unregister atexit handler
-    try:
+    with contextlib.suppress(Exception):
         atexit.unregister(show_cursor)
-    except Exception:
-        pass
 
     # Restore original signal handlers
     if _original_sigint is not None:
-        try:
+        with contextlib.suppress(Exception):
             signal.signal(signal.SIGINT, _original_sigint)
-        except Exception:
-            pass
         _original_sigint = None
 
     if _original_sigterm is not None:
-        try:
+        with contextlib.suppress(Exception):
             signal.signal(signal.SIGTERM, _original_sigterm)
-        except Exception:
-            pass
         _original_sigterm = None
 
 

@@ -6,15 +6,15 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import Optional
 
-from common.logger import setup_logging, log_configuration
 from common.cli import add_common_arguments
-from common.validation import validate_directory_or_exit
 from common.interrupt import scanning
+from common.logger import log_configuration, setup_logging
+from common.validation import validate_directory_or_exit
 
 # Default junk file patterns
-JUNK_FILES: Set[str] = {
+JUNK_FILES: set[str] = {
     ".DS_Store",
     "._.DS_Store",
     "Thumbs.db",
@@ -26,12 +26,12 @@ JUNK_FILES: Set[str] = {
 }
 
 # Junk file prefixes (macOS resource forks)
-JUNK_PREFIXES: Set[str] = {
+JUNK_PREFIXES: set[str] = {
     "._",
 }
 
 # Junk directories
-JUNK_DIRS: Set[str] = {
+JUNK_DIRS: set[str] = {
     "__MACOSX",
     ".AppleDouble",
     ".LSOverride",
@@ -134,9 +134,9 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
 def find_junk(
     directory: str,
     recursive: bool,
-    junk_files: Set[str],
-    junk_dirs: Set[str],
-) -> List[Path]:
+    junk_files: set[str],
+    junk_dirs: set[str],
+) -> list[Path]:
     """Finds junk files and directories.
 
     Args:
@@ -148,7 +148,7 @@ def find_junk(
     Returns:
         List of paths to junk items.
     """
-    junk_items: List[Path] = []
+    junk_items: list[Path] = []
     directory_path = Path(directory)
     scanned = 0
 
@@ -186,17 +186,13 @@ def find_junk(
                 # Skip symlinks
                 if entry.is_symlink():
                     continue
-                if entry.is_dir(follow_symlinks=False) and entry.name in junk_dirs:
-                    junk_items.append(Path(entry.path))
-                elif entry.is_file(follow_symlinks=False) and is_junk_file(
-                    entry.name, junk_files
+                if (entry.is_dir(follow_symlinks=False) and entry.name in junk_dirs) or (
+                    entry.is_file(follow_symlinks=False) and is_junk_file(entry.name, junk_files)
                 ):
                     junk_items.append(Path(entry.path))
         except PermissionError as e:
             print(f"Permission denied: {directory_path}")
-            logging.warning(
-                {"action": "scan_error", "path": str(directory_path), "error": str(e)}
-            )
+            logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
 
     if scanned >= 1000:
         print(f"Scanned {scanned} directories.    ")  # Clear progress line
@@ -204,7 +200,7 @@ def find_junk(
     return junk_items
 
 
-def is_junk_file(filename: str, junk_files: Set[str]) -> bool:
+def is_junk_file(filename: str, junk_files: set[str]) -> bool:
     """Checks if a filename is a junk file.
 
     Args:
@@ -218,14 +214,10 @@ def is_junk_file(filename: str, junk_files: Set[str]) -> bool:
         return True
 
     # Check prefixes (e.g., ._ files)
-    for prefix in JUNK_PREFIXES:
-        if filename.startswith(prefix):
-            return True
-
-    return False
+    return any(filename.startswith(prefix) for prefix in JUNK_PREFIXES)
 
 
-def remove_junk(junk_items: List[Path]) -> tuple:
+def remove_junk(junk_items: list[Path]) -> tuple:
     """Removes junk files and directories.
 
     Args:

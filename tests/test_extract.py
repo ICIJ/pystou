@@ -1,12 +1,13 @@
-import unittest
-import tempfile
-import shutil
 import os
+import shutil
+import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
-from extract.main import process_archive
-from common.indexer import initialize_database, close_database
+
+from common.indexer import close_database, initialize_database
 from common.utils import get_archive_files
+from extract.main import process_archive
 
 
 class TestExtract(unittest.TestCase):
@@ -130,9 +131,7 @@ class TestExtract(unittest.TestCase):
         self.assertTrue((Path(self.test_dir) / "archive.zip").exists())
 
     @patch("builtins.print")
-    @patch(
-        "builtins.input", return_value="1"
-    )  # Mock user input to '1' (extract) and '2' (keep)
+    @patch("builtins.input", return_value="1")  # Mock user input to '1' (extract) and '2' (keep)
     def test_process_archive_extract_keep_archive(self, mock_input, mock_print):
         """
         Test extracting an archive and choosing to keep the archive file.
@@ -211,9 +210,7 @@ class TestExtract(unittest.TestCase):
         self.assertFalse((Path(self.test_dir) / "archive.zip").exists())
 
     @patch("builtins.print")
-    @patch(
-        "builtins.input", return_value="2"
-    )  # Mock user input for default delete choice
+    @patch("builtins.input", return_value="2")  # Mock user input for default delete choice
     def test_process_archive_default_delete_choice_keep(self, mock_input, mock_print):
         """
         Test processing archives with default choices set for extraction and keeping the archive.
@@ -294,8 +291,9 @@ class TestExtract(unittest.TestCase):
     @patch("builtins.print")
     def test_parallel_keeps_archive_when_extraction_fails(self, mock_print):
         """A failed extraction must not delete the source archive in parallel mode."""
-        from extract.main import process_archives_parallel
         from pathlib import Path as _P
+
+        from extract.main import process_archives_parallel
 
         bad = _P(self.test_dir) / "broken.zip"
         bad.write_bytes(b"not a real zip")

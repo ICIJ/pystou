@@ -26,9 +26,7 @@ def unique_path(base) -> Path:
         counter += 1
 
 
-def verify_then_delete(
-    archive: Path, success: bool, delete_fn: Callable[[], None]
-) -> None:
+def verify_then_delete(archive: Path, success: bool, delete_fn: Callable[[], None]) -> None:
     """Deletes a source archive only if its extraction succeeded.
 
     Args:

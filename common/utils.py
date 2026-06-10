@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import shutil
@@ -6,11 +7,9 @@ import tarfile
 import zipfile
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, Optional, Union
 
-import logging
-
-from common.safe_extract import safe_extract_zip, safe_extract_tar
+from common.safe_extract import safe_extract_tar, safe_extract_zip
 from common.safe_ops import unique_path
 
 
@@ -63,7 +62,7 @@ def get_directory_size(conn, dir_path: Path) -> tuple:
     return total_size, num_files
 
 
-def summarize_group(group_key, dir_paths: List[Path], conn) -> None:
+def summarize_group(group_key, dir_paths: list[Path], conn) -> None:
     """Prints a summary of a group of duplicate directories.
 
     Args:
@@ -77,16 +76,14 @@ def summarize_group(group_key, dir_paths: List[Path], conn) -> None:
         size, num_files = get_directory_size(conn, dir_path)
         formatted_size = f"{size:,}"
         formatted_num_files = f"{num_files:,}"
-        print(
-            f" - {dir_path.name} : {formatted_num_files} files, {formatted_size} bytes"
-        )
+        print(f" - {dir_path.name} : {formatted_num_files} files, {formatted_size} bytes")
 
 
 def get_archive_files(
     directory: Union[str, Path],
     recursive: bool,
-    filter_types: Optional[List[str]] = None,
-) -> List[Path]:
+    filter_types: Optional[list[str]] = None,
+) -> list[Path]:
     """Returns a list of archive files in the directory.
 
     Args:
@@ -122,7 +119,7 @@ def get_archive_files(
     # Pattern to match split archive parts (.z01, .z02, etc.)
     split_part_pattern = re.compile(r"\.z\d+$", re.IGNORECASE)
 
-    archive_files: List[Path] = []
+    archive_files: list[Path] = []
     directory_path = Path(directory)
 
     def is_archive(filename: str) -> bool:
@@ -172,9 +169,7 @@ def extract_archive(archive_path: Path) -> bool:
         elif suffixes.endswith(".gz") or suffixes.endswith(".bz2"):
             return extract_compressed_file(archive_path)
         elif (
-            suffixes.endswith(".tar.zst")
-            or suffixes.endswith(".tzst")
-            or suffixes.endswith(".zst")
+            suffixes.endswith(".tar.zst") or suffixes.endswith(".tzst") or suffixes.endswith(".zst")
         ):
             return extract_zst_archive(archive_path)
         elif suffixes.endswith(".pst"):
@@ -246,9 +241,7 @@ def extract_split_zip_archive(archive_path: Path) -> bool:
         bool: True if extraction was successful, False otherwise.
     """
     if shutil.which("7z") is None:
-        print(
-            "7z command not found. Please install p7zip-full to extract split ZIP archives."
-        )
+        print("7z command not found. Please install p7zip-full to extract split ZIP archives.")
         logging.error(
             {
                 "action": "extract_split_zip",
@@ -498,9 +491,7 @@ def extract_pst_archive(archive_path: Path) -> bool:
         bool: True if extraction was successful, False otherwise.
     """
     if shutil.which("readpst") is None:
-        print(
-            "readpst command not found. Please install readpst to extract .pst files."
-        )
+        print("readpst command not found. Please install readpst to extract .pst files.")
         logging.error(
             {
                 "action": "extract_pst",
@@ -532,7 +523,7 @@ def extract_pst_archive(archive_path: Path) -> bool:
         return False
 
 
-def get_split_archive_parts(archive_path: Path) -> List[Path]:
+def get_split_archive_parts(archive_path: Path) -> list[Path]:
     """Finds all parts of a split ZIP archive.
 
     Given a .zip file, finds all related split parts (.z01, .z02, etc.).
@@ -544,7 +535,7 @@ def get_split_archive_parts(archive_path: Path) -> List[Path]:
     Returns:
         List[Path]: Sorted list of all split archive parts, or empty list if not split.
     """
-    if not archive_path.suffix.lower() == ".zip":
+    if archive_path.suffix.lower() != ".zip":
         return []
 
     base_name = archive_path.stem

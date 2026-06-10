@@ -1,13 +1,12 @@
 # tests/test_safe_extract.py
-import os
+import shutil
 import tarfile
 import tempfile
-import shutil
 import unittest
 import zipfile
 from pathlib import Path
 
-from common.safe_extract import safe_extract_zip, safe_extract_tar
+from common.safe_extract import safe_extract_tar, safe_extract_zip
 
 
 class TestSafeExtractZip(unittest.TestCase):

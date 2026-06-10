@@ -1,26 +1,27 @@
 #!/usr/bin/env python3
 
 import argparse
-import os
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
-# Import common modules
-from common.logger import setup_logging, log_configuration
-from common.utils import get_archive_files, extract_archive, get_split_archive_parts
+from common.cli import add_common_arguments
+from common.fs_walker import collect_directories
 from common.indexer import (
+    close_database,
     initialize_database,
     prompt_use_existing_index,
-    close_database,
     update_index_after_change,
 )
-from common.fs_walker import collect_directories
-from common.cli import add_common_arguments
-from common.validation import validate_directory_or_exit
 from common.interrupt import scanning
+
+# Import common modules
+from common.logger import log_configuration, setup_logging
 from common.safe_ops import verify_then_delete
+from common.utils import extract_archive, get_archive_files, get_split_archive_parts
+from common.validation import validate_directory_or_exit
 
 
 def add_extract_arguments(parser: argparse.ArgumentParser) -> None:
@@ -117,7 +118,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     close_database(conn)
 
 
-def process_archives_parallel(archive_files: List[Path], args, conn) -> None:
+def process_archives_parallel(archive_files: list[Path], args, conn) -> None:
     """Processes multiple archives in parallel.
 
     Args:
@@ -131,8 +132,7 @@ def process_archives_parallel(archive_files: List[Path], args, conn) -> None:
     results = []
     with ThreadPoolExecutor(max_workers=args.parallel) as executor:
         future_to_archive = {
-            executor.submit(extract_archive, archive): archive
-            for archive in archive_files
+            executor.submit(extract_archive, archive): archive for archive in archive_files
         }
         for future in as_completed(future_to_archive):
             archive = future_to_archive[future]
@@ -159,9 +159,7 @@ def process_archives_parallel(archive_files: List[Path], args, conn) -> None:
 
     for archive, success in results:
         if success:
-            logging.info(
-                {"action": "extract", "status": "success", "archive": str(archive)}
-            )
+            logging.info({"action": "extract", "status": "success", "archive": str(archive)})
             update_index_after_extraction(conn, archive.parent)
 
         if args.default_delete_choice == 1:
@@ -242,9 +240,7 @@ def prompt_user_action(archive_file: Path, default_choice: Optional[int]) -> str
             print("Invalid input. Please enter 1 or 2.")
 
 
-def prompt_delete_action(
-    archive_file: Path, default_delete_choice: Optional[int]
-) -> str:
+def prompt_delete_action(archive_file: Path, default_delete_choice: Optional[int]) -> str:
     """Prompts the user whether to delete the archive after extraction.
 
     Args:
@@ -255,9 +251,7 @@ def prompt_delete_action(
         str: The user's choice ('1' or '2').
     """
     if default_delete_choice:
-        print(
-            f"Applying default delete choice {default_delete_choice} for {archive_file}"
-        )
+        print(f"Applying default delete choice {default_delete_choice} for {archive_file}")
         return str(default_delete_choice)
 
     print("\nExtraction complete.")
@@ -283,15 +277,11 @@ def extract_and_update_index(archive_file: Path, args, conn, depth: int = 0) -> 
     """
     if args.dry_run:
         print(f"Dry run: would extract {archive_file}")
-        logging.info(
-            {"action": "extract", "status": "dry_run", "archive": str(archive_file)}
-        )
+        logging.info({"action": "extract", "status": "dry_run", "archive": str(archive_file)})
     else:
         success = extract_archive(archive_file)
         if success:
-            logging.info(
-                {"action": "extract", "status": "success", "archive": str(archive_file)}
-            )
+            logging.info({"action": "extract", "status": "success", "archive": str(archive_file)})
             # Update index with new files/directories
             update_index_after_extraction(conn, archive_file.parent)
 
@@ -300,18 +290,14 @@ def extract_and_update_index(archive_file: Path, args, conn, depth: int = 0) -> 
                 process_nested_archives(archive_file.parent, args, conn, depth + 1)
 
             # Prompt to delete the archive
-            delete_action = prompt_delete_action(
-                archive_file, args.default_delete_choice
-            )
+            delete_action = prompt_delete_action(archive_file, args.default_delete_choice)
             if delete_action == "1":
                 delete_archive_file(archive_file, conn, args.dry_run)
             else:
                 print(f"Keeping archive: {archive_file}")
                 logging.info({"action": "keep_archive", "archive": str(archive_file)})
         else:
-            logging.error(
-                {"action": "extract", "status": "error", "archive": str(archive_file)}
-            )
+            logging.error({"action": "extract", "status": "error", "archive": str(archive_file)})
 
 
 def process_nested_archives(directory: Path, args, conn, depth: int) -> None:

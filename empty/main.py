@@ -5,12 +5,12 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
-from common.logger import setup_logging, log_configuration
 from common.cli import add_common_arguments
-from common.validation import validate_directory_or_exit
 from common.interrupt import scanning
+from common.logger import log_configuration, setup_logging
+from common.validation import validate_directory_or_exit
 
 
 def add_empty_arguments(parser: argparse.ArgumentParser) -> None:
@@ -50,9 +50,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
 
     # Find empty directories
     with scanning("scan"):
-        empty_dirs = find_empty_directories(
-            args.directory, args.recursive, args.include_hidden
-        )
+        empty_dirs = find_empty_directories(args.directory, args.recursive, args.include_hidden)
 
     if not empty_dirs:
         print("No empty directories found.")
@@ -101,7 +99,7 @@ def find_empty_directories(
     directory: str,
     recursive: bool,
     include_hidden: bool,
-) -> List[Path]:
+) -> list[Path]:
     """Finds empty directories.
 
     Args:
@@ -112,7 +110,7 @@ def find_empty_directories(
     Returns:
         List of paths to empty directories, sorted deepest first.
     """
-    empty_dirs: List[Path] = []
+    empty_dirs: list[Path] = []
     directory_path = Path(directory)
     scanned = 0
 
@@ -120,9 +118,7 @@ def find_empty_directories(
         # Walk bottom-up so we can detect directories that become empty
         # after removing their empty subdirectories
         # followlinks=False prevents infinite loops from symlink cycles
-        for root, dirs, files in os.walk(
-            directory_path, topdown=False, followlinks=False
-        ):
+        for root, _dirs, _files in os.walk(directory_path, topdown=False, followlinks=False):
             root_path = Path(root)
             scanned += 1
 
@@ -163,9 +159,7 @@ def find_empty_directories(
                         empty_dirs.append(dir_path)
         except PermissionError as e:
             print(f"Permission denied: {directory_path}")
-            logging.warning(
-                {"action": "scan_error", "path": str(directory_path), "error": str(e)}
-            )
+            logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
 
     if scanned >= 1000:
         print(f"Scanned {scanned} directories.    ")  # Clear progress line
@@ -206,7 +200,7 @@ def is_directory_empty(dir_path: Path, include_hidden: bool) -> bool:
         return False
 
 
-def remove_empty_directories(empty_dirs: List[Path]) -> tuple:
+def remove_empty_directories(empty_dirs: list[Path]) -> tuple:
     """Removes empty directories.
 
     Args:

@@ -18,9 +18,8 @@ class TestScanning(unittest.TestCase):
     @patch.object(interrupt, "show_cursor")
     @patch.object(interrupt, "hide_cursor")
     def test_keyboard_interrupt_exits_130(self, mock_hide, mock_show, mock_print):
-        with self.assertRaises(SystemExit) as cm:
-            with scanning("scan"):
-                raise KeyboardInterrupt
+        with self.assertRaises(SystemExit) as cm, scanning("scan"):
+            raise KeyboardInterrupt
         self.assertEqual(cm.exception.code, 130)
         self.assertTrue(mock_show.called)  # cursor restored
 

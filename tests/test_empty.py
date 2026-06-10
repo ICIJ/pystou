@@ -1,14 +1,14 @@
-import unittest
-import tempfile
 import shutil
+import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from empty.main import (
     find_empty_directories,
     is_directory_empty,
-    remove_empty_directories,
     main,
+    remove_empty_directories,
 )
 
 
@@ -97,9 +97,7 @@ class TestEmptyFindEmptyDirectories(unittest.TestCase):
 
     def test_find_empty_non_recursive(self):
         """Test finding empty directories without recursion."""
-        empty_dirs = find_empty_directories(
-            self.test_dir, recursive=False, include_hidden=False
-        )
+        empty_dirs = find_empty_directories(self.test_dir, recursive=False, include_hidden=False)
 
         dir_names = {d.name for d in empty_dirs}
         self.assertIn("empty1", dir_names)
@@ -109,9 +107,7 @@ class TestEmptyFindEmptyDirectories(unittest.TestCase):
 
     def test_find_empty_recursive(self):
         """Test finding empty directories with recursion."""
-        empty_dirs = find_empty_directories(
-            self.test_dir, recursive=True, include_hidden=False
-        )
+        empty_dirs = find_empty_directories(self.test_dir, recursive=True, include_hidden=False)
 
         dir_names = {d.name for d in empty_dirs}
         self.assertIn("empty1", dir_names)
@@ -120,9 +116,7 @@ class TestEmptyFindEmptyDirectories(unittest.TestCase):
 
     def test_find_empty_include_hidden(self):
         """Test finding empty directories including hidden."""
-        empty_dirs = find_empty_directories(
-            self.test_dir, recursive=False, include_hidden=True
-        )
+        empty_dirs = find_empty_directories(self.test_dir, recursive=False, include_hidden=True)
 
         dir_names = {d.name for d in empty_dirs}
         self.assertIn(".hidden_empty", dir_names)
@@ -133,9 +127,7 @@ class TestEmptyFindEmptyDirectories(unittest.TestCase):
         deep = self.test_path / "a" / "b" / "c"
         deep.mkdir(parents=True)
 
-        empty_dirs = find_empty_directories(
-            self.test_dir, recursive=True, include_hidden=False
-        )
+        empty_dirs = find_empty_directories(self.test_dir, recursive=True, include_hidden=False)
 
         # First directories should be the deepest
         if len(empty_dirs) > 1:

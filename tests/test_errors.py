@@ -1,7 +1,7 @@
 # tests/test_errors.py
 import unittest
 
-from common.errors import PystouError, InvalidDirectoryError
+from common.errors import InvalidDirectoryError, PystouError
 
 
 class TestErrors(unittest.TestCase):

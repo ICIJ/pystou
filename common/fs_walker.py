@@ -1,14 +1,14 @@
-import os
-from pathlib import Path
 import logging
+import os
 import sqlite3
-from typing import List, Optional, Tuple
+from pathlib import Path
+from typing import Optional
 
 
 class ScanContext:
     """Context object to track scanning state efficiently."""
 
-    __slots__ = ("dir_count", "file_count", "update_interval", "_last_update")
+    __slots__ = ("_last_update", "dir_count", "file_count", "update_interval")
 
     def __init__(self, update_interval: int = 100):
         self.dir_count = 0
@@ -71,14 +71,14 @@ def scan_tree(
         level (Optional[int]): Maximum depth level for recursion.
         ctx (ScanContext): Scanning context for counters and output.
     """
-    stack: List[Tuple[Path, int]] = [(root_dir, 1)]
+    stack: list[tuple[Path, int]] = [(root_dir, 1)]
     while stack:
         current_dir, current_level = stack.pop()
         try:
             with os.scandir(current_dir) as entries:
-                dir_entries: List[Tuple[str, str, float]] = []
-                file_entries: List[Tuple[str, str, int, float]] = []
-                subdirs: List[Path] = []
+                dir_entries: list[tuple[str, str, float]] = []
+                file_entries: list[tuple[str, str, int, float]] = []
+                subdirs: list[Path] = []
                 for entry in entries:
                     full_path = Path(entry.path)
                     try:
@@ -117,9 +117,7 @@ def scan_tree(
                     stack.append((subdir, current_level + 1))
         except PermissionError as e:
             print(f"\nPermission denied: {current_dir}")
-            logging.error(
-                {"action": "scan_error", "directory": str(current_dir), "error": str(e)}
-            )
+            logging.error({"action": "scan_error", "directory": str(current_dir), "error": str(e)})
         except OSError as e:
             logging.warning(
                 {"action": "scan_error", "directory": str(current_dir), "error": str(e)}
@@ -156,8 +154,8 @@ def update_live_output(dir_count: int, file_count: int) -> None:
 
 def insert_entries(
     conn: sqlite3.Connection,
-    dir_entries: List[Tuple[str, str, float]],
-    file_entries: List[Tuple[str, str, int, float]],
+    dir_entries: list[tuple[str, str, float]],
+    file_entries: list[tuple[str, str, int, float]],
 ) -> None:
     """Inserts directory and file entries into the database.
 

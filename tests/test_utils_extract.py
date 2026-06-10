@@ -1,8 +1,7 @@
 # tests/test_utils_extract.py
-import os
+import shutil
 import tarfile
 import tempfile
-import shutil
 import unittest
 import zipfile
 from pathlib import Path

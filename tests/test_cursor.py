@@ -1,13 +1,13 @@
-import unittest
 import signal
-from unittest.mock import patch, MagicMock
+import unittest
+from unittest.mock import MagicMock, patch
 
 from common.cursor import (
-    hide_cursor,
-    show_cursor,
-    _signal_handler,
     HIDE_CURSOR,
     SHOW_CURSOR,
+    _signal_handler,
+    hide_cursor,
+    show_cursor,
 )
 
 

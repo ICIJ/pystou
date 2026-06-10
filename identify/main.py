@@ -5,15 +5,15 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
-from common.logger import setup_logging, log_configuration
 from common.cli import add_common_arguments
-from common.validation import validate_directory_or_exit
 from common.interrupt import scanning
+from common.logger import log_configuration, setup_logging
+from common.validation import validate_directory_or_exit
 
 # File signatures (magic bytes) for common file types
-FILE_SIGNATURES: Dict[bytes, str] = {
+FILE_SIGNATURES: dict[bytes, str] = {
     b"\x50\x4b\x03\x04": "zip",
     b"\x50\x4b\x05\x06": "zip",  # Empty archive
     b"\x50\x4b\x07\x08": "zip",  # Spanned archive
@@ -34,7 +34,7 @@ FILE_SIGNATURES: Dict[bytes, str] = {
 }
 
 # Extension to expected type mapping
-EXTENSION_TYPE_MAP: Dict[str, Set[str]] = {
+EXTENSION_TYPE_MAP: dict[str, set[str]] = {
     ".zip": {"zip", "docx/xlsx/pptx"},
     ".gz": {"gzip"},
     ".tgz": {"gzip"},
@@ -115,7 +115,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         args.check_mismatch = True
 
     # Parse extensions filter if provided
-    extensions_filter: Optional[Set[str]] = None
+    extensions_filter: Optional[set[str]] = None
     if args.extensions:
         extensions_filter = {
             ext.strip().lower() if ext.startswith(".") else f".{ext.strip().lower()}"
@@ -133,7 +133,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         print("No files to analyze.")
         return
 
-    issues: List[Tuple[Path, str]] = []
+    issues: list[tuple[Path, str]] = []
 
     # Run checks
     with scanning("analysis"):
@@ -166,8 +166,8 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
 def collect_files(
     directory: str,
     recursive: bool,
-    extensions_filter: Optional[Set[str]] = None,
-) -> List[Path]:
+    extensions_filter: Optional[set[str]] = None,
+) -> list[Path]:
     """Collects files from the directory.
 
     Args:
@@ -178,7 +178,7 @@ def collect_files(
     Returns:
         List of file paths.
     """
-    files: List[Path] = []
+    files: list[Path] = []
     directory_path = Path(directory)
     scanned = 0
 
@@ -197,10 +197,7 @@ def collect_files(
                 # Skip symlinks
                 if file_path.is_symlink():
                     continue
-                if (
-                    extensions_filter is None
-                    or file_path.suffix.lower() in extensions_filter
-                ):
+                if extensions_filter is None or file_path.suffix.lower() in extensions_filter:
                     files.append(file_path)
     else:
         try:
@@ -210,16 +207,11 @@ def collect_files(
                     continue
                 if entry.is_file(follow_symlinks=False):
                     file_path = Path(entry.path)
-                    if (
-                        extensions_filter is None
-                        or file_path.suffix.lower() in extensions_filter
-                    ):
+                    if extensions_filter is None or file_path.suffix.lower() in extensions_filter:
                         files.append(file_path)
         except PermissionError as e:
             print(f"Permission denied: {directory_path}")
-            logging.warning(
-                {"action": "scan_error", "path": str(directory_path), "error": str(e)}
-            )
+            logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
 
     if scanned >= 1000:
         print(f"Scanned {scanned} directories.    ")  # Clear progress line
@@ -262,9 +254,7 @@ def detect_file_type(file_path: Path) -> Optional[str]:
         return None
 
     except FileNotFoundError:
-        logging.warning(
-            {"action": "detect_type", "status": "not_found", "path": str(file_path)}
-        )
+        logging.warning({"action": "detect_type", "status": "not_found", "path": str(file_path)})
         return None
     except PermissionError:
         logging.warning(
@@ -287,7 +277,7 @@ def detect_file_type(file_path: Path) -> Optional[str]:
         return None
 
 
-def check_extension_mismatches(files: List[Path]) -> List[Tuple[Path, str]]:
+def check_extension_mismatches(files: list[Path]) -> list[tuple[Path, str]]:
     """Checks for files with mismatched extensions.
 
     Args:
@@ -296,7 +286,7 @@ def check_extension_mismatches(files: List[Path]) -> List[Tuple[Path, str]]:
     Returns:
         List of (path, issue description) tuples.
     """
-    issues: List[Tuple[Path, str]] = []
+    issues: list[tuple[Path, str]] = []
     total = len(files)
 
     for i, file_path in enumerate(files, 1):
@@ -333,7 +323,7 @@ def check_extension_mismatches(files: List[Path]) -> List[Tuple[Path, str]]:
     return issues
 
 
-def check_encrypted_archives(files: List[Path]) -> List[Tuple[Path, str]]:
+def check_encrypted_archives(files: list[Path]) -> list[tuple[Path, str]]:
     """Checks for encrypted ZIP archives.
 
     Args:
@@ -344,11 +334,11 @@ def check_encrypted_archives(files: List[Path]) -> List[Tuple[Path, str]]:
     """
     import zipfile
 
-    issues: List[Tuple[Path, str]] = []
+    issues: list[tuple[Path, str]] = []
     zip_extensions = {".zip", ".docx", ".xlsx", ".pptx"}
     checked = 0
 
-    for i, file_path in enumerate(files, 1):
+    for _i, file_path in enumerate(files, 1):
         if file_path.suffix.lower() not in zip_extensions:
             continue
 

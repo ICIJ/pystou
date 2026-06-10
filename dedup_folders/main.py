@@ -1,28 +1,29 @@
 #!/usr/bin/env python3
 
 import argparse
-from pathlib import Path
-from typing import Optional, List, Tuple
 import logging
 import os
 import re
 import shutil
 import sqlite3
+from pathlib import Path
+from typing import Optional
 
-# Import modules from the package
-from common.logger import setup_logging, log_configuration
+from common.cli import add_common_arguments
+from common.fs_walker import collect_directories
 from common.indexer import (
-    initialize_database,
-    prompt_use_existing_index,
-    load_directories_from_index,
     close_database,
+    initialize_database,
+    load_directories_from_index,
+    prompt_use_existing_index,
     update_index_after_change,
 )
-from common.fs_walker import collect_directories
-from common.utils import group_directories, summarize_group
-from common.cli import add_common_arguments
-from common.validation import validate_directory_or_exit
 from common.interrupt import scanning
+
+# Import modules from the package
+from common.logger import log_configuration, setup_logging
+from common.utils import group_directories, summarize_group
+from common.validation import validate_directory_or_exit
 
 
 def add_dedup_arguments(parser: argparse.ArgumentParser) -> None:
@@ -69,9 +70,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     directories = load_directories_from_index(conn)
     total_directories = len(directories)
     print(f"Total directories indexed: {total_directories:,}")
-    logging.info(
-        {"action": "directories_indexed", "total_directories": total_directories}
-    )
+    logging.info({"action": "directories_indexed", "total_directories": total_directories})
 
     groups = group_directories(conn)
     if not groups:
@@ -108,7 +107,7 @@ def manage_index(conn: sqlite3.Connection, args) -> None:
 
 
 def process_group(
-    group_key: Tuple[str, str], dir_paths: List[Path], args, conn: sqlite3.Connection
+    group_key: tuple[str, str], dir_paths: list[Path], args, conn: sqlite3.Connection
 ) -> None:
     """Processes a group of duplicate directories.
 
@@ -161,7 +160,7 @@ def process_group(
         )
 
 
-def identify_base_and_duplicates(dir_paths: List[Path]) -> Tuple[Path, List[Path]]:
+def identify_base_and_duplicates(dir_paths: list[Path]) -> tuple[Path, list[Path]]:
     """Identifies the base directory and duplicates from a list of directories.
 
     Args:
@@ -211,9 +210,7 @@ def prompt_user_action(default_choice: Optional[int]) -> str:
             print("Invalid input. Please enter 1, 2, or 3.")
 
 
-def delete_duplicates(
-    duplicate_dirs: List[Path], dry_run: bool, conn: sqlite3.Connection
-) -> None:
+def delete_duplicates(duplicate_dirs: list[Path], dry_run: bool, conn: sqlite3.Connection) -> None:
     """Deletes the duplicate directories.
 
     Args:
@@ -224,16 +221,12 @@ def delete_duplicates(
     for dup_dir in duplicate_dirs:
         if dry_run:
             print(f"Dry run: would delete {dup_dir}")
-            logging.info(
-                {"action": "delete", "status": "dry_run", "directory": str(dup_dir)}
-            )
+            logging.info({"action": "delete", "status": "dry_run", "directory": str(dup_dir)})
         else:
             try:
                 print(f"Deleting {dup_dir}")
                 shutil.rmtree(dup_dir)
-                logging.info(
-                    {"action": "delete", "status": "success", "directory": str(dup_dir)}
-                )
+                logging.info({"action": "delete", "status": "success", "directory": str(dup_dir)})
                 # Update index
                 update_index_after_change(conn, "delete_directory", dup_dir)
             except OSError as e:
@@ -249,7 +242,7 @@ def delete_duplicates(
 
 
 def merge_contents(
-    base_dir: Path, duplicate_dirs: List[Path], dry_run: bool, conn: sqlite3.Connection
+    base_dir: Path, duplicate_dirs: list[Path], dry_run: bool, conn: sqlite3.Connection
 ) -> None:
     """Merges duplicate directories into the base, preserving conflicting files.
 
@@ -330,16 +323,12 @@ def merge_contents(
 
         if dry_run:
             print(f"Dry run: would delete {dup_dir}")
-            logging.info(
-                {"action": "delete", "status": "dry_run", "directory": str(dup_dir)}
-            )
+            logging.info({"action": "delete", "status": "dry_run", "directory": str(dup_dir)})
         else:
             try:
                 print(f"Deleting {dup_dir}")
                 shutil.rmtree(dup_dir)
-                logging.info(
-                    {"action": "delete", "status": "success", "directory": str(dup_dir)}
-                )
+                logging.info({"action": "delete", "status": "success", "directory": str(dup_dir)})
                 update_index_after_change(conn, "delete_directory", dup_dir)
             except OSError as e:
                 print(f"Error deleting {dup_dir}: {e}")

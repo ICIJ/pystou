@@ -1,11 +1,11 @@
 import os
-import tempfile
 import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
-from common.validation import validate_directory, validate_directory_or_exit
 from common.errors import InvalidDirectoryError
+from common.validation import validate_directory, validate_directory_or_exit
 
 
 class TestValidateDirectory(unittest.TestCase):

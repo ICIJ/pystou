@@ -1,10 +1,10 @@
 # tests/test_logger.py
 import logging
-import tempfile
 import shutil
+import tempfile
 import unittest
 
-from common.logger import setup_logging, log_configuration
+from common.logger import log_configuration, setup_logging
 
 
 class TestLogger(unittest.TestCase):

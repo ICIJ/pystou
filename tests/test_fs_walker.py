@@ -1,15 +1,15 @@
 # tests/test_fs_walker.py
 import os
+import shutil
 import sys
 import tempfile
-import shutil
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 import common.fs_walker as fs_walker
-from common.indexer import initialize_database, close_database
+from common.indexer import close_database, initialize_database
 
 
 class TestDeepTree(unittest.TestCase):

@@ -1,13 +1,14 @@
-import unittest
-import tempfile
-import shutil
 import os
+import shutil
+import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
-from dedup_folders.main import identify_base_and_duplicates, process_group
-from common.indexer import initialize_database, close_database
+
 from common.fs_walker import collect_directories
+from common.indexer import close_database, initialize_database
 from common.utils import group_directories
+from dedup_folders.main import identify_base_and_duplicates, process_group
 
 
 class TestDedupFolders(unittest.TestCase):
@@ -85,14 +86,14 @@ class TestDedupFolders(unittest.TestCase):
         self.assertTrue((Path(self.test_dir) / "folder" / "file4.txt").exists())
 
 
-import os as _os
-import tempfile as _tempfile
 import shutil as _shutil
+import tempfile as _tempfile
 from pathlib import Path as _Path
 from unittest.mock import patch as _patch
 
+from common.indexer import close_database as _close_db
+from common.indexer import initialize_database as _init_db
 from dedup_folders.main import merge_contents
-from common.indexer import initialize_database as _init_db, close_database as _close_db
 
 
 class TestMergeConflictPreservesData(unittest.TestCase):

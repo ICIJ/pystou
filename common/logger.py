@@ -1,8 +1,8 @@
-from datetime import datetime
-from logging import handlers
 import json
 import logging
 import os
+from datetime import datetime
+from logging import handlers
 
 
 def setup_logging(script_name: str = "script", log_dir: str = ".") -> None:
@@ -17,9 +17,7 @@ def setup_logging(script_name: str = "script", log_dir: str = ".") -> None:
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_filename = os.path.join(log_dir, f"{script_name}.{timestamp}.log")
-    handler = handlers.RotatingFileHandler(
-        log_filename, maxBytes=10485760, backupCount=5
-    )
+    handler = handlers.RotatingFileHandler(log_filename, maxBytes=10485760, backupCount=5)
     handler.setFormatter(JsonFormatter())
 
     logger = logging.getLogger()
