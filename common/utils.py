@@ -441,6 +441,8 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
         logging.error(
             {"action": "extract_zst_command", "status": "error", "archive": str(archive_path), "error": str(e)}
         )
+        if output_path.exists():
+            output_path.unlink()
         return False
 
 
@@ -524,13 +526,3 @@ def get_split_archive_parts(archive_path: Path) -> List[Path]:
     return [p[1] for p in parts] + [archive_path]
 
 
-def get_unique_folder_name(base_dir: Path) -> Path:
-    """Deprecated alias for :func:`common.safe_ops.unique_path`.
-
-    Args:
-        base_dir (Path): The initial desired directory path.
-
-    Returns:
-        Path: A unique directory path that does not already exist.
-    """
-    return unique_path(base_dir)

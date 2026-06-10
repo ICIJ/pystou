@@ -38,6 +38,19 @@ class TestExtractArchiveSafety(unittest.TestCase):
         # Original must be preserved; decompressed output went to a unique path.
         self.assertEqual(existing.read_text(), "original")
 
+    def test_gz_decompress_does_not_clobber_existing_output(self):
+        import gzip
+
+        src = Path(self.test_dir) / "plain.txt.gz"
+        with gzip.open(src, "wb") as f:
+            f.write(b"new-content")
+        existing = Path(self.test_dir) / "plain.txt"
+        existing.write_text("original")
+        self.assertTrue(utils.extract_archive(src))
+        # Original preserved; decompressed output went to a unique path.
+        self.assertEqual(existing.read_text(), "original")
+        self.assertTrue((Path(self.test_dir) / "plain.txt (1)").exists())
+
     def _import_zstd_or_skip(self):
         try:
             import zstandard as zstd
