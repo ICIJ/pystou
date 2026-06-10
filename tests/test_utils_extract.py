@@ -46,5 +46,49 @@ class TestExtractArchiveSafety(unittest.TestCase):
             self.skipTest("zstandard module not installed")
 
 
+class TestZstdCommandPath(unittest.TestCase):
+    """Exercises the zstd CLI extraction path without the zstd binary."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_tar_zst_command_path_reads_what_it_wrote(self):
+        from unittest.mock import patch
+
+        # Build a real tar that zstd would have produced on decompression.
+        inner = Path(self.test_dir) / "payload_unique.txt"
+        inner.write_text("hello")
+        # The archive the user is "extracting".
+        archive = Path(self.test_dir) / "bundle.tar.zst"
+        archive.write_bytes(b"placeholder-compressed-bytes")
+
+        # The function computes output_path = unique_path(archive.with_suffix("")),
+        # i.e. .../bundle.tar. Our fake zstd writes the real tar there.
+        expected_output = archive.with_suffix("")  # bundle.tar
+
+        def fake_run(cmd, *args, **kwargs):
+            # cmd == ["zstd", "-d", str(archive), "-o", str(expected_output)]
+            out_path = Path(cmd[cmd.index("-o") + 1])
+            with tarfile.open(out_path, "w") as tf:
+                tf.add(inner, arcname="payload_unique.txt")
+
+            class _R:
+                returncode = 0
+
+            return _R()
+
+        with patch.object(utils.subprocess, "run", side_effect=fake_run):
+            result = utils._extract_zst_with_command(archive)
+
+        self.assertTrue(result)
+        # The tar's contents were extracted next to the archive.
+        self.assertTrue((Path(self.test_dir) / "payload_unique.txt").exists())
+        # The temporary decompressed tar was cleaned up.
+        self.assertFalse(expected_output.exists())
+
+
 if __name__ == "__main__":
     unittest.main()
