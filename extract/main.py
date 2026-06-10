@@ -145,7 +145,12 @@ def process_archives_parallel(archive_files: List[Path], args, conn) -> None:
                 results.append((archive, False))
                 print(f"Error extracting {archive}: {e}")
                 logging.error(
-                    {"action": "extract", "status": "error", "archive": str(archive), "error": str(e)}
+                    {
+                        "action": "extract",
+                        "status": "error",
+                        "archive": str(archive),
+                        "error": str(e),
+                    }
                 )
 
     # Update index and handle deletion sequentially (database operations)
@@ -154,7 +159,9 @@ def process_archives_parallel(archive_files: List[Path], args, conn) -> None:
 
     for archive, success in results:
         if success:
-            logging.info({"action": "extract", "status": "success", "archive": str(archive)})
+            logging.info(
+                {"action": "extract", "status": "success", "archive": str(archive)}
+            )
             update_index_after_extraction(conn, archive.parent)
 
         if args.default_delete_choice == 1:
@@ -265,9 +272,7 @@ def prompt_delete_action(
             print("Invalid input. Please enter 1 or 2.")
 
 
-def extract_and_update_index(
-    archive_file: Path, args, conn, depth: int = 0
-) -> None:
+def extract_and_update_index(archive_file: Path, args, conn, depth: int = 0) -> None:
     """Extracts the archive and updates the index.
 
     Args:
@@ -309,9 +314,7 @@ def extract_and_update_index(
             )
 
 
-def process_nested_archives(
-    directory: Path, args, conn, depth: int
-) -> None:
+def process_nested_archives(directory: Path, args, conn, depth: int) -> None:
     """Processes nested archives found in the extracted directory.
 
     Args:
@@ -325,12 +328,14 @@ def process_nested_archives(
         return
 
     print(f"\n[Depth {depth}] Found {len(nested_archives)} nested archive(s)")
-    logging.info({
-        "action": "nested_archives_found",
-        "directory": str(directory),
-        "count": len(nested_archives),
-        "depth": depth,
-    })
+    logging.info(
+        {
+            "action": "nested_archives_found",
+            "directory": str(directory),
+            "count": len(nested_archives),
+            "depth": depth,
+        }
+    )
 
     for archive in nested_archives:
         print(f"[Depth {depth}] Extracting nested archive: {archive}")

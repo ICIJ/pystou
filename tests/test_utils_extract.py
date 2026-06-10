@@ -54,6 +54,7 @@ class TestExtractArchiveSafety(unittest.TestCase):
     def _import_zstd_or_skip(self):
         try:
             import zstandard as zstd
+
             return zstd
         except ImportError:
             self.skipTest("zstandard module not installed")

@@ -97,11 +97,13 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     for item in junk_items:
         print(f"  {item}")
 
-    logging.info({
-        "action": "junk_found",
-        "count": len(junk_items),
-        "items": [str(i) for i in junk_items],
-    })
+    logging.info(
+        {
+            "action": "junk_found",
+            "count": len(junk_items),
+            "items": [str(i) for i in junk_items],
+        }
+    )
 
     if args.list_only:
         print("\n(Use without --list-only to remove)")
@@ -119,12 +121,14 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     print(f"\nRemoved {removed_count}/{len(junk_items)} item(s)")
     if skipped_count > 0:
         print(f"Skipped {skipped_count} item(s) due to errors")
-    logging.info({
-        "action": "cleanup_complete",
-        "removed": removed_count,
-        "skipped": skipped_count,
-        "total": len(junk_items),
-    })
+    logging.info(
+        {
+            "action": "cleanup_complete",
+            "removed": removed_count,
+            "skipped": skipped_count,
+            "total": len(junk_items),
+        }
+    )
 
 
 def find_junk(
@@ -184,11 +188,15 @@ def find_junk(
                     continue
                 if entry.is_dir(follow_symlinks=False) and entry.name in junk_dirs:
                     junk_items.append(Path(entry.path))
-                elif entry.is_file(follow_symlinks=False) and is_junk_file(entry.name, junk_files):
+                elif entry.is_file(follow_symlinks=False) and is_junk_file(
+                    entry.name, junk_files
+                ):
                     junk_items.append(Path(entry.path))
         except PermissionError as e:
             print(f"Permission denied: {directory_path}")
-            logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
+            logging.warning(
+                {"action": "scan_error", "path": str(directory_path), "error": str(e)}
+            )
 
     if scanned >= 1000:
         print(f"Scanned {scanned} directories.    ")  # Clear progress line
@@ -238,11 +246,13 @@ def remove_junk(junk_items: List[Path]) -> tuple:
         try:
             if not item.exists():
                 # File was already deleted (race condition)
-                logging.warning({
-                    "action": "remove_junk",
-                    "status": "already_deleted",
-                    "path": str(item),
-                })
+                logging.warning(
+                    {
+                        "action": "remove_junk",
+                        "status": "already_deleted",
+                        "path": str(item),
+                    }
+                )
                 skipped += 1
                 continue
 
@@ -255,39 +265,47 @@ def remove_junk(junk_items: List[Path]) -> tuple:
                 item.unlink()
 
             removed += 1
-            logging.info({
-                "action": "remove_junk",
-                "status": "success",
-                "path": str(item),
-            })
+            logging.info(
+                {
+                    "action": "remove_junk",
+                    "status": "success",
+                    "path": str(item),
+                }
+            )
 
         except FileNotFoundError:
             # Race condition: file deleted between check and removal
-            logging.warning({
-                "action": "remove_junk",
-                "status": "not_found",
-                "path": str(item),
-            })
+            logging.warning(
+                {
+                    "action": "remove_junk",
+                    "status": "not_found",
+                    "path": str(item),
+                }
+            )
             skipped += 1
 
         except PermissionError as e:
             print(f"Permission denied: {item}")
-            logging.error({
-                "action": "remove_junk",
-                "status": "permission_denied",
-                "path": str(item),
-                "error": str(e),
-            })
+            logging.error(
+                {
+                    "action": "remove_junk",
+                    "status": "permission_denied",
+                    "path": str(item),
+                    "error": str(e),
+                }
+            )
             skipped += 1
 
         except OSError as e:
             print(f"Error removing {item}: {e}")
-            logging.error({
-                "action": "remove_junk",
-                "status": "error",
-                "path": str(item),
-                "error": str(e),
-            })
+            logging.error(
+                {
+                    "action": "remove_junk",
+                    "status": "error",
+                    "path": str(item),
+                    "error": str(e),
+                }
+            )
             skipped += 1
 
     if total > 10:

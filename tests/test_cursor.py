@@ -17,6 +17,7 @@ class TestCursorHide(unittest.TestCase):
     def setUp(self):
         """Reset cursor state before each test."""
         import common.cursor
+
         common.cursor._cursor_hidden = False
         common.cursor._original_sigint = None
         common.cursor._original_sigterm = None
@@ -57,6 +58,7 @@ class TestCursorShow(unittest.TestCase):
     def setUp(self):
         """Reset cursor state before each test."""
         import common.cursor
+
         common.cursor._cursor_hidden = False
         common.cursor._original_sigint = None
         common.cursor._original_sigterm = None
@@ -67,6 +69,7 @@ class TestCursorShow(unittest.TestCase):
     def test_show_cursor_writes_escape_code(self, mock_flush, mock_write, mock_isatty):
         """Test that show_cursor writes the correct escape code."""
         import common.cursor
+
         common.cursor._cursor_hidden = True
 
         show_cursor()
@@ -87,6 +90,7 @@ class TestCursorSignalHandler(unittest.TestCase):
     def setUp(self):
         """Reset cursor state before each test."""
         import common.cursor
+
         common.cursor._cursor_hidden = False
         common.cursor._original_sigint = None
         common.cursor._original_sigterm = None
@@ -101,6 +105,7 @@ class TestCursorSignalHandler(unittest.TestCase):
     def test_signal_handler_restores_cursor(self, mock_flush, mock_write, mock_isatty):
         """Test that signal handler restores cursor before raising."""
         import common.cursor
+
         common.cursor._cursor_hidden = True
         common.cursor._original_sigint = signal.SIG_DFL
 
@@ -116,6 +121,7 @@ class TestCursorSignalHandler(unittest.TestCase):
     def test_signal_handler_calls_original(self, mock_flush, mock_write, mock_isatty):
         """Test that signal handler calls original handler."""
         import common.cursor
+
         common.cursor._cursor_hidden = True
 
         original_handler = MagicMock()
@@ -132,6 +138,7 @@ class TestCursorIntegration(unittest.TestCase):
     def setUp(self):
         """Reset cursor state before each test."""
         import common.cursor
+
         common.cursor._cursor_hidden = False
         common.cursor._original_sigint = None
         common.cursor._original_sigterm = None
@@ -156,7 +163,9 @@ class TestCursorIntegration(unittest.TestCase):
     @patch("sys.stdout.flush")
     @patch("signal.getsignal")
     @patch("signal.signal")
-    def test_signal_handlers_registered(self, mock_signal, mock_getsignal, mock_flush, mock_write, mock_isatty):
+    def test_signal_handlers_registered(
+        self, mock_signal, mock_getsignal, mock_flush, mock_write, mock_isatty
+    ):
         """Test that signal handlers are registered on hide_cursor."""
         mock_getsignal.return_value = signal.SIG_DFL
 

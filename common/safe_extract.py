@@ -48,7 +48,11 @@ def safe_extract_zip(zip_ref, dest) -> bool:
     for name in zip_ref.namelist():
         if _safe_target(dest, name) is None:
             logging.error(
-                {"action": "safe_extract_zip", "status": "unsafe_member", "member": name}
+                {
+                    "action": "safe_extract_zip",
+                    "status": "unsafe_member",
+                    "member": name,
+                }
             )
             return False
     zip_ref.extractall(dest)
@@ -81,7 +85,11 @@ def safe_extract_tar(tar_ref, dest) -> bool:
             return False
         if _safe_target(dest, member.name) is None:
             logging.error(
-                {"action": "safe_extract_tar", "status": "unsafe_member", "member": member.name}
+                {
+                    "action": "safe_extract_tar",
+                    "status": "unsafe_member",
+                    "member": member.name,
+                }
             )
             return False
     try:

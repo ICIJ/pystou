@@ -70,9 +70,7 @@ def create_tables(conn: sqlite3.Connection) -> None:
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_files_directory ON files(directory_path)"
     )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_files_name ON files(name)"
-    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_name ON files(name)")
     conn.commit()
 
 
@@ -149,7 +147,11 @@ def update_index_after_change(
             stat_info = path.stat()
         except OSError:
             logging.warning(
-                {"action": "index_add_directory", "status": "stat_failed", "path": str(path)}
+                {
+                    "action": "index_add_directory",
+                    "status": "stat_failed",
+                    "path": str(path),
+                }
             )
             return
         cursor.execute(

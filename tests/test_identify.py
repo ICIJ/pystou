@@ -59,7 +59,7 @@ class TestIdentifyDetectFileType(unittest.TestCase):
         """Test detecting a JPEG file by magic bytes."""
         jpg_path = self.test_path / "test.jpg"
         # JPEG magic bytes
-        jpg_path.write_bytes(b"\xFF\xD8\xFF" + b"\x00" * 100)
+        jpg_path.write_bytes(b"\xff\xd8\xff" + b"\x00" * 100)
 
         file_type = detect_file_type(jpg_path)
         self.assertEqual(file_type, "jpeg")
@@ -216,9 +216,7 @@ class TestIdentifyCollectFiles(unittest.TestCase):
 
     def test_collect_files_with_extension_filter(self):
         """Test collecting files with extension filter."""
-        files = collect_files(
-            self.test_dir, recursive=True, extensions_filter={".zip"}
-        )
+        files = collect_files(self.test_dir, recursive=True, extensions_filter={".zip"})
 
         self.assertEqual(len(files), 2)
         for f in files:
@@ -270,7 +268,9 @@ class TestIdentifyMain(unittest.TestCase):
 
         # Should print a message about 0 files
         calls = [str(call) for call in mock_print.call_args_list]
-        found_zero_files = any("0 files" in call or "No files" in call for call in calls)
+        found_zero_files = any(
+            "0 files" in call or "No files" in call for call in calls
+        )
         self.assertTrue(found_zero_files, f"Expected '0 files' message, got: {calls}")
 
     @patch("builtins.print")
@@ -325,7 +325,9 @@ class TestIdentifyMain(unittest.TestCase):
 
         # Check that issues were found
         calls = [str(call) for call in mock_print.call_args_list]
-        found_issue = any("issue" in call.lower() or "mismatch" in call.lower() for call in calls)
+        found_issue = any(
+            "issue" in call.lower() or "mismatch" in call.lower() for call in calls
+        )
         self.assertTrue(found_issue)
 
     @patch("builtins.print")

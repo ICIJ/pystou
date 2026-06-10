@@ -14,23 +14,23 @@ from common.interrupt import scanning
 
 # File signatures (magic bytes) for common file types
 FILE_SIGNATURES: Dict[bytes, str] = {
-    b"\x50\x4B\x03\x04": "zip",
-    b"\x50\x4B\x05\x06": "zip",  # Empty archive
-    b"\x50\x4B\x07\x08": "zip",  # Spanned archive
-    b"\x1F\x8B": "gzip",
-    b"\x42\x5A\x68": "bzip2",
-    b"\xFD\x37\x7A\x58\x5A\x00": "xz",
-    b"\x28\xB5\x2F\xFD": "zstd",
+    b"\x50\x4b\x03\x04": "zip",
+    b"\x50\x4b\x05\x06": "zip",  # Empty archive
+    b"\x50\x4b\x07\x08": "zip",  # Spanned archive
+    b"\x1f\x8b": "gzip",
+    b"\x42\x5a\x68": "bzip2",
+    b"\xfd\x37\x7a\x58\x5a\x00": "xz",
+    b"\x28\xb5\x2f\xfd": "zstd",
     b"\x75\x73\x74\x61\x72": "tar",  # "ustar" at offset 257
-    b"\x52\x61\x72\x21\x1A\x07": "rar",
-    b"\x37\x7A\xBC\xAF\x27\x1C": "7z",
-    b"\x21\x42\x44\x4E": "pst",  # MS Outlook PST
-    b"\xFF\xD8\xFF": "jpeg",
-    b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A": "png",
+    b"\x52\x61\x72\x21\x1a\x07": "rar",
+    b"\x37\x7a\xbc\xaf\x27\x1c": "7z",
+    b"\x21\x42\x44\x4e": "pst",  # MS Outlook PST
+    b"\xff\xd8\xff": "jpeg",
+    b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a": "png",
     b"\x47\x49\x46\x38": "gif",
     b"\x25\x50\x44\x46": "pdf",
-    b"\x50\x4B": "docx/xlsx/pptx",  # Office Open XML (also zip-based)
-    b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1": "doc/xls/ppt",  # OLE2 compound document
+    b"\x50\x4b": "docx/xlsx/pptx",  # Office Open XML (also zip-based)
+    b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1": "doc/xls/ppt",  # OLE2 compound document
 }
 
 # Extension to expected type mapping
@@ -154,11 +154,13 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     for file_path, issue in issues:
         print(f"  [{issue}] {file_path}")
 
-    logging.info({
-        "action": "issues_found",
-        "count": len(issues),
-        "issues": [{"path": str(p), "issue": i} for p, i in issues],
-    })
+    logging.info(
+        {
+            "action": "issues_found",
+            "count": len(issues),
+            "issues": [{"path": str(p), "issue": i} for p, i in issues],
+        }
+    )
 
 
 def collect_files(
@@ -195,7 +197,10 @@ def collect_files(
                 # Skip symlinks
                 if file_path.is_symlink():
                     continue
-                if extensions_filter is None or file_path.suffix.lower() in extensions_filter:
+                if (
+                    extensions_filter is None
+                    or file_path.suffix.lower() in extensions_filter
+                ):
                     files.append(file_path)
     else:
         try:
@@ -205,11 +210,16 @@ def collect_files(
                     continue
                 if entry.is_file(follow_symlinks=False):
                     file_path = Path(entry.path)
-                    if extensions_filter is None or file_path.suffix.lower() in extensions_filter:
+                    if (
+                        extensions_filter is None
+                        or file_path.suffix.lower() in extensions_filter
+                    ):
                         files.append(file_path)
         except PermissionError as e:
             print(f"Permission denied: {directory_path}")
-            logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
+            logging.warning(
+                {"action": "scan_error", "path": str(directory_path), "error": str(e)}
+            )
 
     if scanned >= 1000:
         print(f"Scanned {scanned} directories.    ")  # Clear progress line
@@ -252,13 +262,28 @@ def detect_file_type(file_path: Path) -> Optional[str]:
         return None
 
     except FileNotFoundError:
-        logging.warning({"action": "detect_type", "status": "not_found", "path": str(file_path)})
+        logging.warning(
+            {"action": "detect_type", "status": "not_found", "path": str(file_path)}
+        )
         return None
     except PermissionError:
-        logging.warning({"action": "detect_type", "status": "permission_denied", "path": str(file_path)})
+        logging.warning(
+            {
+                "action": "detect_type",
+                "status": "permission_denied",
+                "path": str(file_path),
+            }
+        )
         return None
     except OSError as e:
-        logging.warning({"action": "detect_type", "status": "error", "path": str(file_path), "error": str(e)})
+        logging.warning(
+            {
+                "action": "detect_type",
+                "status": "error",
+                "path": str(file_path),
+                "error": str(e),
+            }
+        )
         return None
 
 
@@ -293,12 +318,14 @@ def check_extension_mismatches(files: List[Path]) -> List[Tuple[Path, str]]:
         if detected_type not in expected_types:
             issue = f"Extension mismatch: {ext} file is actually {detected_type}"
             issues.append((file_path, issue))
-            logging.warning({
-                "action": "extension_mismatch",
-                "path": str(file_path),
-                "extension": ext,
-                "detected_type": detected_type,
-            })
+            logging.warning(
+                {
+                    "action": "extension_mismatch",
+                    "path": str(file_path),
+                    "extension": ext,
+                    "detected_type": detected_type,
+                }
+            )
 
     if total > 100:
         print(f"Checked {total} files.           ")  # Clear progress line
@@ -337,21 +364,42 @@ def check_encrypted_archives(files: List[Path]) -> List[Tuple[Path, str]]:
                     if info.flag_bits & 0x1:  # Encrypted flag
                         issue = "Encrypted ZIP archive"
                         issues.append((file_path, issue))
-                        logging.warning({
-                            "action": "encrypted_archive",
-                            "path": str(file_path),
-                        })
+                        logging.warning(
+                            {
+                                "action": "encrypted_archive",
+                                "path": str(file_path),
+                            }
+                        )
                         break
 
         except FileNotFoundError:
-            logging.warning({"action": "check_encrypted", "status": "not_found", "path": str(file_path)})
+            logging.warning(
+                {
+                    "action": "check_encrypted",
+                    "status": "not_found",
+                    "path": str(file_path),
+                }
+            )
         except PermissionError:
-            logging.warning({"action": "check_encrypted", "status": "permission_denied", "path": str(file_path)})
+            logging.warning(
+                {
+                    "action": "check_encrypted",
+                    "status": "permission_denied",
+                    "path": str(file_path),
+                }
+            )
         except zipfile.BadZipFile:
             # Not a valid zip file - might be detected by mismatch check
             pass
         except OSError as e:
-            logging.warning({"action": "check_encrypted", "status": "error", "path": str(file_path), "error": str(e)})
+            logging.warning(
+                {
+                    "action": "check_encrypted",
+                    "status": "error",
+                    "path": str(file_path),
+                    "error": str(e),
+                }
+            )
 
     if checked > 100:
         print(f"Checked {checked} archives.      ")  # Clear progress line

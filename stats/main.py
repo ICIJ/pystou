@@ -101,8 +101,16 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:
     }
 
     archive_extensions = {
-        ".zip", ".tar", ".gz", ".tgz", ".bz2", ".xz",
-        ".zst", ".rar", ".7z", ".pst",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".tgz",
+        ".bz2",
+        ".xz",
+        ".zst",
+        ".rar",
+        ".7z",
+        ".pst",
     }
 
     directory_path = Path(directory)
@@ -116,7 +124,10 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:
 
             # Progress indicator every 1000 directories
             if scanned % 1000 == 0:
-                print(f"Scanned {scanned} directories, {stats['summary']['total_files']} files...", end="\r")
+                print(
+                    f"Scanned {scanned} directories, {stats['summary']['total_files']} files...",
+                    end="\r",
+                )
 
             stats["summary"]["total_dirs"] += len(dirs)
 
@@ -169,11 +180,15 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:
                     process_file(Path(entry.path), stats, archive_extensions, top_n)
         except PermissionError as e:
             print(f"Permission denied: {directory_path}")
-            logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
+            logging.warning(
+                {"action": "scan_error", "path": str(directory_path), "error": str(e)}
+            )
             stats["summary"]["errors"] += 1
 
     if scanned >= 1000:
-        print(f"Scanned {scanned} directories, {stats['summary']['total_files']} files.    ")
+        print(
+            f"Scanned {scanned} directories, {stats['summary']['total_files']} files.    "
+        )
 
     # Convert heap to sorted list (largest first)
     stats["largest_files"] = [
@@ -183,7 +198,9 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:
     return stats
 
 
-def process_file(file_path: Path, stats: Dict, archive_extensions: set, top_n: int) -> None:
+def process_file(
+    file_path: Path, stats: Dict, archive_extensions: set, top_n: int
+) -> None:
     """Processes a single file and updates statistics.
 
     Args:
@@ -276,7 +293,9 @@ def output_text(
         )[:top_n]
 
         for ext, data in sorted_by_count:
-            print(f"  {ext:15} {data['count']:>8,} files  ({format_size(data['size']):>10})")
+            print(
+                f"  {ext:15} {data['count']:>8,} files  ({format_size(data['size']):>10})"
+            )
 
     # Show largest files if requested
     if show_by_size:

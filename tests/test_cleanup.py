@@ -78,7 +78,9 @@ class TestCleanupFindJunk(unittest.TestCase):
 
     def test_find_junk_non_recursive(self):
         """Test finding junk files without recursion."""
-        junk = find_junk(self.test_dir, recursive=False, junk_files=JUNK_FILES, junk_dirs=JUNK_DIRS)
+        junk = find_junk(
+            self.test_dir, recursive=False, junk_files=JUNK_FILES, junk_dirs=JUNK_DIRS
+        )
         junk_names = {j.name for j in junk}
 
         self.assertIn(".DS_Store", junk_names)
@@ -89,7 +91,9 @@ class TestCleanupFindJunk(unittest.TestCase):
 
     def test_find_junk_recursive(self):
         """Test finding junk files with recursion."""
-        junk = find_junk(self.test_dir, recursive=True, junk_files=JUNK_FILES, junk_dirs=JUNK_DIRS)
+        junk = find_junk(
+            self.test_dir, recursive=True, junk_files=JUNK_FILES, junk_dirs=JUNK_DIRS
+        )
 
         # Should find junk in root and subdirectory
         self.assertGreaterEqual(len(junk), 4)
@@ -106,7 +110,9 @@ class TestCleanupFindJunk(unittest.TestCase):
         custom_junk = JUNK_FILES.copy()
         custom_junk.add("custom.bak")
 
-        junk = find_junk(self.test_dir, recursive=False, junk_files=custom_junk, junk_dirs=JUNK_DIRS)
+        junk = find_junk(
+            self.test_dir, recursive=False, junk_files=custom_junk, junk_dirs=JUNK_DIRS
+        )
         junk_names = {j.name for j in junk}
 
         self.assertIn("custom.bak", junk_names)

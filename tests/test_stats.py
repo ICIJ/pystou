@@ -93,7 +93,9 @@ class TestStatsCollectStats(unittest.TestCase):
         stats = collect_stats(self.test_dir, recursive=True)
 
         self.assertIn(".txt", stats["by_extension"])
-        self.assertEqual(stats["by_extension"][".txt"]["count"], 3)  # file1, file2, file4
+        self.assertEqual(
+            stats["by_extension"][".txt"]["count"], 3
+        )  # file1, file2, file4
 
         self.assertIn(".pdf", stats["by_extension"])
         self.assertEqual(stats["by_extension"][".pdf"]["count"], 1)

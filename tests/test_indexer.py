@@ -5,7 +5,11 @@ import shutil
 import unittest
 from pathlib import Path
 
-from common.indexer import initialize_database, update_index_after_change, close_database
+from common.indexer import (
+    initialize_database,
+    update_index_after_change,
+    close_database,
+)
 from common.errors import PystouError
 
 
@@ -55,8 +59,12 @@ class TestIndexerDeleteDirectory(unittest.TestCase):
 
     def test_delete_directory_escapes_like_wildcards(self):
         cur = self.conn.cursor()
-        cur.execute("INSERT INTO directories (path, parent_path, mtime) VALUES ('/a/te_st/sub', '/a/te_st', 0)")
-        cur.execute("INSERT INTO directories (path, parent_path, mtime) VALUES ('/a/teXst/sub', '/a/teXst', 0)")
+        cur.execute(
+            "INSERT INTO directories (path, parent_path, mtime) VALUES ('/a/te_st/sub', '/a/te_st', 0)"
+        )
+        cur.execute(
+            "INSERT INTO directories (path, parent_path, mtime) VALUES ('/a/teXst/sub', '/a/teXst', 0)"
+        )
         self.conn.commit()
         update_index_after_change(self.conn, "delete_directory", Path("/a/te_st"))
         dirs = self._dirs()

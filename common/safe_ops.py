@@ -26,7 +26,9 @@ def unique_path(base) -> Path:
         counter += 1
 
 
-def verify_then_delete(archive: Path, success: bool, delete_fn: Callable[[], None]) -> None:
+def verify_then_delete(
+    archive: Path, success: bool, delete_fn: Callable[[], None]
+) -> None:
     """Deletes a source archive only if its extraction succeeded.
 
     Args:
@@ -37,7 +39,11 @@ def verify_then_delete(archive: Path, success: bool, delete_fn: Callable[[], Non
     if not success:
         print(f"Keeping archive (extraction failed or produced nothing): {archive}")
         logging.warning(
-            {"action": "keep_archive", "status": "extraction_failed", "archive": str(archive)}
+            {
+                "action": "keep_archive",
+                "status": "extraction_failed",
+                "archive": str(archive),
+            }
         )
         return
     delete_fn()

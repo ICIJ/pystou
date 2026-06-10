@@ -50,7 +50,9 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
 
     # Find empty directories
     with scanning("scan"):
-        empty_dirs = find_empty_directories(args.directory, args.recursive, args.include_hidden)
+        empty_dirs = find_empty_directories(
+            args.directory, args.recursive, args.include_hidden
+        )
 
     if not empty_dirs:
         print("No empty directories found.")
@@ -61,11 +63,13 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     for d in empty_dirs:
         print(f"  {d}")
 
-    logging.info({
-        "action": "empty_dirs_found",
-        "count": len(empty_dirs),
-        "directories": [str(d) for d in empty_dirs],
-    })
+    logging.info(
+        {
+            "action": "empty_dirs_found",
+            "count": len(empty_dirs),
+            "directories": [str(d) for d in empty_dirs],
+        }
+    )
 
     if args.list_only:
         print("\n(Use without --list-only to remove)")
@@ -83,12 +87,14 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     print(f"\nRemoved {removed_count}/{len(empty_dirs)} directory(ies)")
     if skipped_count > 0:
         print(f"Skipped {skipped_count} directory(ies) due to errors")
-    logging.info({
-        "action": "remove_empty_complete",
-        "removed": removed_count,
-        "skipped": skipped_count,
-        "total": len(empty_dirs),
-    })
+    logging.info(
+        {
+            "action": "remove_empty_complete",
+            "removed": removed_count,
+            "skipped": skipped_count,
+            "total": len(empty_dirs),
+        }
+    )
 
 
 def find_empty_directories(
@@ -114,7 +120,9 @@ def find_empty_directories(
         # Walk bottom-up so we can detect directories that become empty
         # after removing their empty subdirectories
         # followlinks=False prevents infinite loops from symlink cycles
-        for root, dirs, files in os.walk(directory_path, topdown=False, followlinks=False):
+        for root, dirs, files in os.walk(
+            directory_path, topdown=False, followlinks=False
+        ):
             root_path = Path(root)
             scanned += 1
 
@@ -155,7 +163,9 @@ def find_empty_directories(
                         empty_dirs.append(dir_path)
         except PermissionError as e:
             print(f"Permission denied: {directory_path}")
-            logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
+            logging.warning(
+                {"action": "scan_error", "path": str(directory_path), "error": str(e)}
+            )
 
     if scanned >= 1000:
         print(f"Scanned {scanned} directories.    ")  # Clear progress line
@@ -217,67 +227,81 @@ def remove_empty_directories(empty_dirs: List[Path]) -> tuple:
         try:
             # Check if it still exists and is still empty
             if not dir_path.exists():
-                logging.warning({
-                    "action": "remove_empty_dir",
-                    "status": "already_deleted",
-                    "path": str(dir_path),
-                })
+                logging.warning(
+                    {
+                        "action": "remove_empty_dir",
+                        "status": "already_deleted",
+                        "path": str(dir_path),
+                    }
+                )
                 skipped += 1
                 continue
 
             if dir_path.is_symlink():
                 # Skip symlinks for safety
-                logging.warning({
-                    "action": "remove_empty_dir",
-                    "status": "symlink_skipped",
-                    "path": str(dir_path),
-                })
+                logging.warning(
+                    {
+                        "action": "remove_empty_dir",
+                        "status": "symlink_skipped",
+                        "path": str(dir_path),
+                    }
+                )
                 skipped += 1
                 continue
 
             dir_path.rmdir()
             removed += 1
-            logging.info({
-                "action": "remove_empty_dir",
-                "status": "success",
-                "path": str(dir_path),
-            })
+            logging.info(
+                {
+                    "action": "remove_empty_dir",
+                    "status": "success",
+                    "path": str(dir_path),
+                }
+            )
 
         except FileNotFoundError:
             # Directory was deleted between check and removal
-            logging.warning({
-                "action": "remove_empty_dir",
-                "status": "not_found",
-                "path": str(dir_path),
-            })
+            logging.warning(
+                {
+                    "action": "remove_empty_dir",
+                    "status": "not_found",
+                    "path": str(dir_path),
+                }
+            )
             skipped += 1
 
         except PermissionError as e:
             print(f"Permission denied: {dir_path}")
-            logging.error({
-                "action": "remove_empty_dir",
-                "status": "permission_denied",
-                "path": str(dir_path),
-                "error": str(e),
-            })
+            logging.error(
+                {
+                    "action": "remove_empty_dir",
+                    "status": "permission_denied",
+                    "path": str(dir_path),
+                    "error": str(e),
+                }
+            )
             skipped += 1
 
         except OSError as e:
             # Directory might not be empty anymore or have other issues
             if "not empty" in str(e).lower() or e.errno == 39:  # ENOTEMPTY
-                logging.warning({
-                    "action": "remove_empty_dir",
-                    "status": "not_empty",
-                    "path": str(dir_path),
-                })
+                logging.warning(
+                    {
+                        "action": "remove_empty_dir",
+                        "status": "not_empty",
+                        "path": str(dir_path),
+                    }
+                )
             else:
                 print(f"Error removing {dir_path}: {e}")
-                logging.error({
-                    "action": "remove_empty_dir",
-                    "status": "error",
-                    "path": str(dir_path),
-                    "error": str(e),
-                })
+                logging.error(
+                    {
+                        "action": "remove_empty_dir",
+                        "status": "error",
+                        "path": str(dir_path),
+                        "error": str(e),
+                    }
+                )
             skipped += 1
 
     if total > 10:

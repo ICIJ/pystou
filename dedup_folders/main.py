@@ -272,20 +272,35 @@ def merge_contents(
                 had_conflict = True
                 print(f"Conflict: {dst} already exists. Keeping {src}")
                 logging.info(
-                    {"action": "merge", "status": "conflict", "source": str(src), "destination": str(dst)}
+                    {
+                        "action": "merge",
+                        "status": "conflict",
+                        "source": str(src),
+                        "destination": str(dst),
+                    }
                 )
             else:
                 if dry_run:
                     print(f"Dry run: would move {src} to {dst}")
                     logging.info(
-                        {"action": "move", "status": "dry_run", "source": str(src), "destination": str(dst)}
+                        {
+                            "action": "move",
+                            "status": "dry_run",
+                            "source": str(src),
+                            "destination": str(dst),
+                        }
                     )
                 else:
                     try:
                         print(f"Moving {src} to {dst}")
                         shutil.move(str(src), str(dst))
                         logging.info(
-                            {"action": "move", "status": "success", "source": str(src), "destination": str(dst)}
+                            {
+                                "action": "move",
+                                "status": "success",
+                                "source": str(src),
+                                "destination": str(dst),
+                            }
                         )
                         update_index_after_change(conn, "delete_file", src)
                         update_index_after_change(conn, "add_file", dst)
@@ -293,29 +308,48 @@ def merge_contents(
                         had_conflict = True  # keep the dir; the file did not move
                         print(f"Error moving {src} to {dst}: {e}")
                         logging.error(
-                            {"action": "move", "status": "error", "source": str(src), "destination": str(dst), "error": str(e)}
+                            {
+                                "action": "move",
+                                "status": "error",
+                                "source": str(src),
+                                "destination": str(dst),
+                                "error": str(e),
+                            }
                         )
 
         if had_conflict:
             print(f"Keeping {dup_dir} (unmerged items remain)")
             logging.info(
-                {"action": "delete", "status": "skipped_conflict", "directory": str(dup_dir)}
+                {
+                    "action": "delete",
+                    "status": "skipped_conflict",
+                    "directory": str(dup_dir),
+                }
             )
             continue
 
         if dry_run:
             print(f"Dry run: would delete {dup_dir}")
-            logging.info({"action": "delete", "status": "dry_run", "directory": str(dup_dir)})
+            logging.info(
+                {"action": "delete", "status": "dry_run", "directory": str(dup_dir)}
+            )
         else:
             try:
                 print(f"Deleting {dup_dir}")
                 shutil.rmtree(dup_dir)
-                logging.info({"action": "delete", "status": "success", "directory": str(dup_dir)})
+                logging.info(
+                    {"action": "delete", "status": "success", "directory": str(dup_dir)}
+                )
                 update_index_after_change(conn, "delete_directory", dup_dir)
             except OSError as e:
                 print(f"Error deleting {dup_dir}: {e}")
                 logging.error(
-                    {"action": "delete", "status": "error", "directory": str(dup_dir), "error": str(e)}
+                    {
+                        "action": "delete",
+                        "status": "error",
+                        "directory": str(dup_dir),
+                        "error": str(e),
+                    }
                 )
 
 

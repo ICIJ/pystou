@@ -57,7 +57,7 @@ def get_directory_size(conn, dir_path: Path) -> tuple:
     # Use SQL aggregate functions instead of fetching all rows
     cursor.execute(
         "SELECT COALESCE(SUM(size), 0), COUNT(*) FROM files WHERE directory_path = ?",
-        (str(dir_path),)
+        (str(dir_path),),
     )
     total_size, num_files = cursor.fetchone()
     return total_size, num_files
@@ -189,7 +189,12 @@ def extract_archive(archive_path: Path) -> bool:
                 }
             )
             return False
-    except (OSError, zipfile.BadZipFile, tarfile.TarError, subprocess.CalledProcessError) as e:
+    except (
+        OSError,
+        zipfile.BadZipFile,
+        tarfile.TarError,
+        subprocess.CalledProcessError,
+    ) as e:
         print(f"Error extracting archive {archive_path}: {e}")
         logging.error(
             {
@@ -221,7 +226,12 @@ def extract_zip_archive(archive_path: Path) -> bool:
     except (zipfile.BadZipFile, OSError) as e:
         print(f"Error extracting ZIP archive {archive_path}: {e}")
         logging.error(
-            {"action": "extract_zip", "status": "error", "archive": str(archive_path), "error": str(e)}
+            {
+                "action": "extract_zip",
+                "status": "error",
+                "archive": str(archive_path),
+                "error": str(e),
+            }
         )
         return False
 
@@ -286,7 +296,12 @@ def extract_tar_archive(archive_path: Path) -> bool:
     except (tarfile.TarError, OSError) as e:
         print(f"Error extracting TAR archive {archive_path}: {e}")
         logging.error(
-            {"action": "extract_tar", "status": "error", "archive": str(archive_path), "error": str(e)}
+            {
+                "action": "extract_tar",
+                "status": "error",
+                "archive": str(archive_path),
+                "error": str(e),
+            }
         )
         return False
 
@@ -305,7 +320,10 @@ def extract_compressed_file(archive_path: Path) -> bool:
             import gzip
 
             target_path = unique_path(archive_path.with_suffix(""))
-            with gzip.open(archive_path, "rb") as f_in, open(target_path, "wb") as f_out:
+            with (
+                gzip.open(archive_path, "rb") as f_in,
+                open(target_path, "wb") as f_out,
+            ):
                 shutil.copyfileobj(f_in, f_out)
         elif archive_path.suffix == ".bz2":
             import bz2
@@ -316,7 +334,11 @@ def extract_compressed_file(archive_path: Path) -> bool:
         else:
             print(f"Unsupported compressed file format: {archive_path}")
             logging.error(
-                {"action": "extract_compressed_file", "status": "unsupported_format", "archive": str(archive_path)}
+                {
+                    "action": "extract_compressed_file",
+                    "status": "unsupported_format",
+                    "archive": str(archive_path),
+                }
             )
             return False
         print(f"Extracted compressed file: {archive_path}")
@@ -324,7 +346,12 @@ def extract_compressed_file(archive_path: Path) -> bool:
     except OSError as e:
         print(f"Error extracting compressed file {archive_path}: {e}")
         logging.error(
-            {"action": "extract_compressed_file", "status": "error", "archive": str(archive_path), "error": str(e)}
+            {
+                "action": "extract_compressed_file",
+                "status": "error",
+                "archive": str(archive_path),
+                "error": str(e),
+            }
         )
         return False
 
@@ -387,7 +414,12 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
         except (OSError, tarfile.TarError) as e:
             print(f"Error extracting ZST archive {archive_path}: {e}")
             logging.error(
-                {"action": "extract_zst_module", "status": "error", "archive": str(archive_path), "error": str(e)}
+                {
+                    "action": "extract_zst_module",
+                    "status": "error",
+                    "archive": str(archive_path),
+                    "error": str(e),
+                }
             )
             return False
         finally:
@@ -403,7 +435,12 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
         except OSError as e:
             print(f"Error extracting ZST archive {archive_path}: {e}")
             logging.error(
-                {"action": "extract_zst_module", "status": "error", "archive": str(archive_path), "error": str(e)}
+                {
+                    "action": "extract_zst_module",
+                    "status": "error",
+                    "archive": str(archive_path),
+                    "error": str(e),
+                }
             )
             return False
 
@@ -439,7 +476,12 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
     except (subprocess.CalledProcessError, tarfile.TarError, OSError) as e:
         print(f"Error extracting ZST archive with zstd command {archive_path}: {e}")
         logging.error(
-            {"action": "extract_zst_command", "status": "error", "archive": str(archive_path), "error": str(e)}
+            {
+                "action": "extract_zst_command",
+                "status": "error",
+                "archive": str(archive_path),
+                "error": str(e),
+            }
         )
         if output_path.exists():
             output_path.unlink()
@@ -524,5 +566,3 @@ def get_split_archive_parts(archive_path: Path) -> List[Path]:
     # Sort by part number and return just the paths
     parts.sort(key=lambda x: x[0])
     return [p[1] for p in parts] + [archive_path]
-
-
