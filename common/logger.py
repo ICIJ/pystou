@@ -6,7 +6,10 @@ import os
 
 
 def setup_logging(script_name: str = "script", log_dir: str = ".") -> None:
-    """Sets up JSON logging to a file with the current timestamp.
+    """Sets up JSON logging to a timestamped file.
+
+    Idempotent: clears handlers added by previous calls so dispatching a
+    subcommand (or running tests) does not duplicate log lines.
 
     Args:
         script_name (str): Name of the script (used in log filename).
@@ -18,9 +21,28 @@ def setup_logging(script_name: str = "script", log_dir: str = ".") -> None:
         log_filename, maxBytes=10485760, backupCount=5
     )
     handler.setFormatter(JsonFormatter())
+
     logger = logging.getLogger()
+    for existing in logger.handlers[:]:
+        logger.removeHandler(existing)
+        existing.close()
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
+
+
+def log_configuration(args) -> None:
+    """Logs the run configuration, excluding internal/non-serializable keys.
+
+    Args:
+        args: Parsed command-line arguments (argparse.Namespace or similar).
+    """
+    config = {
+        k: v
+        for k, v in vars(args).items()
+        if not k.startswith("_") and k not in ("func", "command")
+    }
+    config["action"] = "configuration"
+    logging.info(config)
 
 
 class JsonFormatter(logging.Formatter):
@@ -38,7 +60,7 @@ class JsonFormatter(logging.Formatter):
         log_record = {
             "timestamp": self.formatTime(record, self.datefmt),
             "level": record.levelname,
-            "message": record.msg,  # Expected to be a dict
+            "message": record.msg,
             "function": record.funcName,
             "line": record.lineno,
         }
