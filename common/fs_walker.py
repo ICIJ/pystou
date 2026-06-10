@@ -111,7 +111,9 @@ def scan_tree(
                             }
                         )
                 insert_entries(conn, dir_entries, file_entries)
-                for subdir in subdirs:
+                # reversed() so siblings are popped in scandir order (matches the
+                # original recursive traversal).
+                for subdir in reversed(subdirs):
                     stack.append((subdir, current_level + 1))
         except PermissionError as e:
             print(f"\nPermission denied: {current_dir}")

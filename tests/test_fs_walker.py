@@ -43,7 +43,7 @@ class TestDeepTree(unittest.TestCase):
         # Must complete without RecursionError.
         fs_walker.collect_directories(self.conn, self.test_dir, recursive=True)
         count = self.conn.execute("SELECT COUNT(*) FROM directories").fetchone()[0]
-        self.assertGreaterEqual(count, depth)
+        self.assertEqual(count, depth)
 
 
 class FakeEntry:
