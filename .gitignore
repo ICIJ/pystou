@@ -116,3 +116,6 @@ dmypy.json
 # SQLite3 database files
 *.sqlite3
 *.db
+
+# Superpowers (local design specs/plans, not tracked)
+docs/superpowers/
