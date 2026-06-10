@@ -1,0 +1,297 @@
+# CHANGELOG
+
+
+## v0.1.1 (2026-06-10)
+
+### Bug Fixes
+
+- Trigger automated release pipeline (smoke test)
+  ([`4b24fcd`](https://github.com/ICIJ/pystou/commit/4b24fcd570e4ae33bdddc7cb8924fa1dcee00e6b))
+
+### Continuous Integration
+
+- Publish to pypi via trusted publishing after release
+  ([`ea78c81`](https://github.com/ICIJ/pystou/commit/ea78c81862b31136aef44ebb080f79c12ebb4f5e))
+
+
+## v0.1.0 (2026-06-10)
+
+### Bug Fixes
+
+- Filter non-serializable attributes in log_configuration
+  ([`6c79b99`](https://github.com/ICIJ/pystou/commit/6c79b99f3b540dadb8842f98204fc4925584b590))
+
+- **build**: Use python3 command in Makefile
+  ([`73ad286`](https://github.com/ICIJ/pystou/commit/73ad2862a29c58387b6ad3e9a035ab57899a883d))
+
+- **common**: Correct index delete prefix matching and guard stat()
+  ([`c2e2e19`](https://github.com/ICIJ/pystou/commit/c2e2e1952a5b169b6f97006901bf2a78c22e88e7))
+
+- **common**: Make setup_logging idempotent and share log_configuration
+  ([`d07bb68`](https://github.com/ICIJ/pystou/commit/d07bb68439cef92a29719bf5f6855647101ade2e))
+
+- **common**: Safe extraction, non-clobbering outputs, zstd CLI path fix
+  ([`a5da991`](https://github.com/ICIJ/pystou/commit/a5da991c20dafa4e81f4ac0a09c4e7aaf396d85d))
+
+- **common**: Scan filesystem iteratively and isolate bad entries
+  ([`a68d035`](https://github.com/ICIJ/pystou/commit/a68d035a4a958b0a899f1e00c29a9c610922d163))
+
+- **dedup**: Preserve conflicting files on merge; validate and handle interrupts
+  ([`de927fe`](https://github.com/ICIJ/pystou/commit/de927fe7039b908bf246feb30def1e1d4b12f286))
+
+- **indexer**: Chain PystouError from sqlite errors
+  ([`83f2f1c`](https://github.com/ICIJ/pystou/commit/83f2f1cb009aa79bbc3331418a2190be19dc7da8))
+
+### Build System
+
+- Migrate from setup.py to pyproject.toml with hatchling and uv
+  ([`08cd9da`](https://github.com/ICIJ/pystou/commit/08cd9daf67ed4ff901f4c5d652a21ce3a94258b1))
+
+- Remove python 3.6 support
+  ([`8ff56a4`](https://github.com/ICIJ/pystou/commit/8ff56a4c658d996f69a253a503a60cb90d24c620))
+
+### Chores
+
+- Ignore local superpowers specs and plans
+  ([`9f84420`](https://github.com/ICIJ/pystou/commit/9f84420d16e130e6d6153a51aba48c92dea2cc3e))
+
+- **make**: Adopt uv-based kuroi-style Makefile
+  ([`44c8714`](https://github.com/ICIJ/pystou/commit/44c8714070bcea224ecf94d5da95fac3cd3fcaac))
+
+### Code Style
+
+- Apply ruff import sorting, pep585 typing, and formatting
+  ([`e73019b`](https://github.com/ICIJ/pystou/commit/e73019b6d6039d395f63f289dafc802cf0138635))
+
+### Continuous Integration
+
+- Add github action workflow
+  ([`56aa26c`](https://github.com/ICIJ/pystou/commit/56aa26ca9d2bd898a4a9d226c5b99d7098c036ca))
+
+- Add semantic-release versioning workflow on push to main
+  ([`54030b1`](https://github.com/ICIJ/pystou/commit/54030b1823de0ba528f92a865e38f5108097c6c1))
+
+- Replace workflow with lint + test matrix on python 3.9-3.12
+  ([`a0b0dfd`](https://github.com/ICIJ/pystou/commit/a0b0dfd1aace295d51892b43e6655bc0b5058831))
+
+- Test 3.12 instead of 3.8
+  ([`e69e7e9`](https://github.com/ICIJ/pystou/commit/e69e7e9b16bea46e41505bed24356e3d9e50665f))
+
+- Use string for python versions
+  ([`5e0bc04`](https://github.com/ICIJ/pystou/commit/5e0bc04718514f5e6562f432a285a0360ee7189c))
+
+### Documentation
+
+- Add subcommand documentation for cleanup, identify, stats, and empty
+  ([`7bff696`](https://github.com/ICIJ/pystou/commit/7bff696c5922bac1e69c2c17c2d8ba8ee71b1785))
+
+- Update CLI usage for unified command
+  ([`7e30ec5`](https://github.com/ICIJ/pystou/commit/7e30ec52ebf0d316c10f69985150561bf72df0b4))
+
+Update documentation to reflect new pystou command structure with dedup and unarchive subcommands.
+  Add information about split ZIP support, parallel extraction, and p7zip-full dependency.
+
+- Update references from unarchive to extract
+  ([`d02a860`](https://github.com/ICIJ/pystou/commit/d02a860b4963fed26475b42c359333c6ea86e298))
+
+- **extract**: Document nested extraction options
+  ([`878150f`](https://github.com/ICIJ/pystou/commit/878150fce28ca38b429a88ff79eb0d02e2b20814))
+
+Add --nested and --max-depth option documentation with usage example.
+
+### Features
+
+- :herb:
+  ([`348a0d6`](https://github.com/ICIJ/pystou/commit/348a0d666e4d7f3cbb1a0e942f14d52ec471d780))
+
+- Add filter for specific type
+  ([`3bb17ad`](https://github.com/ICIJ/pystou/commit/3bb17adc3f16c015da79049fa4aca294ff06d13c))
+
+- Add robustness improvements across all subcommands
+  ([`739ec58`](https://github.com/ICIJ/pystou/commit/739ec5822047f83f9ae7418a2f1f2cdf443ffdb3))
+
+Filesystem safety: - Add followlinks=False to os.walk() to prevent symlink loops - Skip symlinks
+  during iteration to avoid issues - Add FileNotFoundError handling for race conditions - Add
+  PermissionError handling with proper error reporting
+
+User experience: - Add keyboard interrupt (Ctrl+C) handling for graceful exit - Add progress
+  reporting (every 1000 dirs or 100 files) - Add directory validation at startup
+
+API improvements: - Change return values to tuple (removed, skipped) - Track skipped counts for
+  better error reporting
+
+Performance (stats): - Use heapq for memory-efficient largest file tracking - Add symlinks_skipped
+  and errors to summary
+
+Tests: - Update for new return value tuples - Update for renamed stats fields (largest_files)
+
+- Add split ZIP archive support
+  ([`260c7ed`](https://github.com/ICIJ/pystou/commit/260c7ed49a89fca123eb14b628ab57e2c3b18e60))
+
+- Integrate cursor hiding in progress displays
+  ([`f0eb51b`](https://github.com/ICIJ/pystou/commit/f0eb51b5e31ffabe495bb6945003738f976460fc))
+
+- **cleanup**: Add junk file removal subcommand
+  ([`4eb7772`](https://github.com/ICIJ/pystou/commit/4eb7772279fdceb3d7ca77a429371b3619a42d28))
+
+- **cli**: Add top-level error boundary with clean exit codes
+  ([`f600e95`](https://github.com/ICIJ/pystou/commit/f600e95243523e811b911721db08435a51d84446))
+
+- **cli**: Derive --version from package __version__
+  ([`34f9d66`](https://github.com/ICIJ/pystou/commit/34f9d662ec0b1c06cb7b3461b668e9e096748e9f))
+
+- **cli**: Register empty subcommand
+  ([`0f47342`](https://github.com/ICIJ/pystou/commit/0f473422e20fe75922909e4ea16e4ad0cd1b75cd))
+
+- **common**: Add cursor utility for terminal display
+  ([`cbf214f`](https://github.com/ICIJ/pystou/commit/cbf214fee96d2a231a08c31c0473cfc54af1a300))
+
+- **common**: Add member-validated safe archive extraction
+  ([`263bb77`](https://github.com/ICIJ/pystou/commit/263bb778c726d0a85bc7a590cb57e5e06eeeb1fc))
+
+- **common**: Add scanning interrupt/cursor context manager
+  ([`1e2ad3a`](https://github.com/ICIJ/pystou/commit/1e2ad3ac0d464a348c0689571596f03625a46737))
+
+- **common**: Add shared directory validation
+  ([`42691de`](https://github.com/ICIJ/pystou/commit/42691dedf646504bb9dd558c2b69bc9f836aa995))
+
+- **common**: Add typed error hierarchy
+  ([`9ba7751`](https://github.com/ICIJ/pystou/commit/9ba775177257f70fb45f64e48256951ce4951bf5))
+
+- **common**: Add unique_path and verify_then_delete helpers
+  ([`d01dae0`](https://github.com/ICIJ/pystou/commit/d01dae0fae25f952c0fb9e2de2c57f39aa3d809e))
+
+- **empty**: Add empty directory detection and removal
+  ([`aa5da47`](https://github.com/ICIJ/pystou/commit/aa5da47258dd98a63beddb494d747b82b6d34c17))
+
+- **extract**: Add nested archive extraction
+  ([`1e36617`](https://github.com/ICIJ/pystou/commit/1e36617543ed78f4f10b1fc84a532bfc7c319af1))
+
+Add --nested and --max-depth options to recursively extract archives found inside extracted content.
+  Implements process_nested_archives() function and modifies extract_and_update_index() to handle
+  depth tracking.
+
+- **extract**: Validate directory, handle interrupts, verify before delete
+  ([`5c2a1ad`](https://github.com/ICIJ/pystou/commit/5c2a1adfaae26a238a122a0b1f193f38fa6a5597))
+
+- **identify**: Add file type detection subcommand
+  ([`b5104c1`](https://github.com/ICIJ/pystou/commit/b5104c182e34ce444e57f2590c111e73cf923de1))
+
+Add identify subcommand that detects file types by magic bytes and finds files with mismatched
+  extensions or encrypted ZIP archives
+
+- **stats**: Add directory statistics subcommand
+  ([`7418c69`](https://github.com/ICIJ/pystou/commit/7418c693ea8712281e1cccc1bfcff14a6ee4f7b9))
+
+- **unarchive**: Add parallel extraction
+  ([`84c0673`](https://github.com/ICIJ/pystou/commit/84c0673645999f780771ddbbabe8ff2aaaa5dd9f))
+
+Add -p/--parallel flag to extract multiple archives concurrently using ThreadPoolExecutor. Requires
+  -c flag for automatic mode.
+
+- **unarchive**: Delete all split archive parts
+  ([`2160a4a`](https://github.com/ICIJ/pystou/commit/2160a4ae7e90a929b025d4105e4b04023b7a6a04))
+
+### Performance Improvements
+
+- **fs_walker**: Add batched terminal updates
+  ([`b724fe2`](https://github.com/ICIJ/pystou/commit/b724fe2c4c816923d8cac9c7f0fd192bb3a118f6))
+
+Add ScanContext class to batch terminal updates every 100 entries instead of every entry, reducing
+  overhead.
+
+- **fs_walker**: Cache stat() calls
+  ([`5c991a3`](https://github.com/ICIJ/pystou/commit/5c991a332a557d6a32e73a13da14939c5a12982a))
+
+Cache stat() result per entry to avoid redundant filesystem calls.
+
+- **fs_walker**: Optimize recursion strategy
+  ([`f1055b3`](https://github.com/ICIJ/pystou/commit/f1055b3c2a1909432b57c7be756fb377ed942111))
+
+Collect subdirs first, then recurse after DB commit for better locality and reduced memory pressure.
+
+- **indexer**: Add database indexes
+  ([`a275fed`](https://github.com/ICIJ/pystou/commit/a275fed460fa94620519d0541a2b8b94c34b8e62))
+
+Add indexes on directories.parent_path, files.directory_path, and files.name for faster query
+  performance.
+
+- **indexer**: Cache stat() calls
+  ([`67cce10`](https://github.com/ICIJ/pystou/commit/67cce10dafcda245ad8068ff17384adc80002bd2))
+
+Cache stat() result in update_index_after_change to avoid redundant filesystem calls.
+
+- **indexer**: Use cursor iteration
+  ([`a75bb03`](https://github.com/ICIJ/pystou/commit/a75bb03e3577c1d7507aa58160169469f0142da7))
+
+Iterate cursor directly instead of fetchall() to reduce memory usage.
+
+- **utils**: Use cursor iteration
+  ([`6a2443c`](https://github.com/ICIJ/pystou/commit/6a2443c64aebce280f4946259630e31f02412c20))
+
+Iterate cursor directly in group_directories() to reduce memory usage.
+
+- **utils**: Use SQL aggregates
+  ([`1376b97`](https://github.com/ICIJ/pystou/commit/1376b97b9af244cec674b37734fa2ca99961c15c))
+
+Use SUM and COUNT in get_directory_size() instead of fetching all rows.
+
+### Refactoring
+
+- Adopt shared validation, interrupt, and logging helpers
+  ([`b36a90c`](https://github.com/ICIJ/pystou/commit/b36a90c16f3f6cc875238895bafcb9409f3a00f4))
+
+- Finish shared log_configuration adoption; harden get_archive_files symlink walk
+  ([`2344392`](https://github.com/ICIJ/pystou/commit/2344392b933bfde4d4acb77e7742113b5aa8f066))
+
+- Lint ([`7215843`](https://github.com/ICIJ/pystou/commit/72158434cbf72e47aa6f544fe93f7a0c80817a51))
+
+- Lint ([`9840d1e`](https://github.com/ICIJ/pystou/commit/9840d1ed35b28414a14fd94809c95674980b65c1))
+
+- Rename unarchive module to extract
+  ([`5a1323d`](https://github.com/ICIJ/pystou/commit/5a1323ddeec11e5ec2fa92209ed7bd2f34a1be3d))
+
+- Unify CLI with subcommands
+  ([`5403b74`](https://github.com/ICIJ/pystou/commit/5403b74061a95cc9304c84d5b8c555c0e12a5137))
+
+Replace separate dedup_folders and unarchive scripts with single pystou command using subcommands.
+  Extract argument parsing into reusable functions and fix logging of argparse internal attributes.
+
+- Add pystou package with main entry point - Change parse_arguments() to add_common_arguments() -
+  Add add_dedup_arguments() and add_unarchive_arguments() - Update main() functions to accept args
+  parameter - Fix log_configuration() to exclude func and command keys - Update setup.py with single
+  pystou entry point
+
+- Update CLI to use extract subcommand
+  ([`38abcad`](https://github.com/ICIJ/pystou/commit/38abcad43a32f6410df69e4cff512c62f735599e))
+
+- **common**: Close index connection on init failure; add stat-guard test
+  ([`fc05d6c`](https://github.com/ICIJ/pystou/commit/fc05d6ce3a9295e39e0c588b840d65c733e1bf71))
+
+- **common**: Drop dead alias, clean partial zst output, add .gz non-clobber test
+  ([`12e52b8`](https://github.com/ICIJ/pystou/commit/12e52b84176dcdd2a473b956ca5c596121d9d6b3))
+
+- **common**: Preserve sibling scan order; tighten deep-tree assertion
+  ([`3a42de1`](https://github.com/ICIJ/pystou/commit/3a42de1a34914c5ac845302e1b7f2d3436387d1b))
+
+### Testing
+
+- Add comprehensive tests for subcommands
+  ([`b3bcddc`](https://github.com/ICIJ/pystou/commit/b3bcddc9129ff05ae3a1bafdcb5ab882a263a015))
+
+- Rename test_unarchive to test_extract
+  ([`2e6cf6d`](https://github.com/ICIJ/pystou/commit/2e6cf6d4d9d6912a806d75cd6ab52e92e520c730))
+
+- **common**: Cover hardlink/device/nested/absolute archive members; document strict policy
+  ([`3e8c172`](https://github.com/ICIJ/pystou/commit/3e8c172e1acb8a36afa6ba1fdaea38a6f4083966))
+
+- **common**: Cover zstd CLI tar.zst extraction path
+  ([`08eefb8`](https://github.com/ICIJ/pystou/commit/08eefb82f36dd38c943787de14733fba29e4b5c4))
+
+- **cursor**: Add comprehensive cursor utility tests
+  ([`d457b1c`](https://github.com/ICIJ/pystou/commit/d457b1c446bbde82750eaa80ca17d32b703341dd))
+
+- **extract**: Update mocks for nested options
+  ([`e76bf14`](https://github.com/ICIJ/pystou/commit/e76bf14ed39018464c7e53e1097068e2a1ba74e1))
+
+Add nested and max_depth attributes to all Args mock objects to match new function signatures.
