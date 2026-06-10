@@ -4,13 +4,13 @@
 import argparse
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import List, Optional
 
-from common.logger import setup_logging
+from common.logger import setup_logging, log_configuration
 from common.cli import add_common_arguments
-from common.cursor import hide_cursor, show_cursor
+from common.validation import validate_directory_or_exit
+from common.interrupt import scanning
 
 
 def add_empty_arguments(parser: argparse.ArgumentParser) -> None:
@@ -46,29 +46,11 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     setup_logging("empty", args.log_dir)
     log_configuration(args)
 
-    # Validate directory
-    directory_path = Path(args.directory)
-    if not directory_path.exists():
-        print(f"Error: Directory does not exist: {args.directory}")
-        logging.error({"action": "error", "message": "Directory not found", "path": args.directory})
-        sys.exit(1)
-    if not directory_path.is_dir():
-        print(f"Error: Not a directory: {args.directory}")
-        logging.error({"action": "error", "message": "Not a directory", "path": args.directory})
-        sys.exit(1)
+    validate_directory_or_exit(args.directory)
 
     # Find empty directories
-    hide_cursor()
-    try:
-        empty_dirs = find_empty_directories(
-            args.directory, args.recursive, args.include_hidden
-        )
-    except KeyboardInterrupt:
-        show_cursor()
-        print("\nScan interrupted by user.")
-        logging.info({"action": "scan_interrupted"})
-        sys.exit(130)
-    show_cursor()
+    with scanning("scan"):
+        empty_dirs = find_empty_directories(args.directory, args.recursive, args.include_hidden)
 
     if not empty_dirs:
         print("No empty directories found.")
@@ -95,15 +77,8 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         return
 
     # Remove empty directories
-    hide_cursor()
-    try:
+    with scanning("removal"):
         removed_count, skipped_count = remove_empty_directories(empty_dirs)
-    except KeyboardInterrupt:
-        show_cursor()
-        print("\nRemoval interrupted by user.")
-        logging.info({"action": "removal_interrupted"})
-        sys.exit(130)
-    show_cursor()
 
     print(f"\nRemoved {removed_count}/{len(empty_dirs)} directory(ies)")
     if skipped_count > 0:
@@ -114,16 +89,6 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         "skipped": skipped_count,
         "total": len(empty_dirs),
     })
-
-
-def log_configuration(args) -> None:
-    """Logs the configuration used to run the script."""
-    config = {
-        k: v for k, v in vars(args).items()
-        if not k.startswith("_") and k not in ("func", "command")
-    }
-    config["action"] = "configuration"
-    logging.info(config)
 
 
 def find_empty_directories(

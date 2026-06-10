@@ -5,14 +5,14 @@ import argparse
 import heapq
 import logging
 import os
-import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Optional
 
-from common.logger import setup_logging
+from common.logger import setup_logging, log_configuration
 from common.cli import add_common_arguments
-from common.cursor import hide_cursor, show_cursor
+from common.validation import validate_directory_or_exit
+from common.interrupt import scanning
 
 
 def add_stats_arguments(parser: argparse.ArgumentParser) -> None:
@@ -60,27 +60,11 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     setup_logging("stats", args.log_dir)
     log_configuration(args)
 
-    # Validate directory
-    directory_path = Path(args.directory)
-    if not directory_path.exists():
-        print(f"Error: Directory does not exist: {args.directory}")
-        logging.error({"action": "error", "message": "Directory not found", "path": args.directory})
-        sys.exit(1)
-    if not directory_path.is_dir():
-        print(f"Error: Not a directory: {args.directory}")
-        logging.error({"action": "error", "message": "Not a directory", "path": args.directory})
-        sys.exit(1)
+    validate_directory_or_exit(args.directory)
 
     # Collect statistics
-    hide_cursor()
-    try:
+    with scanning("scan"):
         stats = collect_stats(args.directory, args.recursive, args.top)
-    except KeyboardInterrupt:
-        show_cursor()
-        print("\nScan interrupted by user.")
-        logging.info({"action": "scan_interrupted"})
-        sys.exit(130)
-    show_cursor()
 
     if args.json:
         output_json(stats, args.top)
@@ -88,16 +72,6 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         output_text(stats, args.top, args.by_extension, args.by_size)
 
     logging.info({"action": "stats_complete", **stats["summary"]})
-
-
-def log_configuration(args) -> None:
-    """Logs the configuration used to run the script."""
-    config = {
-        k: v for k, v in vars(args).items()
-        if not k.startswith("_") and k not in ("func", "command")
-    }
-    config["action"] = "configuration"
-    logging.info(config)
 
 
 def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> Dict:

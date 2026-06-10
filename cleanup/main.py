@@ -5,13 +5,13 @@ import argparse
 import logging
 import os
 import shutil
-import sys
 from pathlib import Path
 from typing import List, Optional, Set
 
-from common.logger import setup_logging
+from common.logger import setup_logging, log_configuration
 from common.cli import add_common_arguments
-from common.cursor import hide_cursor, show_cursor
+from common.validation import validate_directory_or_exit
+from common.interrupt import scanning
 
 # Default junk file patterns
 JUNK_FILES: Set[str] = {
@@ -75,16 +75,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     setup_logging("cleanup", args.log_dir)
     log_configuration(args)
 
-    # Validate directory
-    directory_path = Path(args.directory)
-    if not directory_path.exists():
-        print(f"Error: Directory does not exist: {args.directory}")
-        logging.error({"action": "error", "message": "Directory not found", "path": args.directory})
-        sys.exit(1)
-    if not directory_path.is_dir():
-        print(f"Error: Not a directory: {args.directory}")
-        logging.error({"action": "error", "message": "Not a directory", "path": args.directory})
-        sys.exit(1)
+    validate_directory_or_exit(args.directory)
 
     # Build the set of patterns to match
     junk_files = JUNK_FILES.copy()
@@ -94,17 +85,8 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
             junk_files.add(pattern)
 
     # Find junk files
-    hide_cursor()
-    try:
-        junk_items = find_junk(
-            args.directory, args.recursive, junk_files, junk_dirs
-        )
-    except KeyboardInterrupt:
-        show_cursor()
-        print("\nScan interrupted by user.")
-        logging.info({"action": "scan_interrupted"})
-        sys.exit(130)
-    show_cursor()
+    with scanning("scan"):
+        junk_items = find_junk(args.directory, args.recursive, junk_files, junk_dirs)
 
     if not junk_items:
         print("No junk files found.")
@@ -131,15 +113,8 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         return
 
     # Remove junk files
-    hide_cursor()
-    try:
+    with scanning("removal"):
         removed_count, skipped_count = remove_junk(junk_items)
-    except KeyboardInterrupt:
-        show_cursor()
-        print("\nRemoval interrupted by user.")
-        logging.info({"action": "removal_interrupted"})
-        sys.exit(130)
-    show_cursor()
 
     print(f"\nRemoved {removed_count}/{len(junk_items)} item(s)")
     if skipped_count > 0:
@@ -150,16 +125,6 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         "skipped": skipped_count,
         "total": len(junk_items),
     })
-
-
-def log_configuration(args) -> None:
-    """Logs the configuration used to run the script."""
-    config = {
-        k: v for k, v in vars(args).items()
-        if not k.startswith("_") and k not in ("func", "command")
-    }
-    config["action"] = "configuration"
-    logging.info(config)
 
 
 def find_junk(

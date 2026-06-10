@@ -4,13 +4,13 @@
 import argparse
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-from common.logger import setup_logging
+from common.logger import setup_logging, log_configuration
 from common.cli import add_common_arguments
-from common.cursor import hide_cursor, show_cursor
+from common.validation import validate_directory_or_exit
+from common.interrupt import scanning
 
 # File signatures (magic bytes) for common file types
 FILE_SIGNATURES: Dict[bytes, str] = {
@@ -103,16 +103,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     setup_logging("identify", args.log_dir)
     log_configuration(args)
 
-    # Validate directory
-    directory_path = Path(args.directory)
-    if not directory_path.exists():
-        print(f"Error: Directory does not exist: {args.directory}")
-        logging.error({"action": "error", "message": "Directory not found", "path": args.directory})
-        sys.exit(1)
-    if not directory_path.is_dir():
-        print(f"Error: Not a directory: {args.directory}")
-        logging.error({"action": "error", "message": "Not a directory", "path": args.directory})
-        sys.exit(1)
+    validate_directory_or_exit(args.directory)
 
     # Enable all checks if --check-all is set
     if args.check_all:
@@ -132,15 +123,8 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         }
 
     # Collect files to analyze
-    hide_cursor()
-    try:
+    with scanning("scan"):
         files = collect_files(args.directory, args.recursive, extensions_filter)
-    except KeyboardInterrupt:
-        show_cursor()
-        print("\nScan interrupted by user.")
-        logging.info({"action": "scan_interrupted"})
-        sys.exit(130)
-    show_cursor()
 
     print(f"Found {len(files)} files to analyze.")
     logging.info({"action": "files_found", "count": len(files)})
@@ -152,23 +136,13 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     issues: List[Tuple[Path, str]] = []
 
     # Run checks
-    hide_cursor()
-    try:
+    with scanning("analysis"):
         if args.check_mismatch:
             print("Checking for extension mismatches...")
-            mismatch_issues = check_extension_mismatches(files)
-            issues.extend(mismatch_issues)
-
+            issues.extend(check_extension_mismatches(files))
         if args.check_encrypted:
             print("Checking for encrypted archives...")
-            encrypted_issues = check_encrypted_archives(files)
-            issues.extend(encrypted_issues)
-    except KeyboardInterrupt:
-        show_cursor()
-        print("\nAnalysis interrupted by user.")
-        logging.info({"action": "analysis_interrupted"})
-        sys.exit(130)
-    show_cursor()
+            issues.extend(check_encrypted_archives(files))
 
     # Report results
     if not issues:
@@ -185,16 +159,6 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         "count": len(issues),
         "issues": [{"path": str(p), "issue": i} for p, i in issues],
     })
-
-
-def log_configuration(args) -> None:
-    """Logs the configuration used to run the script."""
-    config = {
-        k: v for k, v in vars(args).items()
-        if not k.startswith("_") and k not in ("func", "command")
-    }
-    config["action"] = "configuration"
-    logging.info(config)
 
 
 def collect_files(
