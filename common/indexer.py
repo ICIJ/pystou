@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from typing import List
 
+from common.errors import PystouError
+
 
 def initialize_database(
     db_dir: str = ".", db_name: str = "filesystem_index.db"
@@ -16,10 +18,16 @@ def initialize_database(
 
     Returns:
         sqlite3.Connection: SQLite database connection.
+
+    Raises:
+        PystouError: If the database file cannot be opened.
     """
     db_path = os.path.join(db_dir, db_name)
-    conn = sqlite3.connect(db_path)
-    create_tables(conn)
+    try:
+        conn = sqlite3.connect(db_path)
+        create_tables(conn)
+    except sqlite3.Error as e:
+        raise PystouError(f"Could not open index database at {db_path}: {e}")
     return conn
 
 
@@ -85,6 +93,11 @@ def prompt_use_existing_index() -> bool:
         print("Invalid input. Please enter 'Y' or 'n'.")
 
 
+def _escape_like(text: str) -> str:
+    """Escapes SQL LIKE wildcards so paths match literally (ESCAPE '\\')."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def update_index_after_change(
     conn: sqlite3.Connection, action: str, path: Path
 ) -> None:
@@ -92,7 +105,8 @@ def update_index_after_change(
 
     Args:
         conn (sqlite3.Connection): SQLite database connection.
-        action (str): The action performed ('delete_file', 'delete_directory', 'add_file', 'add_directory').
+        action (str): One of 'delete_file', 'delete_directory', 'add_file',
+            'add_directory'.
         path (Path): Path of the file or directory affected.
     """
     cursor = conn.cursor()
@@ -102,28 +116,41 @@ def update_index_after_change(
             (str(path.parent), path.name),
         )
     elif action == "delete_directory":
-        # Delete directory entry and all files under it
-        cursor.execute("DELETE FROM directories WHERE path = ?", (str(path),))
-        cursor.execute("DELETE FROM files WHERE directory_path = ?", (str(path),))
-        # Optionally, delete subdirectories recursively if they were indexed
+        path_str = str(path)
+        # Match the directory itself and only true descendants (path + separator),
+        # escaping LIKE wildcards so '%'/'_' in real paths are treated literally.
+        descendant = _escape_like(path_str + os.sep) + "%"
         cursor.execute(
-            "DELETE FROM directories WHERE parent_path LIKE ?", (str(path) + "%",)
+            "DELETE FROM directories WHERE path = ? OR path LIKE ? ESCAPE '\\'",
+            (path_str, descendant),
         )
         cursor.execute(
-            "DELETE FROM files WHERE directory_path LIKE ?", (str(path) + "%",)
+            "DELETE FROM files WHERE directory_path = ? OR directory_path LIKE ? ESCAPE '\\'",
+            (path_str, descendant),
         )
     elif action == "add_file":
-        stat_info = path.stat()
+        try:
+            stat_info = path.stat()
+        except OSError:
+            logging.warning(
+                {"action": "index_add_file", "status": "stat_failed", "path": str(path)}
+            )
+            return
         cursor.execute(
             "INSERT OR IGNORE INTO files (directory_path, name, size, mtime) VALUES (?, ?, ?, ?)",
             (str(path.parent), path.name, stat_info.st_size, stat_info.st_mtime),
         )
     elif action == "add_directory":
-        stat_info = path.stat()
-        parent_path = str(path.parent)
+        try:
+            stat_info = path.stat()
+        except OSError:
+            logging.warning(
+                {"action": "index_add_directory", "status": "stat_failed", "path": str(path)}
+            )
+            return
         cursor.execute(
             "INSERT OR IGNORE INTO directories (path, parent_path, mtime) VALUES (?, ?, ?)",
-            (str(path), parent_path, stat_info.st_mtime),
+            (str(path), str(path.parent), stat_info.st_mtime),
         )
     conn.commit()
 
