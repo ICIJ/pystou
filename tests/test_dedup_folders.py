@@ -85,5 +85,43 @@ class TestDedupFolders(unittest.TestCase):
         self.assertTrue((Path(self.test_dir) / "folder" / "file4.txt").exists())
 
 
+import os as _os
+import tempfile as _tempfile
+import shutil as _shutil
+from pathlib import Path as _Path
+from unittest.mock import patch as _patch
+
+from dedup_folders.main import merge_contents
+from common.indexer import initialize_database as _init_db, close_database as _close_db
+
+
+class TestMergeConflictPreservesData(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = _tempfile.mkdtemp()
+        self.conn = _init_db(self.test_dir)
+        self.base = _Path(self.test_dir) / "base"
+        self.dup = _Path(self.test_dir) / "base (1)"
+        self.base.mkdir()
+        self.dup.mkdir()
+        # Conflicting filename present in both, with different content.
+        (self.base / "shared.txt").write_text("base-version")
+        (self.dup / "shared.txt").write_text("dup-version")
+
+    def tearDown(self):
+        _close_db(self.conn)
+        _shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    @_patch("builtins.print")
+    def test_conflicting_file_is_not_destroyed(self, mock_print):
+        merge_contents(self.base, [self.dup], dry_run=False, conn=self.conn)
+        # Because of the conflict, the duplicate dir must be preserved...
+        self.assertTrue(self.dup.exists())
+        # ...and the conflicting file inside it must still exist.
+        self.assertTrue((self.dup / "shared.txt").exists())
+        self.assertEqual((self.dup / "shared.txt").read_text(), "dup-version")
+        # Base copy is untouched.
+        self.assertEqual((self.base / "shared.txt").read_text(), "base-version")
+
+
 if __name__ == "__main__":
     unittest.main()

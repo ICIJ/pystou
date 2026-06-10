@@ -21,6 +21,8 @@ from common.indexer import (
 from common.fs_walker import collect_directories
 from common.utils import group_directories, summarize_group
 from common.cli import add_common_arguments
+from common.validation import validate_directory_or_exit
+from common.interrupt import scanning
 
 
 def add_dedup_arguments(parser: argparse.ArgumentParser) -> None:
@@ -59,6 +61,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
 
     setup_logging("dedup_folders", args.log_dir)
     log_configuration(args)
+    validate_directory_or_exit(args.directory)
 
     conn = initialize_database(args.db_dir)
     manage_index(conn, args)
@@ -77,8 +80,9 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         close_database(conn)
         return
 
-    for group_key, dir_paths in groups.items():
-        process_group(group_key, dir_paths, args, conn)
+    with scanning("scan"):
+        for group_key, dir_paths in groups.items():
+            process_group(group_key, dir_paths, args, conn)
 
     logging.info({"action": "script_complete"})
     close_database(conn)
@@ -246,7 +250,8 @@ def delete_duplicates(
                 )
                 # Update index
                 update_index_after_change(conn, "delete_directory", dup_dir)
-            except Exception as e:
+            except OSError as e:
+                print(f"Error deleting {dup_dir}: {e}")
                 logging.error(
                     {
                         "action": "delete",
@@ -260,90 +265,71 @@ def delete_duplicates(
 def merge_contents(
     base_dir: Path, duplicate_dirs: List[Path], dry_run: bool, conn: sqlite3.Connection
 ) -> None:
-    """Merges contents of duplicate directories into the base directory.
+    """Merges duplicate directories into the base, preserving conflicting files.
+
+    A duplicate directory is only deleted if every item moved without conflict;
+    if any item conflicted (and was therefore skipped), the duplicate is kept so
+    no data is lost.
 
     Args:
         base_dir (Path): Base directory.
-        duplicate_dirs (List[Path]): List of duplicate directories to merge.
+        duplicate_dirs (List[Path]): Duplicate directories to merge.
         dry_run (bool): Whether to perform a dry run.
         conn (sqlite3.Connection): SQLite database connection.
     """
     for dup_dir in duplicate_dirs:
+        had_conflict = False
         for item in os.listdir(dup_dir):
             src = dup_dir / item
             dst = base_dir / item
             if dst.exists():
-                print(f"Conflict: {dst} already exists.")
-                print(f"Skipping {src}")
+                had_conflict = True
+                print(f"Conflict: {dst} already exists. Keeping {src}")
                 logging.info(
-                    {
-                        "action": "merge",
-                        "status": "conflict",
-                        "source": str(src),
-                        "destination": str(dst),
-                    }
+                    {"action": "merge", "status": "conflict", "source": str(src), "destination": str(dst)}
                 )
             else:
                 if dry_run:
                     print(f"Dry run: would move {src} to {dst}")
                     logging.info(
-                        {
-                            "action": "move",
-                            "status": "dry_run",
-                            "source": str(src),
-                            "destination": str(dst),
-                        }
+                        {"action": "move", "status": "dry_run", "source": str(src), "destination": str(dst)}
                     )
                 else:
                     try:
                         print(f"Moving {src} to {dst}")
                         shutil.move(str(src), str(dst))
                         logging.info(
-                            {
-                                "action": "move",
-                                "status": "success",
-                                "source": str(src),
-                                "destination": str(dst),
-                            }
+                            {"action": "move", "status": "success", "source": str(src), "destination": str(dst)}
                         )
-                        # Update index
                         update_index_after_change(conn, "delete_file", src)
                         update_index_after_change(conn, "add_file", dst)
-                    except Exception as e:
+                    except OSError as e:
+                        had_conflict = True  # keep the dir; the file did not move
                         print(f"Error moving {src} to {dst}: {e}")
                         logging.error(
-                            {
-                                "action": "move",
-                                "status": "error",
-                                "source": str(src),
-                                "destination": str(dst),
-                                "error": str(e),
-                            }
+                            {"action": "move", "status": "error", "source": str(src), "destination": str(dst), "error": str(e)}
                         )
-        # Delete the duplicate directory
+
+        if had_conflict:
+            print(f"Keeping {dup_dir} (unmerged items remain)")
+            logging.info(
+                {"action": "delete", "status": "skipped_conflict", "directory": str(dup_dir)}
+            )
+            continue
+
         if dry_run:
             print(f"Dry run: would delete {dup_dir}")
-            logging.info(
-                {"action": "delete", "status": "dry_run", "directory": str(dup_dir)}
-            )
+            logging.info({"action": "delete", "status": "dry_run", "directory": str(dup_dir)})
         else:
             try:
                 print(f"Deleting {dup_dir}")
                 shutil.rmtree(dup_dir)
-                logging.info(
-                    {"action": "delete", "status": "success", "directory": str(dup_dir)}
-                )
-                # Update index
+                logging.info({"action": "delete", "status": "success", "directory": str(dup_dir)})
                 update_index_after_change(conn, "delete_directory", dup_dir)
-            except Exception as e:
+            except OSError as e:
                 print(f"Error deleting {dup_dir}: {e}")
                 logging.error(
-                    {
-                        "action": "delete",
-                        "status": "error",
-                        "directory": str(dup_dir),
-                        "error": str(e),
-                    }
+                    {"action": "delete", "status": "error", "directory": str(dup_dir), "error": str(e)}
                 )
 
 
