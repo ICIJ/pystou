@@ -78,6 +78,11 @@ class TestIndexerStatGuard(unittest.TestCase):
         # Must not raise even though the file does not exist.
         update_index_after_change(self.conn, "add_file", missing)
 
+    def test_add_directory_on_missing_path_does_not_raise(self):
+        missing = Path(self.test_dir) / "ghost_dir"
+        # Must not raise even though the directory does not exist.
+        update_index_after_change(self.conn, "add_directory", missing)
+
 
 class TestInitializeDatabaseDefensive(unittest.TestCase):
     def test_unusable_db_path_raises_pystou_error(self):

@@ -25,8 +25,12 @@ def initialize_database(
     db_path = os.path.join(db_dir, db_name)
     try:
         conn = sqlite3.connect(db_path)
+    except sqlite3.Error as e:
+        raise PystouError(f"Could not open index database at {db_path}: {e}")
+    try:
         create_tables(conn)
     except sqlite3.Error as e:
+        conn.close()
         raise PystouError(f"Could not open index database at {db_path}: {e}")
     return conn
 
