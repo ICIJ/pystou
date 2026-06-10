@@ -41,7 +41,7 @@ def collect_directories(
     recursive: bool,
     level: Optional[int] = None,
 ) -> None:
-    """Scans the filesystem and populates the database with directory and file information.
+    """Scans the filesystem and populates the database.
 
     Args:
         conn (sqlite3.Connection): SQLite database connection.
@@ -51,8 +51,77 @@ def collect_directories(
     """
     ctx = ScanContext(update_interval=100)
     clear_database(conn)
-    scan_dir(Path(directory), 1, conn, recursive, level, ctx)
+    scan_tree(Path(directory), conn, recursive, level, ctx)
     ctx.final_update()
+
+
+def scan_tree(
+    root_dir: Path,
+    conn: sqlite3.Connection,
+    recursive: bool,
+    level: Optional[int],
+    ctx: ScanContext,
+) -> None:
+    """Scans a tree iteratively (explicit stack avoids RecursionError on deep trees).
+
+    Args:
+        root_dir (Path): Directory to start from.
+        conn (sqlite3.Connection): SQLite database connection.
+        recursive (bool): Whether to scan recursively.
+        level (Optional[int]): Maximum depth level for recursion.
+        ctx (ScanContext): Scanning context for counters and output.
+    """
+    stack: List[Tuple[Path, int]] = [(root_dir, 1)]
+    while stack:
+        current_dir, current_level = stack.pop()
+        try:
+            with os.scandir(current_dir) as entries:
+                dir_entries: List[Tuple[str, str, float]] = []
+                file_entries: List[Tuple[str, str, int, float]] = []
+                subdirs: List[Path] = []
+                for entry in entries:
+                    full_path = Path(entry.path)
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            stat_info = entry.stat(follow_symlinks=False)
+                            dir_entries.append(
+                                (str(full_path), str(current_dir), stat_info.st_mtime)
+                            )
+                            ctx.increment_dirs()
+                            if recursive and (level is None or current_level < level):
+                                subdirs.append(full_path)
+                        elif entry.is_file(follow_symlinks=False):
+                            stat_info = entry.stat(follow_symlinks=False)
+                            file_entries.append(
+                                (
+                                    str(current_dir),
+                                    entry.name,
+                                    stat_info.st_size,
+                                    stat_info.st_mtime,
+                                )
+                            )
+                            ctx.increment_files()
+                    except OSError as e:
+                        # One bad entry must not abort its siblings.
+                        logging.warning(
+                            {
+                                "action": "scan_entry_error",
+                                "path": str(full_path),
+                                "error": str(e),
+                            }
+                        )
+                insert_entries(conn, dir_entries, file_entries)
+                for subdir in subdirs:
+                    stack.append((subdir, current_level + 1))
+        except PermissionError as e:
+            print(f"\nPermission denied: {current_dir}")
+            logging.error(
+                {"action": "scan_error", "directory": str(current_dir), "error": str(e)}
+            )
+        except OSError as e:
+            logging.warning(
+                {"action": "scan_error", "directory": str(current_dir), "error": str(e)}
+            )
 
 
 def clear_database(conn: sqlite3.Connection) -> None:
@@ -65,52 +134,6 @@ def clear_database(conn: sqlite3.Connection) -> None:
     cursor.execute("DELETE FROM directories")
     cursor.execute("DELETE FROM files")
     conn.commit()
-
-
-def scan_dir(
-    current_dir: Path,
-    current_level: int,
-    conn: sqlite3.Connection,
-    recursive: bool,
-    level: Optional[int],
-    ctx: ScanContext,
-) -> None:
-    """Recursively scans directories and updates the database.
-
-    Args:
-        current_dir (Path): Current directory being scanned.
-        current_level (int): Current depth level.
-        conn (sqlite3.Connection): SQLite database connection.
-        recursive (bool): Whether to scan directories recursively.
-        level (Optional[int]): Maximum depth level for recursion.
-        ctx (ScanContext): Scanning context for counters and output.
-    """
-    try:
-        with os.scandir(current_dir) as entries:
-            dir_entries: List[Tuple[str, str, float]] = []
-            file_entries: List[Tuple[str, str, int, float]] = []
-            subdirs: List[Path] = []
-            for entry in entries:
-                full_path = Path(entry.path)
-                if entry.is_dir(follow_symlinks=False):
-                    stat_info = entry.stat(follow_symlinks=False)
-                    dir_entries.append((str(full_path), str(current_dir), stat_info.st_mtime))
-                    ctx.increment_dirs()
-                    if recursive and (level is None or current_level < level):
-                        subdirs.append(full_path)
-                elif entry.is_file(follow_symlinks=False):
-                    stat_info = entry.stat(follow_symlinks=False)
-                    file_entries.append((str(current_dir), entry.name, stat_info.st_size, stat_info.st_mtime))
-                    ctx.increment_files()
-            insert_entries(conn, dir_entries, file_entries)
-            # Process subdirectories after current directory is committed
-            for subdir in subdirs:
-                scan_dir(subdir, current_level + 1, conn, recursive, level, ctx)
-    except PermissionError as e:
-        print(f"\nPermission denied: {current_dir}")
-        logging.error(
-            {"action": "scan_error", "directory": str(current_dir), "error": str(e)}
-        )
 
 
 def update_live_output(dir_count: int, file_count: int) -> None:
