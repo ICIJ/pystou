@@ -532,6 +532,17 @@ def extract_pst_archive(archive_path: Path) -> bool:
         os.makedirs(unique_output_dir, exist_ok=True)
         cmd = ["readpst", "-reD", "-o", str(unique_output_dir), str(archive_path)]
         subprocess.run(cmd, check=True)
+        try:
+            _collapse_redundant_root(unique_output_dir)
+        except OSError as e:
+            logging.warning(
+                {
+                    "action": "extract_pst",
+                    "status": "collapse_failed",
+                    "archive": str(archive_path),
+                    "error": str(e),
+                }
+            )
         print(f"Extracted PST file to {unique_output_dir}")
         return True
     except subprocess.CalledProcessError as e:

@@ -151,5 +151,48 @@ class TestCollapseRedundantRoot(unittest.TestCase):
         self.assertEqual(list(out.iterdir()), [])
 
 
+class TestExtractPstCollapsesRoot(unittest.TestCase):
+    """Exercises extract_pst_archive's collapse without a real readpst/PST."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_double_root_is_collapsed(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "555555.pst"
+        archive.write_bytes(b"placeholder-pst-bytes")
+
+        def fake_run(cmd, *args, **kwargs):
+            # cmd == ["readpst", "-reD", "-o", str(o_dir), str(archive)]
+            o_dir = Path(cmd[cmd.index("-o") + 1])
+            # Reproduce readpst -r: it creates its OWN root dir (named after the
+            # PST) inside -o, holding the mail folders.
+            mail = o_dir / "555555" / "Входящие"
+            mail.mkdir(parents=True)
+            (mail / "0001.eml").write_text("from: a@b")
+
+            class _R:
+                returncode = 0
+
+            return _R()
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(utils.subprocess, "run", side_effect=fake_run),
+        ):
+            result = utils.extract_pst_archive(archive)
+
+        self.assertTrue(result)
+        out = archive.parent / "555555"
+        # Mail folder sits directly under the unique output dir...
+        self.assertTrue((out / "Входящие" / "0001.eml").exists())
+        # ...and the redundant nested 555555/555555 level is gone.
+        self.assertFalse((out / "555555").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
