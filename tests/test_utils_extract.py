@@ -226,7 +226,9 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
 
         def fake_run(cmd, *args, **kwargs):
             o_dir = Path(cmd[cmd.index("-o") + 1])
-            (o_dir / "555555" / "Входящие").mkdir(parents=True)
+            mail = o_dir / "555555" / "Входящие"
+            mail.mkdir(parents=True)
+            (mail / "1.eml").write_text("from: a@b")
 
             class _R:
                 returncode = 0
