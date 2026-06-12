@@ -103,5 +103,121 @@ class TestZstdCommandPath(unittest.TestCase):
         self.assertFalse(expected_output.exists())
 
 
+class TestCollapseRedundantRoot(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_collapses_single_nested_root(self):
+        out = Path(self.test_dir) / "555555"
+        inner = out / "555555"
+        (inner / "sub").mkdir(parents=True)
+        (inner / "a.txt").write_text("hi")
+
+        utils._collapse_redundant_root(out)
+
+        self.assertTrue((out / "a.txt").exists())
+        self.assertTrue((out / "sub").is_dir())
+        self.assertFalse((out / "555555").exists())
+
+    def test_noop_on_multiple_entries(self):
+        out = Path(self.test_dir) / "out"
+        (out / "one").mkdir(parents=True)
+        (out / "two").mkdir()
+
+        utils._collapse_redundant_root(out)
+
+        self.assertTrue((out / "one").is_dir())
+        self.assertTrue((out / "two").is_dir())
+
+    def test_noop_on_single_file_entry(self):
+        out = Path(self.test_dir) / "out"
+        out.mkdir()
+        (out / "file.txt").write_text("x")
+
+        utils._collapse_redundant_root(out)
+
+        self.assertTrue((out / "file.txt").exists())
+
+    def test_noop_on_empty_dir(self):
+        out = Path(self.test_dir) / "out"
+        out.mkdir()
+
+        utils._collapse_redundant_root(out)
+
+        self.assertTrue(out.is_dir())
+        self.assertEqual(list(out.iterdir()), [])
+
+
+class TestExtractPstCollapsesRoot(unittest.TestCase):
+    """Exercises extract_pst_archive's collapse without a real readpst/PST."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_double_root_is_collapsed(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "555555.pst"
+        archive.write_bytes(b"placeholder-pst-bytes")
+
+        def fake_run(cmd, *args, **kwargs):
+            # cmd == ["readpst", "-reD", "-o", str(o_dir), str(archive)]
+            o_dir = Path(cmd[cmd.index("-o") + 1])
+            # Reproduce readpst -r: it creates its OWN root dir (named after the
+            # PST) inside -o, holding the mail folders.
+            mail = o_dir / "555555" / "Входящие"
+            mail.mkdir(parents=True)
+            (mail / "0001.eml").write_text("from: a@b")
+
+            class _R:
+                returncode = 0
+
+            return _R()
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(utils.subprocess, "run", side_effect=fake_run),
+        ):
+            result = utils.extract_pst_archive(archive)
+
+        self.assertTrue(result)
+        out = archive.parent / "555555"
+        # Mail folder sits directly under the unique output dir...
+        self.assertTrue((out / "Входящие" / "0001.eml").exists())
+        # ...and the redundant nested 555555/555555 level is gone.
+        self.assertFalse((out / "555555").exists())
+
+    def test_collapse_failure_does_not_fail_extraction(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "555555.pst"
+        archive.write_bytes(b"placeholder-pst-bytes")
+
+        def fake_run(cmd, *args, **kwargs):
+            o_dir = Path(cmd[cmd.index("-o") + 1])
+            (o_dir / "555555" / "Входящие").mkdir(parents=True)
+
+            class _R:
+                returncode = 0
+
+            return _R()
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(utils.subprocess, "run", side_effect=fake_run),
+            patch.object(utils, "_collapse_redundant_root", side_effect=OSError("boom")),
+        ):
+            result = utils.extract_pst_archive(archive)
+
+        # Collapse blew up, but the extraction still reports success.
+        self.assertTrue(result)
+
+
 if __name__ == "__main__":
     unittest.main()
