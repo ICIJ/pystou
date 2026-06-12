@@ -103,5 +103,53 @@ class TestZstdCommandPath(unittest.TestCase):
         self.assertFalse(expected_output.exists())
 
 
+class TestCollapseRedundantRoot(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_collapses_single_nested_root(self):
+        out = Path(self.test_dir) / "555555"
+        inner = out / "555555"
+        (inner / "sub").mkdir(parents=True)
+        (inner / "a.txt").write_text("hi")
+
+        utils._collapse_redundant_root(out)
+
+        self.assertTrue((out / "a.txt").exists())
+        self.assertTrue((out / "sub").is_dir())
+        self.assertFalse((out / "555555").exists())
+
+    def test_noop_on_multiple_entries(self):
+        out = Path(self.test_dir) / "out"
+        (out / "one").mkdir(parents=True)
+        (out / "two").mkdir()
+
+        utils._collapse_redundant_root(out)
+
+        self.assertTrue((out / "one").is_dir())
+        self.assertTrue((out / "two").is_dir())
+
+    def test_noop_on_single_file_entry(self):
+        out = Path(self.test_dir) / "out"
+        out.mkdir()
+        (out / "file.txt").write_text("x")
+
+        utils._collapse_redundant_root(out)
+
+        self.assertTrue((out / "file.txt").exists())
+
+    def test_noop_on_empty_dir(self):
+        out = Path(self.test_dir) / "out"
+        out.mkdir()
+
+        utils._collapse_redundant_root(out)
+
+        self.assertTrue(out.is_dir())
+        self.assertEqual(list(out.iterdir()), [])
+
+
 if __name__ == "__main__":
     unittest.main()

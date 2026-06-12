@@ -481,6 +481,30 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
         return False
 
 
+def _collapse_redundant_root(output_dir: Path) -> None:
+    """Collapse a single redundant nested root directory.
+
+    If ``output_dir`` holds exactly one entry and it is a directory, lift that
+    directory's contents up into ``output_dir`` and remove the now-empty
+    wrapper. ``readpst -r`` writes its tree inside a folder named after the PST,
+    one level below the unique directory pystou created — yielding
+    ``output_dir/<root>/<mail folders>``. This collapses that single redundant
+    level. It is a no-op when ``output_dir`` is empty, holds more than one
+    entry, or holds a single non-directory entry.
+
+    Args:
+        output_dir (Path): The unique directory pystou created for the PST.
+    """
+    entries = list(output_dir.iterdir())
+    if len(entries) != 1 or not entries[0].is_dir():
+        return
+    inner_name = entries[0].name
+    wrapper_tmp = unique_path(output_dir.parent / f"{output_dir.name}.tmp")
+    output_dir.rename(wrapper_tmp)
+    (wrapper_tmp / inner_name).rename(output_dir)
+    wrapper_tmp.rmdir()
+
+
 def extract_pst_archive(archive_path: Path) -> bool:
     """Extracts a PST file using readpst, ensuring the output is in a unique folder.
 
