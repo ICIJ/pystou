@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.2.0 (2026-06-12)
+
+### Bug Fixes
+
+- **dedup**: Stop false 'index found' on clean start
+  ([`86aee8a`](https://github.com/ICIJ/pystou/commit/86aee8a8ca438d754ef6afd7f7f1adf7593d2f77))
+
+- **extract**: Stop false 'index found' on clean start
+  ([`e40fb14`](https://github.com/ICIJ/pystou/commit/e40fb146cc262e05b81ee359e9f1cb61206afd6f))
+
+### Chores
+
+- Sync uv.lock to version 0.1.1
+  ([`9bf5733`](https://github.com/ICIJ/pystou/commit/9bf57336fa6537aa96096c3b789fd33723247a97))
+
+### Documentation
+
+- Install from pypi via pip, pipx, or uv
+  ([`52d05bc`](https://github.com/ICIJ/pystou/commit/52d05bc22f11662a3e83e2cf7cfa002032d4aa15))
+
+### Features
+
+- **indexer**: Add index_has_data helper
+  ([`a01fd72`](https://github.com/ICIJ/pystou/commit/a01fd72dbf00f88d512bf27866737c15f079fd11))
+
+
 ## v0.1.1 (2026-06-10)
 
 ### Bug Fixes
