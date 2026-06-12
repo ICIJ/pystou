@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from common.safe_extract import safe_extract_tar, safe_extract_zip
-from common.safe_ops import unique_path
+from common.safe_ops import make_unique_dir, unique_path
 
 
 def group_directories(conn) -> dict:
@@ -499,7 +499,7 @@ def _collapse_redundant_root(output_dir: Path) -> None:
     if len(entries) != 1 or not entries[0].is_dir():
         return
     inner_name = entries[0].name
-    wrapper_tmp = unique_path(output_dir.parent / f"{output_dir.name}.tmp")
+    wrapper_tmp = make_unique_dir(output_dir.parent / f"{output_dir.name}.tmp")
     output_dir.rename(wrapper_tmp)
     try:
         (wrapper_tmp / inner_name).rename(output_dir)
@@ -533,9 +533,7 @@ def extract_pst_archive(archive_path: Path) -> bool:
 
     try:
         base_output_dir = archive_path.parent / archive_path.stem
-        unique_output_dir = unique_path(base_output_dir)
-        # Create the output directory if it does not exist
-        os.makedirs(unique_output_dir, exist_ok=True)
+        unique_output_dir = make_unique_dir(base_output_dir)
         cmd = ["readpst", "-reD", "-o", str(unique_output_dir), str(archive_path)]
         subprocess.run(cmd, check=True)
         try:
