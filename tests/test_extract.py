@@ -3,11 +3,13 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 from unittest.mock import patch
 
 from common.indexer import close_database, initialize_database
 from common.utils import get_archive_files
-from extract.main import process_archive
+from extract.main import manage_index, process_archive
 
 
 class TestExtract(unittest.TestCase):
@@ -311,6 +313,53 @@ class TestExtract(unittest.TestCase):
         )
         process_archives_parallel([bad], args, self.conn)
         self.assertTrue(bad.exists())  # kept because extraction failed
+
+
+class TestExtractManageIndex(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.conn = initialize_database(self.test_dir)
+        self.args = SimpleNamespace(directory=self.test_dir, recursive=True)
+
+    def tearDown(self):
+        close_database(self.conn)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def _populate(self):
+        self.conn.execute(
+            "INSERT INTO directories (path, parent_path, mtime) VALUES ('/a', '/', 0)"
+        )
+        self.conn.commit()
+
+    @mock.patch("extract.main.collect_directories")
+    @mock.patch("extract.main.prompt_use_existing_index")
+    def test_no_file_scans_without_prompt(self, prompt, collect):
+        manage_index(self.conn, self.args, index_existed=False)
+        prompt.assert_not_called()
+        collect.assert_called_once()
+
+    @mock.patch("extract.main.collect_directories")
+    @mock.patch("extract.main.prompt_use_existing_index")
+    def test_empty_file_scans_without_prompt(self, prompt, collect):
+        manage_index(self.conn, self.args, index_existed=True)
+        prompt.assert_not_called()
+        collect.assert_called_once()
+
+    @mock.patch("extract.main.collect_directories")
+    @mock.patch("extract.main.prompt_use_existing_index", return_value=True)
+    def test_populated_file_reused_skips_scan(self, prompt, collect):
+        self._populate()
+        manage_index(self.conn, self.args, index_existed=True)
+        prompt.assert_called_once()
+        collect.assert_not_called()
+
+    @mock.patch("extract.main.collect_directories")
+    @mock.patch("extract.main.prompt_use_existing_index", return_value=False)
+    def test_populated_file_rescan_calls_collect(self, prompt, collect):
+        self._populate()
+        manage_index(self.conn, self.args, index_existed=True)
+        prompt.assert_called_once()
+        collect.assert_called_once()
 
 
 if __name__ == "__main__":
