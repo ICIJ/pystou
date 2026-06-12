@@ -88,6 +88,20 @@ def prompt_use_existing_index() -> bool:
         print("Invalid input. Please enter 'Y' or 'n'.")
 
 
+def index_has_data(conn: sqlite3.Connection) -> bool:
+    """Returns True if the index contains at least one directory record.
+
+    Args:
+        conn (sqlite3.Connection): SQLite database connection.
+
+    Returns:
+        bool: True if the directories table has any rows, False otherwise.
+    """
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM directories LIMIT 1")
+    return cursor.fetchone() is not None
+
+
 def _escape_like(text: str) -> str:
     """Escapes SQL LIKE wildcards so paths match literally (ESCAPE '\\')."""
     return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
