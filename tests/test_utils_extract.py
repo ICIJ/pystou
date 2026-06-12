@@ -150,6 +150,31 @@ class TestCollapseRedundantRoot(unittest.TestCase):
         self.assertTrue(out.is_dir())
         self.assertEqual(list(out.iterdir()), [])
 
+    def test_rollback_on_second_rename_failure(self):
+        from unittest.mock import patch
+
+        out = Path(self.test_dir) / "555555"
+        inner = out / "555555"
+        inner.mkdir(parents=True)
+        (inner / "a.txt").write_text("hi")
+
+        real_rename = Path.rename
+        calls = {"n": 0}
+
+        def flaky_rename(self, target):
+            calls["n"] += 1
+            if calls["n"] == 2:  # the inner -> output_dir rename
+                raise OSError("boom")
+            return real_rename(self, target)
+
+        with patch.object(Path, "rename", flaky_rename), self.assertRaises(OSError):
+            utils._collapse_redundant_root(out)
+
+        # output_dir is restored to its original (un-collapsed) state...
+        self.assertTrue((out / "555555" / "a.txt").exists())
+        # ...and no stray .tmp wrapper is left behind.
+        self.assertFalse((Path(self.test_dir) / "555555.tmp").exists())
+
 
 class TestExtractPstCollapsesRoot(unittest.TestCase):
     """Exercises extract_pst_archive's collapse without a real readpst/PST."""

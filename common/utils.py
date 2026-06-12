@@ -501,7 +501,13 @@ def _collapse_redundant_root(output_dir: Path) -> None:
     inner_name = entries[0].name
     wrapper_tmp = unique_path(output_dir.parent / f"{output_dir.name}.tmp")
     output_dir.rename(wrapper_tmp)
-    (wrapper_tmp / inner_name).rename(output_dir)
+    try:
+        (wrapper_tmp / inner_name).rename(output_dir)
+    except OSError:
+        # The inner rename failed and output_dir is still vacated; restore the
+        # original directory so output_dir is never left missing, then re-raise.
+        wrapper_tmp.rename(output_dir)
+        raise
     wrapper_tmp.rmdir()
 
 
