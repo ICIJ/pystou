@@ -271,6 +271,47 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
         # The source archive is left in place for the caller to keep.
         self.assertTrue(archive.exists())
 
+    def test_collapse_rollback_through_extract_keeps_data_and_succeeds(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "555555.pst"
+        archive.write_bytes(b"placeholder-pst-bytes")
+
+        def fake_run(cmd, *args, **kwargs):
+            o_dir = Path(cmd[cmd.index("-o") + 1])
+            mail = o_dir / "555555" / "Входящие"
+            mail.mkdir(parents=True)
+            (mail / "1.eml").write_text("from: a@b")
+
+            class _R:
+                returncode = 0
+
+            return _R()
+
+        real_rename = Path.rename
+        calls = {"n": 0}
+
+        def flaky_rename(self, target):
+            calls["n"] += 1
+            if calls["n"] == 2:  # the inner -> output_dir rename inside the collapse
+                raise OSError("boom")
+            return real_rename(self, target)
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(utils.subprocess, "run", side_effect=fake_run),
+            patch.object(Path, "rename", flaky_rename),
+        ):
+            result = utils.extract_pst_archive(archive)
+
+        out = archive.parent / "555555"
+        # Collapse failed and rolled back, but output exists -> success is honest.
+        self.assertTrue(result)
+        # Data is intact in the restored (un-collapsed) layout...
+        self.assertTrue((out / "555555" / "Входящие" / "1.eml").exists())
+        # ...with no stray .tmp wrapper left behind.
+        self.assertFalse((archive.parent / "555555.tmp").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
