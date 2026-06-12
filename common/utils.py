@@ -549,6 +549,18 @@ def extract_pst_archive(archive_path: Path) -> bool:
                     "error": str(e),
                 }
             )
+        if not (
+            unique_output_dir.is_dir() and any(p.is_file() for p in unique_output_dir.rglob("*"))
+        ):
+            print(f"PST extraction produced no output: {archive_path}")
+            logging.warning(
+                {
+                    "action": "extract_pst",
+                    "status": "no_output",
+                    "archive": str(archive_path),
+                }
+            )
+            return False
         print(f"Extracted PST file to {unique_output_dir}")
         return True
     except subprocess.CalledProcessError as e:

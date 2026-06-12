@@ -243,6 +243,32 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
         # Collapse blew up, but the extraction still reports success.
         self.assertTrue(result)
 
+    def test_empty_extraction_returns_false_and_keeps_source(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "555555.pst"
+        archive.write_bytes(b"placeholder-pst-bytes")
+
+        def fake_run(cmd, *args, **kwargs):
+            o_dir = Path(cmd[cmd.index("-o") + 1])
+            # readpst exits 0 but produces only an empty folder tree (no files).
+            (o_dir / "555555" / "EmptyFolder").mkdir(parents=True)
+
+            class _R:
+                returncode = 0
+
+            return _R()
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(utils.subprocess, "run", side_effect=fake_run),
+        ):
+            result = utils.extract_pst_archive(archive)
+
+        self.assertFalse(result)
+        # The source archive is left in place for the caller to keep.
+        self.assertTrue(archive.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
