@@ -486,7 +486,7 @@ def _collapse_redundant_root(output_dir: Path) -> None:
 
     If ``output_dir`` holds exactly one entry and it is a directory, lift that
     directory's contents up into ``output_dir`` and remove the now-empty
-    wrapper. ``readpst -r`` writes its tree inside a folder named after the PST,
+    wrapper. ``readpst`` in recursive mode (``-r``) writes its tree inside a folder named after the PST,
     one level below the unique directory pystou created — yielding
     ``output_dir/<root>/<mail folders>``. This collapses that single redundant
     level. It is a no-op when ``output_dir`` is empty, holds more than one

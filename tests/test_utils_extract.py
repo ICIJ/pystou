@@ -193,6 +193,31 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
         # ...and the redundant nested 555555/555555 level is gone.
         self.assertFalse((out / "555555").exists())
 
+    def test_collapse_failure_does_not_fail_extraction(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "555555.pst"
+        archive.write_bytes(b"placeholder-pst-bytes")
+
+        def fake_run(cmd, *args, **kwargs):
+            o_dir = Path(cmd[cmd.index("-o") + 1])
+            (o_dir / "555555" / "Входящие").mkdir(parents=True)
+
+            class _R:
+                returncode = 0
+
+            return _R()
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(utils.subprocess, "run", side_effect=fake_run),
+            patch.object(utils, "_collapse_redundant_root", side_effect=OSError("boom")),
+        ):
+            result = utils.extract_pst_archive(archive)
+
+        # Collapse blew up, but the extraction still reports success.
+        self.assertTrue(result)
+
 
 if __name__ == "__main__":
     unittest.main()
