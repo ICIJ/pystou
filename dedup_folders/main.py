@@ -13,6 +13,7 @@ from common.cli import add_common_arguments
 from common.fs_walker import collect_directories
 from common.indexer import (
     close_database,
+    index_has_data,
     initialize_database,
     load_directories_from_index,
     prompt_use_existing_index,
@@ -64,8 +65,10 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     log_configuration(args)
     validate_directory_or_exit(args.directory)
 
+    db_path = os.path.join(args.db_dir, "filesystem_index.db")
+    index_existed = os.path.exists(db_path)
     conn = initialize_database(args.db_dir)
-    manage_index(conn, args)
+    manage_index(conn, args, index_existed)
 
     directories = load_directories_from_index(conn)
     total_directories = len(directories)
@@ -87,20 +90,23 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     close_database(conn)
 
 
-def manage_index(conn: sqlite3.Connection, args) -> None:
+def manage_index(conn: sqlite3.Connection, args, index_existed: bool) -> None:
     """Manages the index, prompting the user to use existing index or rescan.
 
     Args:
         conn (sqlite3.Connection): SQLite database connection.
         args: Parsed command-line arguments.
+        index_existed (bool): Whether the index file existed before this run
+            (captured before ``initialize_database`` created it).
     """
-    db_path = os.path.join(args.db_dir, "filesystem_index.db")
-    index_exists = os.path.exists(db_path)
-    if index_exists:
+    if index_existed and index_has_data(conn):
         use_existing = prompt_use_existing_index()
         if not use_existing:
             print("Rescanning the filesystem and rebuilding the index...")
             collect_directories(conn, args.directory, args.recursive, args.level)
+    elif index_existed:
+        print("Empty index found. Rescanning the filesystem...")
+        collect_directories(conn, args.directory, args.recursive, args.level)
     else:
         print("No index file found. Scanning the filesystem...")
         collect_directories(conn, args.directory, args.recursive, args.level)

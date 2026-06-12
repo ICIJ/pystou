@@ -3,12 +3,14 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 from unittest.mock import patch
 
 from common.fs_walker import collect_directories
 from common.indexer import close_database, initialize_database
 from common.utils import group_directories
-from dedup_folders.main import identify_base_and_duplicates, process_group
+from dedup_folders.main import identify_base_and_duplicates, manage_index, process_group
 
 
 class TestDedupFolders(unittest.TestCase):
@@ -122,6 +124,53 @@ class TestMergeConflictPreservesData(unittest.TestCase):
         self.assertEqual((self.dup / "shared.txt").read_text(), "dup-version")
         # Base copy is untouched.
         self.assertEqual((self.base / "shared.txt").read_text(), "base-version")
+
+
+class TestDedupManageIndex(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.conn = initialize_database(self.test_dir)
+        self.args = SimpleNamespace(directory=self.test_dir, recursive=True, level=None)
+
+    def tearDown(self):
+        close_database(self.conn)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def _populate(self):
+        self.conn.execute(
+            "INSERT INTO directories (path, parent_path, mtime) VALUES ('/a', '/', 0)"
+        )
+        self.conn.commit()
+
+    @mock.patch("dedup_folders.main.collect_directories")
+    @mock.patch("dedup_folders.main.prompt_use_existing_index")
+    def test_no_file_scans_without_prompt(self, prompt, collect):
+        manage_index(self.conn, self.args, index_existed=False)
+        prompt.assert_not_called()
+        collect.assert_called_once()
+
+    @mock.patch("dedup_folders.main.collect_directories")
+    @mock.patch("dedup_folders.main.prompt_use_existing_index")
+    def test_empty_file_scans_without_prompt(self, prompt, collect):
+        manage_index(self.conn, self.args, index_existed=True)
+        prompt.assert_not_called()
+        collect.assert_called_once()
+
+    @mock.patch("dedup_folders.main.collect_directories")
+    @mock.patch("dedup_folders.main.prompt_use_existing_index", return_value=True)
+    def test_populated_file_reused_skips_scan(self, prompt, collect):
+        self._populate()
+        manage_index(self.conn, self.args, index_existed=True)
+        prompt.assert_called_once()
+        collect.assert_not_called()
+
+    @mock.patch("dedup_folders.main.collect_directories")
+    @mock.patch("dedup_folders.main.prompt_use_existing_index", return_value=False)
+    def test_populated_file_rescan_calls_collect(self, prompt, collect):
+        self._populate()
+        manage_index(self.conn, self.args, index_existed=True)
+        prompt.assert_called_once()
+        collect.assert_called_once()
 
 
 if __name__ == "__main__":
