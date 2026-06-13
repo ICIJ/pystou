@@ -119,3 +119,5 @@ dmypy.json
 
 # Superpowers (local design specs/plans, not tracked)
 docs/superpowers/
+# Local git worktrees (superpowers/native worktree tooling)
+.claude/worktrees/
