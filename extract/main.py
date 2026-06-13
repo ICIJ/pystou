@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
+from common import trash
 from common.cli import add_common_arguments
 from common.fs_walker import collect_directories
 from common.indexer import (
@@ -74,6 +75,17 @@ def add_extract_arguments(parser: argparse.ArgumentParser) -> None:
         dest="types",
         metavar="TYPE",
         help="Only extract archives of this type (e.g., pst, zip, tar.gz). Can be used multiple times.",
+    )
+    parser.add_argument(
+        "--hard-delete",
+        action="store_true",
+        help="Permanently delete instead of moving to .pystou-trash",
+    )
+    parser.add_argument(
+        "--trash-dir",
+        default=None,
+        metavar="PATH",
+        help="Override the trash location (must be on the same filesystem)",
     )
 
 
@@ -169,7 +181,14 @@ def process_archives_parallel(archive_files: list[Path], args, conn) -> None:
             verify_then_delete(
                 archive,
                 success,
-                lambda a=archive: delete_archive_file(a, conn, args.dry_run),
+                lambda a=archive: delete_archive_file(
+                    a,
+                    conn,
+                    args.dry_run,
+                    args.directory,
+                    hard_delete=args.hard_delete,
+                    trash_dir=args.trash_dir,
+                ),
             )
         elif args.default_delete_choice == 2:
             print(f"Keeping archive: {archive}")
@@ -178,7 +197,14 @@ def process_archives_parallel(archive_files: list[Path], args, conn) -> None:
             if success:
                 delete_action = prompt_delete_action(archive, None)
                 if delete_action == "1":
-                    delete_archive_file(archive, conn, args.dry_run)
+                    delete_archive_file(
+                        archive,
+                        conn,
+                        args.dry_run,
+                        args.directory,
+                        hard_delete=args.hard_delete,
+                        trash_dir=args.trash_dir,
+                    )
                 else:
                     print(f"Keeping archive: {archive}")
                     logging.info({"action": "keep_archive", "archive": str(archive)})
@@ -296,7 +322,14 @@ def extract_and_update_index(archive_file: Path, args, conn, depth: int = 0) -> 
             # Prompt to delete the archive
             delete_action = prompt_delete_action(archive_file, args.default_delete_choice)
             if delete_action == "1":
-                delete_archive_file(archive_file, conn, args.dry_run)
+                delete_archive_file(
+                    archive_file,
+                    conn,
+                    args.dry_run,
+                    args.directory,
+                    hard_delete=args.hard_delete,
+                    trash_dir=args.trash_dir,
+                )
             else:
                 print(f"Keeping archive: {archive_file}")
                 logging.info({"action": "keep_archive", "archive": str(archive_file)})
@@ -343,23 +376,32 @@ def update_index_after_extraction(conn, directory: Path) -> None:
     collect_directories(conn, directory, recursive=False)
 
 
-def delete_archive_file(archive_file: Path, conn, dry_run: bool) -> None:
-    """Deletes the archive file and updates the index.
-
-    For split archives, also deletes all split parts (.z01, .z02, etc.).
+def delete_archive_file(
+    archive_file: Path,
+    conn,
+    dry_run: bool,
+    op_root: str = ".",
+    *,
+    hard_delete: bool = False,
+    trash_dir: Optional[str] = None,
+) -> None:
+    """Removes the archive (and split parts), quarantining by default.
 
     Args:
-        archive_file (Path): The archive file to delete.
+        archive_file (Path): The archive file to remove.
         conn: SQLite database connection.
         dry_run (bool): Whether to perform a dry run.
+        op_root (str): Directory hosting the trash.
+        hard_delete (bool): If True, permanently delete instead of quarantining.
+        trash_dir (Optional[str]): Optional trash location override.
     """
-    # Get all files to delete (includes split parts if applicable)
     split_parts = get_split_archive_parts(archive_file)
     files_to_delete = split_parts if split_parts else [archive_file]
 
     if dry_run:
         for f in files_to_delete:
-            print(f"Dry run: would delete archive: {f}")
+            verb = "delete" if hard_delete else "quarantine"
+            print(f"Dry run: would {verb} archive: {f}")
         logging.info(
             {
                 "action": "delete_archive",
@@ -368,30 +410,49 @@ def delete_archive_file(archive_file: Path, conn, dry_run: bool) -> None:
                 "parts_count": len(files_to_delete),
             }
         )
-    else:
-        for f in files_to_delete:
-            try:
-                print(f"Deleting archive: {f}")
-                f.unlink()
-                logging.info(
-                    {
-                        "action": "delete_archive",
-                        "status": "success",
-                        "archive": str(f),
-                    }
-                )
-                # Update index
+        return
+
+    if not hard_delete:
+        try:
+            trash.quarantine(
+                files_to_delete,
+                op_root,
+                operation="extract",
+                command="pystou extract",
+                trash_dir=trash_dir,
+            )
+            for f in files_to_delete:
+                print(f"Quarantined archive: {f}")
+                logging.info({"action": "delete_archive", "status": "success", "archive": str(f)})
                 update_index_after_change(conn, "delete_file", f)
-            except Exception as e:
-                print(f"Error deleting archive {f}: {e}")
-                logging.error(
-                    {
-                        "action": "delete_archive",
-                        "status": "error",
-                        "archive": str(f),
-                        "error": str(e),
-                    }
-                )
+        except (trash.CrossDeviceTrashError, trash.TrashUnavailableError) as e:
+            print(f"Error: {e}")
+            logging.error(
+                {
+                    "action": "delete_archive",
+                    "status": "trash_error",
+                    "archive": str(archive_file),
+                    "error": str(e),
+                }
+            )
+        return
+
+    for f in files_to_delete:
+        try:
+            print(f"Deleting archive: {f}")
+            f.unlink()
+            logging.info({"action": "delete_archive", "status": "success", "archive": str(f)})
+            update_index_after_change(conn, "delete_file", f)
+        except Exception as e:
+            print(f"Error deleting archive {f}: {e}")
+            logging.error(
+                {
+                    "action": "delete_archive",
+                    "status": "error",
+                    "archive": str(f),
+                    "error": str(e),
+                }
+            )
 
 
 if __name__ == "__main__":
