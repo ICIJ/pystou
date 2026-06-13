@@ -17,6 +17,20 @@ def _app():
     return app
 
 
+def _split_runner():
+    """A CliRunner with stdout/stderr kept separate across Click versions.
+
+    Click <8.2 defaults to merging stderr into stdout (``mix_stderr=True``), which
+    would let a ``print(..., file=sys.stderr)`` leak into ``result.stdout``; pass
+    ``mix_stderr=False`` there. Click >=8.2 removed the parameter (streams are
+    always separate), so fall back to the default constructor.
+    """
+    try:
+        return CliRunner(mix_stderr=False)
+    except TypeError:
+        return CliRunner()
+
+
 class TestExtractCommand(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
@@ -40,7 +54,7 @@ class TestExtractCommand(unittest.TestCase):
 
     def test_extract_stdout_is_clean(self):
         # extraction status ("Extracted ...") must go to stderr, not stdout
-        r = self.runner.invoke(
+        r = _split_runner().invoke(
             _app(),
             [self.dir, "--action", "extract", "--log-dir", self.dir, "--db-dir", self.dir],
         )

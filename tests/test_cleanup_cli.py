@@ -16,6 +16,18 @@ def _app():
     return app
 
 
+def _split_runner():
+    """CliRunner with stdout/stderr kept separate across Click versions.
+
+    Click <8.2 merges stderr into stdout by default; pass mix_stderr=False there.
+    Click >=8.2 removed the parameter (always separate), so fall back.
+    """
+    try:
+        return CliRunner(mix_stderr=False)
+    except TypeError:
+        return CliRunner()
+
+
 class TestCleanupCommand(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
@@ -58,7 +70,7 @@ class TestCleanupCommand(unittest.TestCase):
 
     def test_dry_run_stdout_clean(self):
         (Path(self.dir) / ".DS_Store").write_text("x")
-        r = self.runner.invoke(
+        r = _split_runner().invoke(
             _app(), [self.dir, "-n", "--log-dir", self.dir, "--db-dir", self.dir]
         )
         self.assertEqual(r.exit_code, 0)

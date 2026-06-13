@@ -6,7 +6,9 @@ class TestDeps(unittest.TestCase):
         import rich  # noqa: F401
         import typer  # noqa: F401
 
-    def test_version_is_1_0_0(self):
+    def test_version_is_semver(self):
+        # The version is managed by semantic-release; don't hardcode a specific
+        # number, just assert it's a valid semantic version string.
         import pystou
 
-        self.assertEqual(pystou.__version__, "1.0.0")
+        self.assertRegex(pystou.__version__, r"^\d+\.\d+\.\d+")

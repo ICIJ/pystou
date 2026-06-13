@@ -4,6 +4,7 @@ from unittest import mock
 from typer.testing import CliRunner
 
 from common.errors import PystouError
+from pystou import __version__
 from pystou.main import app, main
 
 
@@ -27,7 +28,7 @@ class TestApp(unittest.TestCase):
     def test_version(self):
         r = CliRunner().invoke(app, ["--version"])
         self.assertEqual(r.exit_code, 0)
-        self.assertIn("1.0.0", r.stdout)
+        self.assertIn(__version__, r.stdout)  # whatever semantic-release set
 
 
 class TestMainBoundary(unittest.TestCase):

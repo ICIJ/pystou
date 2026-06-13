@@ -18,6 +18,18 @@ def _app():
     return app
 
 
+def _split_runner():
+    """CliRunner with stdout/stderr kept separate across Click versions.
+
+    Click <8.2 merges stderr into stdout by default; pass mix_stderr=False there.
+    Click >=8.2 removed the parameter (always separate), so fall back.
+    """
+    try:
+        return CliRunner(mix_stderr=False)
+    except TypeError:
+        return CliRunner()
+
+
 class TestStatsCommand(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
@@ -104,7 +116,7 @@ class TestStatsCommand(unittest.TestCase):
         big = Path(self.dir) / "big"
         for i in range(1100):
             (big / f"d{i}").mkdir(parents=True)
-        runner = CliRunner()  # click >=8.2 separates stdout/stderr by default
+        runner = _split_runner()  # keep stdout/stderr separate on all Click versions
         r = runner.invoke(
             _app(),
             [str(big), "-r", "--json", "--log-dir", self.dir, "--db-dir", self.dir],
@@ -125,7 +137,7 @@ class TestStatsCommand(unittest.TestCase):
         big = Path(self.dir) / "big"
         for i in range(1100):
             (big / f"d{i}").mkdir(parents=True)
-        runner = CliRunner()  # click >=8.2 separates stdout/stderr by default
+        runner = _split_runner()  # keep stdout/stderr separate on all Click versions
         r = runner.invoke(
             _app(),
             [str(big), "-r", "--log-dir", self.dir, "--db-dir", self.dir],
