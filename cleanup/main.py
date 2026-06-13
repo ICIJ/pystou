@@ -8,10 +8,21 @@ import shlex
 import shutil
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
-from common import trash
-from common.cli import add_common_arguments
+import typer
+
+from common import console, trash
+from common.cli import (
+    DbDirOpt,
+    DirectoryArg,
+    DryRunOpt,
+    HardDeleteOpt,
+    LogDirOpt,
+    RecursiveOpt,
+    TrashDirOpt,
+    add_common_arguments,
+)
 from common.fs_walker import is_excluded_dir
 from common.interrupt import scanning
 from common.logger import log_configuration, setup_logging
@@ -73,6 +84,73 @@ def add_cleanup_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         metavar="PATH",
         help="Override the trash location (must be on the same filesystem)",
+    )
+
+
+def cleanup_command(
+    directory: DirectoryArg = ".",
+    recursive: RecursiveOpt = False,
+    include: Annotated[
+        Optional[list[str]], typer.Option("--include", help="Extra file/dir names to remove.")
+    ] = None,
+    list_only: Annotated[
+        bool, typer.Option("--list-only", help="List junk without removing.")
+    ] = False,
+    dry_run: DryRunOpt = False,
+    hard_delete: HardDeleteOpt = False,
+    trash_dir: TrashDirOpt = None,
+    log_dir: LogDirOpt = ".",
+    db_dir: DbDirOpt = ".",
+) -> None:
+    """Remove junk files (.DS_Store, Thumbs.db, etc.); quarantines by default."""
+    setup_logging("cleanup", log_dir)
+    logging.info(
+        {
+            "action": "configuration",
+            "command": "cleanup",
+            "directory": directory,
+            "recursive": recursive,
+            "list_only": list_only,
+            "dry_run": dry_run,
+            "hard_delete": hard_delete,
+        }
+    )
+    validate_directory_or_exit(directory)
+
+    junk_files = JUNK_FILES.copy()
+    junk_dirs = JUNK_DIRS.copy()
+    for pattern in include or []:
+        junk_files.add(pattern)
+
+    junk_items = find_junk(directory, recursive, junk_files, junk_dirs)
+    if not junk_items:
+        console.status("No junk files found.")
+        return
+    console.status(f"Found {len(junk_items)} junk item(s):")
+    for item in junk_items:
+        console.status(f"  {item}")
+    logging.info(
+        {
+            "action": "junk_found",
+            "count": len(junk_items),
+            "items": [str(i) for i in junk_items],
+        }
+    )
+
+    if list_only:
+        console.status("(Use without --list-only to remove)")
+        return
+    if dry_run:
+        console.status("Dry run: would remove the above items")
+        logging.info({"action": "cleanup", "status": "dry_run"})
+        return
+
+    removed, skipped = remove_junk(
+        junk_items, directory, hard_delete=hard_delete, trash_dir=trash_dir
+    )
+    verb = "Deleted" if hard_delete else "Quarantined"
+    console.success(
+        f"{verb} {removed}/{len(junk_items)} item(s)" + (f", skipped {skipped}" if skipped else "")
     )
 
 
