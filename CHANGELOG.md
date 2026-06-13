@@ -1,6 +1,37 @@
 # CHANGELOG
 
 
+## v0.3.0 (2026-06-13)
+
+### Breaking Changes
+
+- **quarantine**: `cleanup`, `dedup` (delete/merge), and `extract` source-delete now **quarantine
+  files by default** into a co-located `.pystou-trash/` directory instead of permanently deleting
+  them. Pass `--hard-delete` to restore the previous permanent-delete behavior. `empty` is unaffected
+  (empty directories hold no data).
+
+### Features
+
+- **restore**: New `pystou restore [directory] --run <id> | --all | --path <original>` subcommand
+  to move quarantined items back to their original paths (never overwrites an occupied path).
+
+- **trash**: New `pystou trash list [directory] [--json]` subcommand to display quarantine runs with
+  item counts and reclaimable size.
+
+- **trash**: New `pystou trash purge [directory] [--run <id> | --all] [--older-than DAYS]`
+  subcommand to permanently delete quarantined runs — the only command that truly deletes.
+
+- **quarantine**: `--hard-delete` flag on `cleanup`, `dedup`, and `extract` to skip quarantine and
+  permanently delete immediately (previous default behavior).
+
+- **quarantine**: `--trash-dir PATH` flag on `cleanup`, `dedup`, and `extract` (and accepted by
+  `restore` and `trash` list/purge) to relocate the trash directory away from the default
+  `.pystou-trash/` co-located path.
+
+- **ledger**: Run-scoped write-ahead JSON Lines audit ledger recording every item removed, enabling
+  reliable restore and purge operations.
+
+
 ## v0.2.0 (2026-06-12)
 
 ### Bug Fixes
