@@ -215,10 +215,10 @@ def _remove_or_quarantine_dir(
     then updates the index. Errors are logged, not raised."""
     try:
         if hard_delete:
-            print(f"Deleting {dup_dir}")
+            console.status(f"Deleting {dup_dir}")
             shutil.rmtree(dup_dir)
         else:
-            print(f"Quarantining {dup_dir}")
+            console.status(f"Quarantining {dup_dir}")
             trash.quarantine(
                 [dup_dir],
                 op_root,
@@ -229,7 +229,7 @@ def _remove_or_quarantine_dir(
         logging.info({"action": "delete", "status": "success", "directory": str(dup_dir)})
         update_index_after_change(conn, "delete_directory", dup_dir)
     except (trash.CrossDeviceTrashError, trash.TrashUnavailableError) as e:
-        print(f"Error: {e}")
+        console.error(str(e))
         logging.error(
             {
                 "action": "delete",
@@ -239,7 +239,7 @@ def _remove_or_quarantine_dir(
             }
         )
     except OSError as e:
-        print(f"Error deleting {dup_dir}: {e}")
+        console.error(f"Error deleting {dup_dir}: {e}")
         logging.error(
             {"action": "delete", "status": "error", "directory": str(dup_dir), "error": str(e)}
         )
@@ -266,7 +266,7 @@ def delete_duplicates(
     """
     for dup_dir in duplicate_dirs:
         if dry_run:
-            print(f"Dry run: would {'delete' if hard_delete else 'quarantine'} {dup_dir}")
+            console.status(f"Dry run: would {'delete' if hard_delete else 'quarantine'} {dup_dir}")
             logging.info({"action": "delete", "status": "dry_run", "directory": str(dup_dir)})
             continue
         _remove_or_quarantine_dir(dup_dir, conn, op_root, hard_delete, trash_dir)
@@ -304,7 +304,7 @@ def merge_contents(
             dst = base_dir / item
             if dst.exists():
                 had_conflict = True
-                print(f"Conflict: {dst} already exists. Keeping {src}")
+                console.warn(f"Conflict: {dst} already exists. Keeping {src}")
                 logging.info(
                     {
                         "action": "merge",
@@ -315,7 +315,7 @@ def merge_contents(
                 )
             else:
                 if dry_run:
-                    print(f"Dry run: would move {src} to {dst}")
+                    console.status(f"Dry run: would move {src} to {dst}")
                     logging.info(
                         {
                             "action": "move",
@@ -326,7 +326,7 @@ def merge_contents(
                     )
                 else:
                     try:
-                        print(f"Moving {src} to {dst}")
+                        console.status(f"Moving {src} to {dst}")
                         shutil.move(str(src), str(dst))
                         logging.info(
                             {
@@ -340,7 +340,7 @@ def merge_contents(
                         update_index_after_change(conn, "add_file", dst)
                     except OSError as e:
                         had_conflict = True  # keep the dir; the file did not move
-                        print(f"Error moving {src} to {dst}: {e}")
+                        console.error(f"Error moving {src} to {dst}: {e}")
                         logging.error(
                             {
                                 "action": "move",
@@ -352,7 +352,7 @@ def merge_contents(
                         )
 
         if had_conflict:
-            print(f"Keeping {dup_dir} (unmerged items remain)")
+            console.warn(f"Keeping {dup_dir} (unmerged items remain)")
             logging.info(
                 {
                     "action": "delete",
@@ -363,7 +363,7 @@ def merge_contents(
             continue
 
         if dry_run:
-            print(f"Dry run: would delete {dup_dir}")
+            console.status(f"Dry run: would delete {dup_dir}")
             logging.info({"action": "delete", "status": "dry_run", "directory": str(dup_dir)})
         else:
             _remove_or_quarantine_dir(dup_dir, conn, op_root, hard_delete, trash_dir)

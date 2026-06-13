@@ -1,6 +1,7 @@
 import logging
 import os
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -135,7 +136,7 @@ def scan_tree(
                 for subdir in reversed(subdirs):
                     stack.append((subdir, current_level + 1))
         except PermissionError as e:
-            print(f"\nPermission denied: {current_dir}")
+            print(f"\nPermission denied: {current_dir}", file=sys.stderr)
             logging.error({"action": "scan_error", "directory": str(current_dir), "error": str(e)})
         except OSError as e:
             logging.warning(

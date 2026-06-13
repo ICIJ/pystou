@@ -138,17 +138,11 @@ def find_junk(
     """
     junk_items: list[Path] = []
     directory_path = Path(directory)
-    scanned = 0
 
     if recursive:
         # followlinks=False prevents infinite loops from symlink cycles
         for root, dirs, files in os.walk(directory_path, followlinks=False):
             root_path = Path(root)
-            scanned += 1
-
-            # Progress indicator every 1000 directories
-            if scanned % 1000 == 0:
-                print(f"Scanned {scanned} directories...", end="\r")
 
             # Check for junk directories
             for dir_name in dirs[:]:  # Copy to allow modification
@@ -185,11 +179,8 @@ def find_junk(
                 ):
                     junk_items.append(Path(entry.path))
         except PermissionError as e:
-            print(f"Permission denied: {directory_path}")
+            console.error(f"Permission denied: {directory_path}")
             logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
-
-    if scanned >= 1000:
-        print(f"Scanned {scanned} directories.    ")  # Clear progress line
 
     return junk_items
 
@@ -242,7 +233,7 @@ def remove_junk(
                 trash_dir=trash_dir,
             )
         except (trash.CrossDeviceTrashError, trash.TrashUnavailableError) as e:
-            print(f"Error: {e}")
+            console.error(str(e))
             logging.error({"action": "cleanup", "status": "trash_error", "error": str(e)})
             return 0, len(junk_items)
         return len(existing), skipped
@@ -259,7 +250,7 @@ def remove_junk(
             removed += 1
             logging.info({"action": "remove_junk", "status": "success", "path": str(item)})
         except OSError as e:
-            print(f"Error removing {item}: {e}")
+            console.error(f"Error removing {item}: {e}")
             logging.error(
                 {
                     "action": "remove_junk",

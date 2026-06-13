@@ -397,7 +397,7 @@ def delete_archive_file(
     if dry_run:
         for f in files_to_delete:
             verb = "delete" if hard_delete else "quarantine"
-            print(f"Dry run: would {verb} archive: {f}")
+            console.status(f"Dry run: would {verb} archive: {f}")
         logging.info(
             {
                 "action": "delete_archive",
@@ -418,11 +418,11 @@ def delete_archive_file(
                 trash_dir=trash_dir,
             )
             for f in files_to_delete:
-                print(f"Quarantined archive: {f}")
+                console.status(f"Quarantined archive: {f}")
                 logging.info({"action": "delete_archive", "status": "success", "archive": str(f)})
                 update_index_after_change(conn, "delete_file", f)
         except (trash.CrossDeviceTrashError, trash.TrashUnavailableError) as e:
-            print(f"Error: {e}")
+            console.error(str(e))
             logging.error(
                 {
                     "action": "delete_archive",
@@ -435,12 +435,12 @@ def delete_archive_file(
 
     for f in files_to_delete:
         try:
-            print(f"Deleting archive: {f}")
+            console.status(f"Deleting archive: {f}")
             f.unlink()
             logging.info({"action": "delete_archive", "status": "success", "archive": str(f)})
             update_index_after_change(conn, "delete_file", f)
         except Exception as e:
-            print(f"Error deleting archive {f}: {e}")
+            console.error(f"Error deleting archive {f}: {e}")
             logging.error(
                 {
                     "action": "delete_archive",

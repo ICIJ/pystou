@@ -161,7 +161,6 @@ def collect_files(
     """
     files: list[Path] = []
     directory_path = Path(directory)
-    scanned = 0
 
     if recursive:
         # followlinks=False prevents infinite loops from symlink cycles
@@ -169,11 +168,6 @@ def collect_files(
             # Prune the trash directory: removes it from results and prevents descent.
             dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
             root_path = Path(root)
-            scanned += 1
-
-            # Progress indicator every 1000 directories
-            if scanned % 1000 == 0:
-                print(f"Scanned {scanned} directories...", end="\r")
 
             for filename in filenames:
                 file_path = root_path / filename
@@ -196,11 +190,8 @@ def collect_files(
                     if extensions_filter is None or file_path.suffix.lower() in extensions_filter:
                         files.append(file_path)
         except PermissionError as e:
-            print(f"Permission denied: {directory_path}")
+            console.error(f"Permission denied: {directory_path}")
             logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
-
-    if scanned >= 1000:
-        print(f"Scanned {scanned} directories.    ")  # Clear progress line
 
     return files
 
@@ -273,13 +264,8 @@ def check_extension_mismatches(files: list[Path]) -> list[tuple[Path, str]]:
         List of (path, issue description) tuples.
     """
     issues: list[tuple[Path, str]] = []
-    total = len(files)
 
-    for i, file_path in enumerate(files, 1):
-        # Progress indicator
-        if total > 100 and i % 100 == 0:
-            print(f"Checked {i}/{total} files...", end="\r")
-
+    for file_path in files:
         ext = file_path.suffix.lower()
         if ext not in EXTENSION_TYPE_MAP:
             continue
@@ -303,9 +289,6 @@ def check_extension_mismatches(files: list[Path]) -> list[tuple[Path, str]]:
                 }
             )
 
-    if total > 100:
-        print(f"Checked {total} files.           ")  # Clear progress line
-
     return issues
 
 
@@ -322,17 +305,10 @@ def check_encrypted_archives(files: list[Path]) -> list[tuple[Path, str]]:
 
     issues: list[tuple[Path, str]] = []
     zip_extensions = {".zip", ".docx", ".xlsx", ".pptx"}
-    checked = 0
 
-    for _i, file_path in enumerate(files, 1):
+    for file_path in files:
         if file_path.suffix.lower() not in zip_extensions:
             continue
-
-        checked += 1
-
-        # Progress indicator
-        if checked > 100 and checked % 100 == 0:
-            print(f"Checked {checked} archives...", end="\r")
 
         try:
             with zipfile.ZipFile(file_path, "r") as zf:
@@ -376,8 +352,5 @@ def check_encrypted_archives(files: list[Path]) -> list[tuple[Path, str]]:
                     "error": str(e),
                 }
             )
-
-    if checked > 100:
-        print(f"Checked {checked} archives.      ")  # Clear progress line
 
     return issues

@@ -92,6 +92,48 @@ class TestStatsCommand(unittest.TestCase):
         # The extension table should show at least one extension
         self.assertIn(".txt", out)
 
+    # ------------------------------------------------------------------
+    # test_json_pure_on_large_tree
+    # >1000 dirs would previously trigger a "Scanned N...\r" print to
+    # stdout BEFORE the JSON, breaking json.loads(stdout).  We point the
+    # console at the real streams (CliRunner patches sys.stdout) so any
+    # leaked chrome would show up in r.stdout alongside the JSON.
+    # ------------------------------------------------------------------
+    def test_json_pure_on_large_tree(self):
+        console.configure(no_color=True, quiet=False)
+        big = Path(self.dir) / "big"
+        for i in range(1100):
+            (big / f"d{i}").mkdir(parents=True)
+        runner = CliRunner()  # click >=8.2 separates stdout/stderr by default
+        r = runner.invoke(
+            _app(),
+            [str(big), "-r", "--json", "--log-dir", self.dir, "--db-dir", self.dir],
+        )
+        self.assertEqual(r.exit_code, 0, r.output)
+        json.loads(r.stdout)  # must parse — no progress line leaked
+        self.assertNotIn("\r", r.stdout)
+        self.assertNotIn("\x1b[", r.stdout)
+
+    # ------------------------------------------------------------------
+    # test_stdout_has_no_chrome
+    # A human (non-json) run produces a table on stdout but must not leak
+    # any progress/scan chrome ("Scanned ...", "\r") onto stdout.  With
+    # mix_stderr=False, r.stdout holds only the primary data stream.
+    # ------------------------------------------------------------------
+    def test_stdout_has_no_chrome(self):
+        console.configure(no_color=True, quiet=False)
+        big = Path(self.dir) / "big"
+        for i in range(1100):
+            (big / f"d{i}").mkdir(parents=True)
+        runner = CliRunner()  # click >=8.2 separates stdout/stderr by default
+        r = runner.invoke(
+            _app(),
+            [str(big), "-r", "--log-dir", self.dir, "--db-dir", self.dir],
+        )
+        self.assertEqual(r.exit_code, 0, r.output)
+        self.assertNotIn("\r", r.stdout)
+        self.assertNotIn("Scanned", r.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

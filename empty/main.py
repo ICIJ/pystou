@@ -108,7 +108,6 @@ def find_empty_directories(
     """
     empty_dirs: list[Path] = []
     directory_path = Path(directory)
-    scanned = 0
 
     if recursive:
         # Walk bottom-up so we can detect directories that become empty
@@ -116,11 +115,6 @@ def find_empty_directories(
         # followlinks=False prevents infinite loops from symlink cycles
         for root, _dirs, _files in os.walk(directory_path, topdown=False, followlinks=False):
             root_path = Path(root)
-            scanned += 1
-
-            # Progress indicator every 1000 directories
-            if scanned % 1000 == 0:
-                print(f"Scanned {scanned} directories...", end="\r")
 
             # Skip the root directory itself
             if root_path == directory_path:
@@ -163,11 +157,8 @@ def find_empty_directories(
                     if is_directory_empty(dir_path, include_hidden):
                         empty_dirs.append(dir_path)
         except PermissionError as e:
-            print(f"Permission denied: {directory_path}")
+            console.error(f"Permission denied: {directory_path}")
             logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
-
-    if scanned >= 1000:
-        print(f"Scanned {scanned} directories.    ")  # Clear progress line
 
     # Sort by depth (deepest first) for safe removal
     empty_dirs.sort(key=lambda p: len(p.parts), reverse=True)
@@ -216,13 +207,8 @@ def remove_empty_directories(empty_dirs: list[Path]) -> tuple:
     """
     removed = 0
     skipped = 0
-    total = len(empty_dirs)
 
-    for i, dir_path in enumerate(empty_dirs, 1):
-        # Progress indicator
-        if total > 10 and i % 10 == 0:
-            print(f"Removing {i}/{total}...", end="\r")
-
+    for dir_path in empty_dirs:
         try:
             # Check if it still exists and is still empty
             if not dir_path.exists():
@@ -270,7 +256,7 @@ def remove_empty_directories(empty_dirs: list[Path]) -> tuple:
             skipped += 1
 
         except PermissionError as e:
-            print(f"Permission denied: {dir_path}")
+            console.error(f"Permission denied: {dir_path}")
             logging.error(
                 {
                     "action": "remove_empty_dir",
@@ -292,7 +278,7 @@ def remove_empty_directories(empty_dirs: list[Path]) -> tuple:
                     }
                 )
             else:
-                print(f"Error removing {dir_path}: {e}")
+                console.error(f"Error removing {dir_path}: {e}")
                 logging.error(
                     {
                         "action": "remove_empty_dir",
@@ -302,8 +288,5 @@ def remove_empty_directories(empty_dirs: list[Path]) -> tuple:
                     }
                 )
             skipped += 1
-
-    if total > 10:
-        print(f"Removed {removed}/{total} directories.    ")  # Clear progress line
 
     return removed, skipped

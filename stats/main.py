@@ -136,7 +136,6 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> dict:
     }
 
     directory_path = Path(directory)
-    scanned = 0
 
     if recursive:
         # followlinks=False prevents infinite loops from symlink cycles
@@ -144,14 +143,6 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> dict:
             # Prune the trash directory: removes it from results and prevents descent.
             dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
             root_path = Path(root)
-            scanned += 1
-
-            # Progress indicator every 1000 directories
-            if scanned % 1000 == 0:
-                print(
-                    f"Scanned {scanned} directories, {stats['summary']['total_files']} files...",
-                    end="\r",
-                )
 
             stats["summary"]["total_dirs"] += len(dirs)
 
@@ -206,12 +197,9 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> dict:
                 elif entry.is_file(follow_symlinks=False):
                     process_file(Path(entry.path), stats, archive_extensions, top_n)
         except PermissionError as e:
-            print(f"Permission denied: {directory_path}")
+            console.error(f"Permission denied: {directory_path}")
             logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
             stats["summary"]["errors"] += 1
-
-    if scanned >= 1000:
-        print(f"Scanned {scanned} directories, {stats['summary']['total_files']} files.    ")
 
     # Convert heap to sorted list (largest first)
     stats["largest_files"] = [
