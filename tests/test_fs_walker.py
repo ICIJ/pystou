@@ -9,7 +9,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 import common.fs_walker as fs_walker
-from common.indexer import close_database, initialize_database
+from common.fs_walker import collect_directories, is_excluded_dir
+from common.indexer import (
+    close_database,
+    initialize_database,
+    load_directories_from_index,
+)
 
 
 class TestDeepTree(unittest.TestCase):
@@ -93,6 +98,29 @@ class TestBadEntryIsolation(unittest.TestCase):
         names = {r[0] for r in self.conn.execute("SELECT name FROM files")}
         self.assertIn("good", names)  # sibling survived the bad entry
         self.assertNotIn("bad", names)
+
+
+class TestExcludeTrash(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_is_excluded_dir(self):
+        self.assertTrue(is_excluded_dir(".pystou-trash"))
+        self.assertFalse(is_excluded_dir("data"))
+
+    def test_scan_skips_trash(self):
+        root = Path(self.test_dir)
+        (root / "keep").mkdir()
+        (root / ".pystou-trash" / "20260613T000000Z-aaaa" / "0" / "victim").mkdir(parents=True)
+        conn = initialize_database(self.test_dir)
+        collect_directories(conn, str(root), recursive=True)
+        paths = [str(p) for p in load_directories_from_index(conn)]
+        conn.close()
+        self.assertTrue(any(p.endswith("keep") for p in paths))
+        self.assertFalse(any(".pystou-trash" in p for p in paths))
 
 
 if __name__ == "__main__":

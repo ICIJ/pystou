@@ -4,6 +4,13 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
+EXCLUDED_DIR_NAMES = {".pystou-trash"}
+
+
+def is_excluded_dir(name: str) -> bool:
+    """Returns True for directory names that no command should descend into."""
+    return name in EXCLUDED_DIR_NAMES
+
 
 class ScanContext:
     """Context object to track scanning state efficiently."""
@@ -83,6 +90,8 @@ def scan_tree(
                     full_path = Path(entry.path)
                     try:
                         if entry.is_dir(follow_symlinks=False):
+                            if is_excluded_dir(entry.name):
+                                continue
                             stat_info = entry.stat(follow_symlinks=False)
                             dir_entries.append(
                                 (str(full_path), str(current_dir), stat_info.st_mtime)
