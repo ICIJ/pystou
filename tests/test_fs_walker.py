@@ -123,5 +123,27 @@ class TestExcludeTrash(unittest.TestCase):
         self.assertFalse(any(".pystou-trash" in p for p in paths))
 
 
+class TestProgressCallback(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_progress_cb_invoked(self):
+        from common.fs_walker import collect_directories
+        from common.indexer import initialize_database
+
+        (Path(self.test_dir) / "a").mkdir()
+        (Path(self.test_dir) / "a" / "f.txt").write_text("x")
+        calls = []
+        conn = initialize_database(self.test_dir)
+        collect_directories(
+            conn, self.test_dir, recursive=True, progress_cb=lambda d, f: calls.append((d, f))
+        )
+        conn.close()
+        self.assertTrue(calls)  # callback received (dirs, files) counts
+
+
 if __name__ == "__main__":
     unittest.main()

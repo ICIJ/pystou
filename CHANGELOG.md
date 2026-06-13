@@ -1,6 +1,41 @@
 # CHANGELOG
 
 
+## v1.0.0 (2026-06-13)
+
+### Breaking Changes
+
+- **dependencies**: PyStou now requires `typer` and `rich`. It is no longer zero-dependency or
+  "pure native Python" — both packages are declared as runtime dependencies and are installed
+  automatically via `pip install pystou`.
+
+- **cli**: The argument parser was rewritten from argparse to [Typer](https://typer.tiangolo.com/).
+  All flags are backward-incompatible:
+  - `dedup`: `-c 1|2|3` / `--default-choice` replaced by `--action delete|merge|skip`.
+  - `extract`: `-c 1|2` / `--default-choice` replaced by `--action extract|skip`; `-dc 1|2` /
+    `--default-delete-choice` replaced by `--remove-archives` / `--keep-archives`; `-N` short flag
+    replaced by `--nested` (long form only).
+  - `identify`: `--check-mismatch`, `--check-encrypted`, `--check-all` replaced by a single
+    repeatable `--check mismatch|encrypted|all` option.
+
+### Features
+
+- **output**: Rich terminal output throughout — formatted tables for stats and trash listings,
+  live progress bars during scanning and extraction, colored status indicators, and styled
+  interactive prompts.
+
+- **global**: `--no-color` flag disables all rich styling (useful for piping and CI).
+
+- **global**: `-q` / `--quiet` flag suppresses progress bars and status messages; only errors
+  are emitted.
+
+- **completion**: Shell tab-completion for bash, zsh, and fish via `pystou --install-completion`
+  (provided by Typer/click).
+
+- **doctor**: New `pystou doctor [--json]` subcommand that checks whether required external tools
+  (`readpst`, `zstd`, `7z`) are installed and reachable on the system `PATH`.
+
+
 ## v0.3.0 (2026-06-13)
 
 ### Breaking Changes

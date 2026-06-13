@@ -2,6 +2,7 @@
 """Safe filesystem operation helpers: non-clobbering paths and verified deletion."""
 
 import logging
+import sys
 from pathlib import Path
 from typing import Callable
 
@@ -89,7 +90,9 @@ def verify_then_delete(archive: Path, success: bool, delete_fn: Callable[[], Non
         delete_fn (Callable[[], None]): Callback that performs the deletion.
     """
     if not success:
-        print(f"Keeping archive (extraction failed or produced nothing): {archive}")
+        print(
+            f"Keeping archive (extraction failed or produced nothing): {archive}", file=sys.stderr
+        )
         logging.warning(
             {
                 "action": "keep_archive",

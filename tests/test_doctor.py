@@ -1,7 +1,3 @@
-import argparse
-import contextlib
-import io
-import json
 import unittest
 from unittest.mock import patch
 
@@ -9,7 +5,6 @@ from doctor.main import (
     ToolStatus,
     _tool_version,
     check_environment,
-    main,
 )
 
 
@@ -66,55 +61,6 @@ class TestCheckEnvironment(unittest.TestCase):
         """_tool_version returns None instead of propagating errors."""
         with patch("doctor.main.subprocess.run", side_effect=OSError("boom")):
             self.assertIsNone(_tool_version("anything"))
-
-
-class TestMain(unittest.TestCase):
-    """Tests for the main entry point exit codes and output."""
-
-    def _all_available(self):
-        return [
-            ToolStatus("readpst", True, "v1", "PST archives", "hint"),
-            ToolStatus("7z", True, "v1", "split ZIP archives", "hint"),
-            ToolStatus("zstd", True, "v1", "Zstandard archives", "hint"),
-        ]
-
-    def _one_missing(self):
-        statuses = self._all_available()
-        statuses[0] = ToolStatus("readpst", False, None, "PST archives", "hint")
-        return statuses
-
-    def test_main_exit_zero_when_all_present(self):
-        """main returns 0 when every capability is available."""
-        with (
-            patch("doctor.main.check_environment", return_value=self._all_available()),
-            contextlib.redirect_stdout(io.StringIO()),
-        ):
-            self.assertEqual(main(argparse.Namespace(json=False)), 0)
-
-    def test_main_exit_one_when_missing(self):
-        """main returns 1 when a capability is missing."""
-        with (
-            patch("doctor.main.check_environment", return_value=self._one_missing()),
-            contextlib.redirect_stdout(io.StringIO()),
-        ):
-            self.assertEqual(main(argparse.Namespace(json=False)), 1)
-
-    def test_json_output(self):
-        """--json prints a parseable array with the expected keys."""
-        buffer = io.StringIO()
-        with (
-            patch("doctor.main.check_environment", return_value=self._all_available()),
-            contextlib.redirect_stdout(buffer),
-        ):
-            main(argparse.Namespace(json=True))
-
-        data = json.loads(buffer.getvalue())
-        self.assertEqual(len(data), 3)
-        for entry in data:
-            self.assertEqual(
-                set(entry.keys()),
-                {"name", "available", "version", "enables", "install_hint"},
-            )
 
 
 if __name__ == "__main__":

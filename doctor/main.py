@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Doctor subcommand: preflight check of required external CLI tools."""
 
-import argparse
 import importlib.util
-import json
 import shutil
 import subprocess
-import sys
 from dataclasses import dataclass
-from typing import Optional
+from typing import Annotated, Optional
+
+import typer
+
+from common import console
 
 
 @dataclass
@@ -127,76 +128,33 @@ def check_environment() -> list[ToolStatus]:
     return statuses
 
 
-def add_doctor_arguments(parser: argparse.ArgumentParser) -> None:
-    """Adds doctor-specific arguments to the parser.
-
-    Args:
-        parser: ArgumentParser to add arguments to.
-    """
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output the report as a JSON array",
-    )
-
-
-def _print_human_report(statuses: list[ToolStatus]) -> None:
-    """Prints a human-readable report for the tool statuses.
-
-    Args:
-        statuses: The tool statuses to report.
-    """
-    for status in statuses:
-        mark = "✓" if status.available else "✗"
-        version = f" ({status.version})" if status.version else ""
-        print(f"{mark} {status.name}{version} - enables {status.enables}")
-        if not status.available:
-            print(f"    {status.install_hint}")
-
-    available_count = sum(1 for s in statuses if s.available)
-    total = len(statuses)
-    print()
-    print(f"{available_count} of {total} capabilities available.")
-    if available_count < total:
-        print("Missing tools only affect the matching archive formats.")
-
-
-def main(args: Optional[argparse.Namespace] = None) -> int:
-    """Main entry point for doctor.
-
-    Args:
-        args: Parsed arguments. If None, parses from command line.
-
-    Returns:
-        0 if all capabilities are available, 1 otherwise.
-    """
-    if args is None:
-        parser = argparse.ArgumentParser(
-            description="Check that required external tools are installed."
-        )
-        add_doctor_arguments(parser)
-        args = parser.parse_args()
-
+def doctor_command(
+    json_out: Annotated[bool, typer.Option("--json", help="Output as JSON.")] = False,
+) -> None:
+    """Check that required external tools are installed."""
     statuses = check_environment()
 
-    if args.json:
-        payload = [
-            {
-                "name": s.name,
-                "available": s.available,
-                "version": s.version,
-                "enables": s.enables,
-                "install_hint": s.install_hint,
-            }
-            for s in statuses
-        ]
-        print(json.dumps(payload, indent=2))
+    if json_out:
+        console.print_json(
+            [
+                {
+                    "name": s.name,
+                    "available": s.available,
+                    "version": s.version,
+                    "enables": s.enables,
+                    "install_hint": s.install_hint,
+                }
+                for s in statuses
+            ]
+        )
     else:
-        _print_human_report(statuses)
+        t = console.table("Environment", ["Tool", "Status", "Version", "Enables"])
+        for s in statuses:
+            status_str = "[green]✓ found[/green]" if s.available else "[red]✗ missing[/red]"
+            t.add_row(s.name, status_str, s.version or "", s.enables)
+        console.print_table(t)
+        for s in statuses:
+            if not s.available:
+                console.status(f"  Install hint for {s.name}: {s.install_hint}")
 
-    all_available = all(s.available for s in statuses)
-    return 0 if all_available else 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+    raise typer.Exit(0 if all(s.available for s in statuses) else 1)

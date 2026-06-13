@@ -1,17 +1,101 @@
 #!/usr/bin/env python3
 """Identify subcommand for detecting file types and mismatches."""
 
-import argparse
 import logging
 import os
+from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
-from common.cli import add_common_arguments
+import typer
+
+from common import console
+from common.cli import (
+    DbDirOpt,
+    DirectoryArg,
+    LogDirOpt,
+    RecursiveOpt,
+)
 from common.fs_walker import is_excluded_dir
-from common.interrupt import scanning
-from common.logger import log_configuration, setup_logging
+from common.logger import setup_logging
 from common.validation import validate_directory_or_exit
+
+
+class CheckKind(str, Enum):
+    mismatch = "mismatch"
+    encrypted = "encrypted"
+    all = "all"
+
+
+def identify_command(
+    directory: DirectoryArg = ".",
+    recursive: RecursiveOpt = False,
+    check: Annotated[
+        Optional[list[CheckKind]],
+        typer.Option("--check", help="mismatch|encrypted|all (repeatable)."),
+    ] = None,
+    extensions: Annotated[
+        Optional[str],
+        typer.Option("--extensions", help="Comma-separated extensions to check (e.g. .zip,.pdf)."),
+    ] = None,
+    log_dir: LogDirOpt = ".",
+    db_dir: DbDirOpt = ".",
+) -> None:
+    """Identify file-type mismatches and encrypted archives."""
+    setup_logging("identify", log_dir)
+    logging.info(
+        {
+            "action": "configuration",
+            "command": "identify",
+            "directory": directory,
+            "recursive": recursive,
+            "check": [c.value for c in check] if check else None,
+            "extensions": extensions,
+        }
+    )
+    validate_directory_or_exit(directory)
+
+    # Determine which checks to run; default to all when nothing specified.
+    checks = set(check) if check else {CheckKind.all}
+    run_mismatch = CheckKind.mismatch in checks or CheckKind.all in checks
+    run_encrypted = CheckKind.encrypted in checks or CheckKind.all in checks
+
+    # Parse extensions filter if provided.
+    extensions_filter: Optional[set[str]] = None
+    if extensions:
+        extensions_filter = {
+            ext.strip().lower() if ext.startswith(".") else f".{ext.strip().lower()}"
+            for ext in extensions.split(",")
+        }
+
+    files = collect_files(directory, recursive, extensions_filter)
+    logging.info({"action": "files_found", "count": len(files)})
+
+    issues: list[tuple[Path, str]] = []
+
+    if run_mismatch:
+        issues.extend(check_extension_mismatches(files))
+    if run_encrypted:
+        issues.extend(check_encrypted_archives(files))
+
+    if not issues:
+        console.status("No issues found.")
+        logging.info({"action": "no_issues_found"})
+        return
+
+    t = console.table("Issues", ["Path", "Issue"])
+    for file_path, issue in issues:
+        t.add_row(str(file_path), issue)
+    console.print_table(t)
+
+    logging.info(
+        {
+            "action": "issues_found",
+            "count": len(issues),
+            "issues": [{"path": str(p), "issue": i} for p, i in issues],
+        }
+    )
+
 
 # File signatures (magic bytes) for common file types
 FILE_SIGNATURES: dict[bytes, str] = {
@@ -60,110 +144,6 @@ EXTENSION_TYPE_MAP: dict[str, set[str]] = {
 }
 
 
-def add_identify_arguments(parser: argparse.ArgumentParser) -> None:
-    """Adds identify-specific arguments to the parser.
-
-    Args:
-        parser: ArgumentParser to add arguments to.
-    """
-    add_common_arguments(parser)
-    parser.add_argument(
-        "--check-mismatch",
-        action="store_true",
-        help="Check for files with mismatched extensions",
-    )
-    parser.add_argument(
-        "--check-encrypted",
-        action="store_true",
-        help="Check for encrypted ZIP archives",
-    )
-    parser.add_argument(
-        "--check-all",
-        action="store_true",
-        help="Run all checks (mismatch, encrypted)",
-    )
-    parser.add_argument(
-        "--extensions",
-        type=str,
-        metavar="EXT",
-        help="Comma-separated list of extensions to check (e.g., '.zip,.pdf')",
-    )
-
-
-def main(args: Optional[argparse.Namespace] = None) -> None:
-    """Main entry point for identify.
-
-    Args:
-        args: Parsed arguments. If None, parses from command line.
-    """
-    if args is None:
-        parser = argparse.ArgumentParser(description="Identify file types script.")
-        add_identify_arguments(parser)
-        args = parser.parse_args()
-
-    setup_logging("identify", args.log_dir)
-    log_configuration(args)
-
-    validate_directory_or_exit(args.directory)
-
-    # Enable all checks if --check-all is set
-    if args.check_all:
-        args.check_mismatch = True
-        args.check_encrypted = True
-
-    # Default to mismatch check if no specific check is requested
-    if not args.check_mismatch and not args.check_encrypted:
-        args.check_mismatch = True
-
-    # Parse extensions filter if provided
-    extensions_filter: Optional[set[str]] = None
-    if args.extensions:
-        extensions_filter = {
-            ext.strip().lower() if ext.startswith(".") else f".{ext.strip().lower()}"
-            for ext in args.extensions.split(",")
-        }
-
-    # Collect files to analyze
-    with scanning("scan"):
-        files = collect_files(args.directory, args.recursive, extensions_filter)
-
-    print(f"Found {len(files)} files to analyze.")
-    logging.info({"action": "files_found", "count": len(files)})
-
-    if not files:
-        print("No files to analyze.")
-        return
-
-    issues: list[tuple[Path, str]] = []
-
-    # Run checks
-    with scanning("analysis"):
-        if args.check_mismatch:
-            print("Checking for extension mismatches...")
-            issues.extend(check_extension_mismatches(files))
-        if args.check_encrypted:
-            print("Checking for encrypted archives...")
-            issues.extend(check_encrypted_archives(files))
-
-    # Report results
-    if not issues:
-        print("No issues found.")
-        logging.info({"action": "no_issues_found"})
-        return
-
-    print(f"\nFound {len(issues)} issue(s):\n")
-    for file_path, issue in issues:
-        print(f"  [{issue}] {file_path}")
-
-    logging.info(
-        {
-            "action": "issues_found",
-            "count": len(issues),
-            "issues": [{"path": str(p), "issue": i} for p, i in issues],
-        }
-    )
-
-
 def collect_files(
     directory: str,
     recursive: bool,
@@ -181,7 +161,6 @@ def collect_files(
     """
     files: list[Path] = []
     directory_path = Path(directory)
-    scanned = 0
 
     if recursive:
         # followlinks=False prevents infinite loops from symlink cycles
@@ -189,11 +168,6 @@ def collect_files(
             # Prune the trash directory: removes it from results and prevents descent.
             dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
             root_path = Path(root)
-            scanned += 1
-
-            # Progress indicator every 1000 directories
-            if scanned % 1000 == 0:
-                print(f"Scanned {scanned} directories...", end="\r")
 
             for filename in filenames:
                 file_path = root_path / filename
@@ -216,11 +190,8 @@ def collect_files(
                     if extensions_filter is None or file_path.suffix.lower() in extensions_filter:
                         files.append(file_path)
         except PermissionError as e:
-            print(f"Permission denied: {directory_path}")
+            console.error(f"Permission denied: {directory_path}")
             logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
-
-    if scanned >= 1000:
-        print(f"Scanned {scanned} directories.    ")  # Clear progress line
 
     return files
 
@@ -293,13 +264,8 @@ def check_extension_mismatches(files: list[Path]) -> list[tuple[Path, str]]:
         List of (path, issue description) tuples.
     """
     issues: list[tuple[Path, str]] = []
-    total = len(files)
 
-    for i, file_path in enumerate(files, 1):
-        # Progress indicator
-        if total > 100 and i % 100 == 0:
-            print(f"Checked {i}/{total} files...", end="\r")
-
+    for file_path in files:
         ext = file_path.suffix.lower()
         if ext not in EXTENSION_TYPE_MAP:
             continue
@@ -323,9 +289,6 @@ def check_extension_mismatches(files: list[Path]) -> list[tuple[Path, str]]:
                 }
             )
 
-    if total > 100:
-        print(f"Checked {total} files.           ")  # Clear progress line
-
     return issues
 
 
@@ -342,17 +305,10 @@ def check_encrypted_archives(files: list[Path]) -> list[tuple[Path, str]]:
 
     issues: list[tuple[Path, str]] = []
     zip_extensions = {".zip", ".docx", ".xlsx", ".pptx"}
-    checked = 0
 
-    for _i, file_path in enumerate(files, 1):
+    for file_path in files:
         if file_path.suffix.lower() not in zip_extensions:
             continue
-
-        checked += 1
-
-        # Progress indicator
-        if checked > 100 and checked % 100 == 0:
-            print(f"Checked {checked} archives...", end="\r")
 
         try:
             with zipfile.ZipFile(file_path, "r") as zf:
@@ -397,11 +353,4 @@ def check_encrypted_archives(files: list[Path]) -> list[tuple[Path, str]]:
                 }
             )
 
-    if checked > 100:
-        print(f"Checked {checked} archives.      ")  # Clear progress line
-
     return issues
-
-
-if __name__ == "__main__":
-    main()

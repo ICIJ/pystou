@@ -1,47 +1,59 @@
-# tests/test_main_boundary.py
 import unittest
-from unittest.mock import patch
+from unittest import mock
 
-import pystou.main as cli
-from common.errors import InvalidDirectoryError
+from typer.testing import CliRunner
+
+from common.errors import PystouError
+from pystou.main import app, main
 
 
-class TestTopLevelBoundary(unittest.TestCase):
-    def _args(self, func):
-        return type("Args", (), {"command": "extract", "func": staticmethod(func)})
+class TestApp(unittest.TestCase):
+    def test_help_lists_commands(self):
+        r = CliRunner().invoke(app, ["--help"])
+        self.assertEqual(r.exit_code, 0)
+        for cmd in (
+            "cleanup",
+            "dedup",
+            "extract",
+            "identify",
+            "stats",
+            "empty",
+            "restore",
+            "trash",
+            "doctor",
+        ):
+            self.assertIn(cmd, r.stdout)
 
-    @patch("builtins.print")
-    def test_pystou_error_exits_1(self, mock_print):
-        def boom(_args):
-            raise InvalidDirectoryError("bad dir")
+    def test_version(self):
+        r = CliRunner().invoke(app, ["--version"])
+        self.assertEqual(r.exit_code, 0)
+        self.assertIn("1.0.0", r.stdout)
 
-        with patch.object(cli, "create_parser") as mk:
-            mk.return_value.parse_args.return_value = self._args(boom)
-            with self.assertRaises(SystemExit) as cm:
-                cli.main()
-        self.assertEqual(cm.exception.code, 1)
 
-    @patch("builtins.print")
-    def test_unexpected_error_exits_1(self, mock_print):
-        def boom(_args):
-            raise ValueError("kaboom")
-
-        with patch.object(cli, "create_parser") as mk:
-            mk.return_value.parse_args.return_value = self._args(boom)
-            with self.assertRaises(SystemExit) as cm:
-                cli.main()
-        self.assertEqual(cm.exception.code, 1)
-
-    @patch("builtins.print")
-    def test_keyboard_interrupt_exits_130(self, mock_print):
-        def boom(_args):
-            raise KeyboardInterrupt
-
-        with patch.object(cli, "create_parser") as mk:
-            mk.return_value.parse_args.return_value = self._args(boom)
-            with self.assertRaises(SystemExit) as cm:
-                cli.main()
+class TestMainBoundary(unittest.TestCase):
+    def test_keyboard_interrupt_exits_130(self):
+        with (
+            mock.patch("pystou.main.app", side_effect=KeyboardInterrupt),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            main()
         self.assertEqual(cm.exception.code, 130)
+
+    def test_pystou_error_exits_1(self):
+        with (
+            mock.patch("pystou.main.app", side_effect=PystouError("boom")),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            main()
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_unexpected_exception_exits_1(self):
+        with (
+            mock.patch("pystou.main.app", side_effect=RuntimeError("kaboom")),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            main()
+        self.assertEqual(cm.exception.code, 1)
 
 
 if __name__ == "__main__":

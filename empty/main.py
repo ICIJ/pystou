@@ -1,67 +1,64 @@
 #!/usr/bin/env python3
 """Empty subcommand for finding and removing empty directories."""
 
-import argparse
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Annotated
 
-from common.cli import add_common_arguments
+import typer
+
+from common import console
+from common.cli import (
+    DbDirOpt,
+    DirectoryArg,
+    DryRunOpt,
+    LogDirOpt,
+    RecursiveOpt,
+)
 from common.fs_walker import is_excluded_dir
-from common.interrupt import scanning
-from common.logger import log_configuration, setup_logging
+from common.logger import setup_logging
 from common.validation import validate_directory_or_exit
 
 
-def add_empty_arguments(parser: argparse.ArgumentParser) -> None:
-    """Adds empty-specific arguments to the parser.
-
-    Args:
-        parser: ArgumentParser to add arguments to.
-    """
-    add_common_arguments(parser)
-    parser.add_argument(
-        "--list-only",
-        action="store_true",
-        help="Only list empty directories without removing them",
+def empty_command(
+    directory: DirectoryArg = ".",
+    recursive: RecursiveOpt = False,
+    list_only: Annotated[
+        bool, typer.Option("--list-only", help="List empty dirs without removing.")
+    ] = False,
+    include_hidden: Annotated[
+        bool, typer.Option("--include-hidden", help="Include hidden directories.")
+    ] = False,
+    dry_run: DryRunOpt = False,
+    log_dir: LogDirOpt = ".",
+    db_dir: DbDirOpt = ".",
+) -> None:
+    """Find and remove empty directories; no quarantine (empty dirs hold no data)."""
+    setup_logging("empty", log_dir)
+    logging.info(
+        {
+            "action": "configuration",
+            "command": "empty",
+            "directory": directory,
+            "recursive": recursive,
+            "list_only": list_only,
+            "include_hidden": include_hidden,
+            "dry_run": dry_run,
+        }
     )
-    parser.add_argument(
-        "--include-hidden",
-        action="store_true",
-        help="Include hidden directories (starting with .)",
-    )
+    validate_directory_or_exit(directory)
 
-
-def main(args: Optional[argparse.Namespace] = None) -> None:
-    """Main entry point for empty.
-
-    Args:
-        args: Parsed arguments. If None, parses from command line.
-    """
-    if args is None:
-        parser = argparse.ArgumentParser(description="Empty directories script.")
-        add_empty_arguments(parser)
-        args = parser.parse_args()
-
-    setup_logging("empty", args.log_dir)
-    log_configuration(args)
-
-    validate_directory_or_exit(args.directory)
-
-    # Find empty directories
-    with scanning("scan"):
-        empty_dirs = find_empty_directories(args.directory, args.recursive, args.include_hidden)
+    empty_dirs = find_empty_directories(directory, recursive, include_hidden)
 
     if not empty_dirs:
-        print("No empty directories found.")
+        console.status("No empty directories found.")
         logging.info({"action": "no_empty_dirs_found"})
         return
 
-    print(f"Found {len(empty_dirs)} empty directory(ies):")
+    console.status(f"Found {len(empty_dirs)} empty directory(ies):")
     for d in empty_dirs:
-        print(f"  {d}")
-
+        console.status(f"  {d}")
     logging.info(
         {
             "action": "empty_dirs_found",
@@ -70,22 +67,20 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         }
     )
 
-    if args.list_only:
-        print("\n(Use without --list-only to remove)")
+    if list_only:
+        console.status("(use without --list-only to remove)")
         return
 
-    if args.dry_run:
-        print("\nDry run: would remove the above directories")
+    if dry_run:
+        console.status("Dry run: would remove the above directories")
         logging.info({"action": "remove_empty", "status": "dry_run"})
         return
 
-    # Remove empty directories
-    with scanning("removal"):
-        removed_count, skipped_count = remove_empty_directories(empty_dirs)
-
-    print(f"\nRemoved {removed_count}/{len(empty_dirs)} directory(ies)")
-    if skipped_count > 0:
-        print(f"Skipped {skipped_count} directory(ies) due to errors")
+    removed_count, skipped_count = remove_empty_directories(empty_dirs)
+    console.success(
+        f"Removed {removed_count}/{len(empty_dirs)} directory(ies)"
+        + (f", skipped {skipped_count}" if skipped_count else "")
+    )
     logging.info(
         {
             "action": "remove_empty_complete",
@@ -113,7 +108,6 @@ def find_empty_directories(
     """
     empty_dirs: list[Path] = []
     directory_path = Path(directory)
-    scanned = 0
 
     if recursive:
         # Walk bottom-up so we can detect directories that become empty
@@ -121,11 +115,6 @@ def find_empty_directories(
         # followlinks=False prevents infinite loops from symlink cycles
         for root, _dirs, _files in os.walk(directory_path, topdown=False, followlinks=False):
             root_path = Path(root)
-            scanned += 1
-
-            # Progress indicator every 1000 directories
-            if scanned % 1000 == 0:
-                print(f"Scanned {scanned} directories...", end="\r")
 
             # Skip the root directory itself
             if root_path == directory_path:
@@ -168,11 +157,8 @@ def find_empty_directories(
                     if is_directory_empty(dir_path, include_hidden):
                         empty_dirs.append(dir_path)
         except PermissionError as e:
-            print(f"Permission denied: {directory_path}")
+            console.error(f"Permission denied: {directory_path}")
             logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
-
-    if scanned >= 1000:
-        print(f"Scanned {scanned} directories.    ")  # Clear progress line
 
     # Sort by depth (deepest first) for safe removal
     empty_dirs.sort(key=lambda p: len(p.parts), reverse=True)
@@ -221,13 +207,8 @@ def remove_empty_directories(empty_dirs: list[Path]) -> tuple:
     """
     removed = 0
     skipped = 0
-    total = len(empty_dirs)
 
-    for i, dir_path in enumerate(empty_dirs, 1):
-        # Progress indicator
-        if total > 10 and i % 10 == 0:
-            print(f"Removing {i}/{total}...", end="\r")
-
+    for dir_path in empty_dirs:
         try:
             # Check if it still exists and is still empty
             if not dir_path.exists():
@@ -275,7 +256,7 @@ def remove_empty_directories(empty_dirs: list[Path]) -> tuple:
             skipped += 1
 
         except PermissionError as e:
-            print(f"Permission denied: {dir_path}")
+            console.error(f"Permission denied: {dir_path}")
             logging.error(
                 {
                     "action": "remove_empty_dir",
@@ -297,7 +278,7 @@ def remove_empty_directories(empty_dirs: list[Path]) -> tuple:
                     }
                 )
             else:
-                print(f"Error removing {dir_path}: {e}")
+                console.error(f"Error removing {dir_path}: {e}")
                 logging.error(
                     {
                         "action": "remove_empty_dir",
@@ -308,11 +289,4 @@ def remove_empty_directories(empty_dirs: list[Path]) -> tuple:
                 )
             skipped += 1
 
-    if total > 10:
-        print(f"Removed {removed}/{total} directories.    ")  # Clear progress line
-
     return removed, skipped
-
-
-if __name__ == "__main__":
-    main()

@@ -3,14 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
-from unittest.mock import patch
 
 from cleanup.main import (
     JUNK_DIRS,
     JUNK_FILES,
     find_junk,
     is_junk_file,
-    main,
     remove_junk,
 )
 from common import trash
@@ -175,139 +173,6 @@ class TestCleanupRemoveJunk(unittest.TestCase):
 
         self.assertEqual(removed, 0)
         self.assertEqual(skipped, 1)
-
-
-class TestCleanupMain(unittest.TestCase):
-    """Tests for the main cleanup function."""
-
-    def setUp(self):
-        """Set up a temporary directory."""
-        self.test_dir = tempfile.mkdtemp()
-        self.test_path = Path(self.test_dir)
-
-    def tearDown(self):
-        """Clean up temporary directory."""
-        shutil.rmtree(self.test_dir)
-
-    @patch("builtins.print")
-    def test_main_no_junk(self, mock_print):
-        """Test main when no junk files are found."""
-        args = type(
-            "Args",
-            (),
-            {
-                "directory": self.test_dir,
-                "recursive": False,
-                "dry_run": False,
-                "log_dir": self.test_dir,
-                "include": None,
-                "list_only": False,
-                "hard_delete": False,
-                "trash_dir": None,
-            },
-        )
-        main(args)
-
-        # Should print "No junk files found."
-        mock_print.assert_called_with("No junk files found.")
-
-    @patch("builtins.print")
-    def test_main_list_only(self, mock_print):
-        """Test main with --list-only flag."""
-        (self.test_path / ".DS_Store").touch()
-
-        args = type(
-            "Args",
-            (),
-            {
-                "directory": self.test_dir,
-                "recursive": False,
-                "dry_run": False,
-                "log_dir": self.test_dir,
-                "include": None,
-                "list_only": True,
-                "hard_delete": False,
-                "trash_dir": None,
-            },
-        )
-        main(args)
-
-        # File should still exist
-        self.assertTrue((self.test_path / ".DS_Store").exists())
-
-    @patch("builtins.print")
-    def test_main_dry_run(self, mock_print):
-        """Test main with --dry-run flag."""
-        (self.test_path / ".DS_Store").touch()
-
-        args = type(
-            "Args",
-            (),
-            {
-                "directory": self.test_dir,
-                "recursive": False,
-                "dry_run": True,
-                "log_dir": self.test_dir,
-                "include": None,
-                "list_only": False,
-                "hard_delete": False,
-                "trash_dir": None,
-            },
-        )
-        main(args)
-
-        # File should still exist
-        self.assertTrue((self.test_path / ".DS_Store").exists())
-
-    @patch("builtins.print")
-    def test_main_remove_junk(self, mock_print):
-        """Test main actually removes junk files."""
-        (self.test_path / ".DS_Store").touch()
-        (self.test_path / "Thumbs.db").touch()
-
-        args = type(
-            "Args",
-            (),
-            {
-                "directory": self.test_dir,
-                "recursive": False,
-                "dry_run": False,
-                "log_dir": self.test_dir,
-                "include": None,
-                "list_only": False,
-                "hard_delete": False,
-                "trash_dir": None,
-            },
-        )
-        main(args)
-
-        # Files should be removed
-        self.assertFalse((self.test_path / ".DS_Store").exists())
-        self.assertFalse((self.test_path / "Thumbs.db").exists())
-
-    @patch("builtins.print")
-    def test_main_with_include(self, mock_print):
-        """Test main with --include flag."""
-        (self.test_path / "custom.tmp").touch()
-
-        args = type(
-            "Args",
-            (),
-            {
-                "directory": self.test_dir,
-                "recursive": False,
-                "dry_run": False,
-                "log_dir": self.test_dir,
-                "include": ["custom.tmp"],
-                "list_only": False,
-                "hard_delete": False,
-                "trash_dir": None,
-            },
-        )
-        main(args)
-
-        # Custom file should be removed
-        self.assertFalse((self.test_path / "custom.tmp").exists())
 
 
 class TestCleanupQuarantine(unittest.TestCase):

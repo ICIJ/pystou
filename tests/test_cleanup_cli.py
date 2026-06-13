@@ -1,0 +1,69 @@
+import shutil
+import tempfile
+import unittest
+from pathlib import Path
+
+import typer
+from typer.testing import CliRunner
+
+from cleanup.main import cleanup_command
+from common import trash
+
+
+def _app():
+    app = typer.Typer()
+    app.command()(cleanup_command)
+    return app
+
+
+class TestCleanupCommand(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.runner = CliRunner()
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_quarantines_by_default(self):
+        (Path(self.dir) / ".DS_Store").write_text("junk")
+        r = self.runner.invoke(_app(), [self.dir, "--log-dir", self.dir, "--db-dir", self.dir])
+        self.assertEqual(r.exit_code, 0)
+        self.assertFalse((Path(self.dir) / ".DS_Store").exists())
+        self.assertEqual(len(trash.list_runs(self.dir)), 1)
+
+    def test_hard_delete(self):
+        (Path(self.dir) / ".DS_Store").write_text("junk")
+        r = self.runner.invoke(
+            _app(), [self.dir, "--hard-delete", "--log-dir", self.dir, "--db-dir", self.dir]
+        )
+        self.assertEqual(r.exit_code, 0)
+        self.assertFalse((Path(self.dir) / ".DS_Store").exists())
+        self.assertEqual(trash.list_runs(self.dir), [])
+
+    def test_list_only_does_not_remove(self):
+        (Path(self.dir) / ".DS_Store").write_text("junk")
+        r = self.runner.invoke(
+            _app(), [self.dir, "--list-only", "--log-dir", self.dir, "--db-dir", self.dir]
+        )
+        self.assertEqual(r.exit_code, 0)
+        self.assertTrue((Path(self.dir) / ".DS_Store").exists())
+
+    def test_dry_run_no_op(self):
+        (Path(self.dir) / ".DS_Store").write_text("junk")
+        r = self.runner.invoke(
+            _app(), [self.dir, "-n", "--log-dir", self.dir, "--db-dir", self.dir]
+        )
+        self.assertEqual(r.exit_code, 0)
+        self.assertTrue((Path(self.dir) / ".DS_Store").exists())
+
+    def test_dry_run_stdout_clean(self):
+        (Path(self.dir) / ".DS_Store").write_text("x")
+        r = self.runner.invoke(
+            _app(), [self.dir, "-n", "--log-dir", self.dir, "--db-dir", self.dir]
+        )
+        self.assertEqual(r.exit_code, 0)
+        self.assertNotIn("\r", r.stdout)
+
+    def test_no_junk(self):
+        r = self.runner.invoke(_app(), [self.dir, "--log-dir", self.dir, "--db-dir", self.dir])
+        self.assertEqual(r.exit_code, 0)

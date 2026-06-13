@@ -41,6 +41,6 @@ def validate_directory_or_exit(directory) -> Path:
     try:
         return validate_directory(directory)
     except InvalidDirectoryError as e:
-        print(f"Error: {e}")
+        print(f"Error: {e}", file=sys.stderr)
         logging.error({"action": "error", "message": str(e), "path": str(directory)})
         sys.exit(1)
