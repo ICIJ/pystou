@@ -8,7 +8,11 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Optional
+from typing import Annotated, Optional
+
+import typer
+
+from common import console
 
 
 @dataclass
@@ -196,6 +200,38 @@ def main(args: Optional[argparse.Namespace] = None) -> int:
 
     all_available = all(s.available for s in statuses)
     return 0 if all_available else 1
+
+
+def doctor_command(
+    json_out: Annotated[bool, typer.Option("--json", help="Output as JSON.")] = False,
+) -> None:
+    """Check that required external tools are installed."""
+    statuses = check_environment()
+
+    if json_out:
+        console.print_json(
+            [
+                {
+                    "name": s.name,
+                    "available": s.available,
+                    "version": s.version,
+                    "enables": s.enables,
+                    "install_hint": s.install_hint,
+                }
+                for s in statuses
+            ]
+        )
+    else:
+        t = console.table("Environment", ["Tool", "Status", "Version", "Enables"])
+        for s in statuses:
+            status_str = "[green]✓ found[/green]" if s.available else "[red]✗ missing[/red]"
+            t.add_row(s.name, status_str, s.version or "", s.enables)
+        console.print_table(t)
+        for s in statuses:
+            if not s.available:
+                console.status(f"  Install hint for {s.name}: {s.install_hint}")
+
+    raise typer.Exit(0 if all(s.available for s in statuses) else 1)
 
 
 if __name__ == "__main__":
