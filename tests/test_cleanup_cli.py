@@ -56,6 +56,14 @@ class TestCleanupCommand(unittest.TestCase):
         self.assertEqual(r.exit_code, 0)
         self.assertTrue((Path(self.dir) / ".DS_Store").exists())
 
+    def test_dry_run_stdout_clean(self):
+        (Path(self.dir) / ".DS_Store").write_text("x")
+        r = self.runner.invoke(
+            _app(), [self.dir, "-n", "--log-dir", self.dir, "--db-dir", self.dir]
+        )
+        self.assertEqual(r.exit_code, 0)
+        self.assertNotIn("\r", r.stdout)
+
     def test_no_junk(self):
         r = self.runner.invoke(_app(), [self.dir, "--log-dir", self.dir, "--db-dir", self.dir])
         self.assertEqual(r.exit_code, 0)

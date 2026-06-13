@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import zipfile
 from collections import defaultdict
@@ -71,12 +72,15 @@ def summarize_group(group_key, dir_paths: list[Path], conn) -> None:
         conn: SQLite database connection.
     """
     parent_dir, base_name = group_key
-    print(f"\nFound duplicate directories in '{parent_dir}': '{base_name}'")
+    print(f"\nFound duplicate directories in '{parent_dir}': '{base_name}'", file=sys.stderr)
     for dir_path in sorted(dir_paths):
         size, num_files = get_directory_size(conn, dir_path)
         formatted_size = f"{size:,}"
         formatted_num_files = f"{num_files:,}"
-        print(f" - {dir_path.name} : {formatted_num_files} files, {formatted_size} bytes")
+        print(
+            f" - {dir_path.name} : {formatted_num_files} files, {formatted_size} bytes",
+            file=sys.stderr,
+        )
 
 
 def get_archive_files(
@@ -175,7 +179,7 @@ def extract_archive(archive_path: Path) -> bool:
         elif suffixes.endswith(".pst"):
             return extract_pst_archive(archive_path)
         else:
-            print(f"Unsupported archive format: {archive_path}")
+            print(f"Unsupported archive format: {archive_path}", file=sys.stderr)
             logging.error(
                 {
                     "action": "extract",
@@ -190,7 +194,7 @@ def extract_archive(archive_path: Path) -> bool:
         tarfile.TarError,
         subprocess.CalledProcessError,
     ) as e:
-        print(f"Error extracting archive {archive_path}: {e}")
+        print(f"Error extracting archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
                 "action": "extract",
@@ -214,12 +218,15 @@ def extract_zip_archive(archive_path: Path) -> bool:
     try:
         with zipfile.ZipFile(archive_path, "r") as zip_ref:
             if not safe_extract_zip(zip_ref, archive_path.parent):
-                print(f"Refused unsafe ZIP archive (path traversal): {archive_path}")
+                print(
+                    f"Refused unsafe ZIP archive (path traversal): {archive_path}",
+                    file=sys.stderr,
+                )
                 return False
-        print(f"Extracted ZIP archive: {archive_path}")
+        print(f"Extracted ZIP archive: {archive_path}", file=sys.stderr)
         return True
     except (zipfile.BadZipFile, OSError) as e:
-        print(f"Error extracting ZIP archive {archive_path}: {e}")
+        print(f"Error extracting ZIP archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
                 "action": "extract_zip",
@@ -241,7 +248,10 @@ def extract_split_zip_archive(archive_path: Path) -> bool:
         bool: True if extraction was successful, False otherwise.
     """
     if shutil.which("7z") is None:
-        print("7z command not found. Please install p7zip-full to extract split ZIP archives.")
+        print(
+            "7z command not found. Please install p7zip-full to extract split ZIP archives.",
+            file=sys.stderr,
+        )
         logging.error(
             {
                 "action": "extract_split_zip",
@@ -255,10 +265,10 @@ def extract_split_zip_archive(archive_path: Path) -> bool:
         output_dir = archive_path.parent
         cmd = ["7z", "x", str(archive_path), f"-o{output_dir}", "-y"]
         subprocess.run(cmd, check=True, capture_output=True)
-        print(f"Extracted split ZIP archive: {archive_path}")
+        print(f"Extracted split ZIP archive: {archive_path}", file=sys.stderr)
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Error extracting split ZIP archive {archive_path}: {e}")
+        print(f"Error extracting split ZIP archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
                 "action": "extract_split_zip",
@@ -282,12 +292,15 @@ def extract_tar_archive(archive_path: Path) -> bool:
     try:
         with tarfile.open(archive_path, "r:*") as tar_ref:
             if not safe_extract_tar(tar_ref, archive_path.parent):
-                print(f"Refused unsafe TAR archive (unsafe member): {archive_path}")
+                print(
+                    f"Refused unsafe TAR archive (unsafe member): {archive_path}",
+                    file=sys.stderr,
+                )
                 return False
-        print(f"Extracted TAR archive: {archive_path}")
+        print(f"Extracted TAR archive: {archive_path}", file=sys.stderr)
         return True
     except (tarfile.TarError, OSError) as e:
-        print(f"Error extracting TAR archive {archive_path}: {e}")
+        print(f"Error extracting TAR archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
                 "action": "extract_tar",
@@ -326,7 +339,7 @@ def extract_compressed_file(archive_path: Path) -> bool:
             with bz2.open(archive_path, "rb") as f_in, open(target_path, "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
         else:
-            print(f"Unsupported compressed file format: {archive_path}")
+            print(f"Unsupported compressed file format: {archive_path}", file=sys.stderr)
             logging.error(
                 {
                     "action": "extract_compressed_file",
@@ -335,12 +348,12 @@ def extract_compressed_file(archive_path: Path) -> bool:
                 }
             )
             return False
-        print(f"Extracted compressed file: {archive_path}")
+        print(f"Extracted compressed file: {archive_path}", file=sys.stderr)
         return True
     except OSError as e:
         if target_path is not None and target_path.exists():
             target_path.unlink()
-        print(f"Error extracting compressed file {archive_path}: {e}")
+        print(f"Error extracting compressed file {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
                 "action": "extract_compressed_file",
@@ -372,7 +385,8 @@ def extract_zst_archive(archive_path: Path) -> bool:
         return _extract_zst_with_command(archive_path)
     else:
         print(
-            "Zstandard module and zstd command-line tool not found. Please install one of them to extract .zst files."
+            "Zstandard module and zstd command-line tool not found. Please install one of them to extract .zst files.",
+            file=sys.stderr,
         )
         logging.error(
             {
@@ -403,12 +417,12 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
                 zstd.ZstdDecompressor().copy_stream(f_in, f_out)
             with tarfile.open(temp_tar_path, "r") as tar_ref:
                 if not safe_extract_tar(tar_ref, archive_path.parent):
-                    print(f"Refused unsafe TAR.ZST archive: {archive_path}")
+                    print(f"Refused unsafe TAR.ZST archive: {archive_path}", file=sys.stderr)
                     return False
-            print(f"Extracted TAR.ZST archive: {archive_path}")
+            print(f"Extracted TAR.ZST archive: {archive_path}", file=sys.stderr)
             return True
         except (OSError, tarfile.TarError) as e:
-            print(f"Error extracting ZST archive {archive_path}: {e}")
+            print(f"Error extracting ZST archive {archive_path}: {e}", file=sys.stderr)
             logging.error(
                 {
                     "action": "extract_zst_module",
@@ -427,12 +441,12 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
             target_path = reserve_unique_file(archive_path.with_suffix(""))
             with open(archive_path, "rb") as f_in, open(target_path, "wb") as f_out:
                 zstd.ZstdDecompressor().copy_stream(f_in, f_out)
-            print(f"Decompressed ZST file: {archive_path}")
+            print(f"Decompressed ZST file: {archive_path}", file=sys.stderr)
             return True
         except OSError as e:
             if target_path is not None and target_path.exists():
                 target_path.unlink()
-            print(f"Error extracting ZST archive {archive_path}: {e}")
+            print(f"Error extracting ZST archive {archive_path}: {e}", file=sys.stderr)
             logging.error(
                 {
                     "action": "extract_zst_module",
@@ -463,15 +477,17 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
         if is_tar:
             with tarfile.open(output_path, "r") as tar_ref:
                 if not safe_extract_tar(tar_ref, archive_path.parent):
-                    print(f"Refused unsafe TAR.ZST archive: {archive_path}")
+                    print(f"Refused unsafe TAR.ZST archive: {archive_path}", file=sys.stderr)
                     return False
-            print(f"Extracted TAR.ZST archive using zstd command: {archive_path}")
+            print(f"Extracted TAR.ZST archive using zstd command: {archive_path}", file=sys.stderr)
             return True
         keep_output = True  # the decompressed plain file IS the result
-        print(f"Decompressed ZST file using zstd command: {archive_path}")
+        print(f"Decompressed ZST file using zstd command: {archive_path}", file=sys.stderr)
         return True
     except (subprocess.CalledProcessError, tarfile.TarError, OSError) as e:
-        print(f"Error extracting ZST archive with zstd command {archive_path}: {e}")
+        print(
+            f"Error extracting ZST archive with zstd command {archive_path}: {e}", file=sys.stderr
+        )
         logging.error(
             {
                 "action": "extract_zst_command",
@@ -529,7 +545,10 @@ def extract_pst_archive(archive_path: Path) -> bool:
         bool: True if extraction was successful, False otherwise.
     """
     if shutil.which("readpst") is None:
-        print("readpst command not found. Please install readpst to extract .pst files.")
+        print(
+            "readpst command not found. Please install readpst to extract .pst files.",
+            file=sys.stderr,
+        )
         logging.error(
             {
                 "action": "extract_pst",
@@ -558,7 +577,7 @@ def extract_pst_archive(archive_path: Path) -> bool:
         if not (
             unique_output_dir.is_dir() and any(p.is_file() for p in unique_output_dir.rglob("*"))
         ):
-            print(f"PST extraction produced no output: {archive_path}")
+            print(f"PST extraction produced no output: {archive_path}", file=sys.stderr)
             logging.warning(
                 {
                     "action": "extract_pst",
@@ -567,10 +586,10 @@ def extract_pst_archive(archive_path: Path) -> bool:
                 }
             )
             return False
-        print(f"Extracted PST file to {unique_output_dir}")
+        print(f"Extracted PST file to {unique_output_dir}", file=sys.stderr)
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Error extracting PST file {archive_path}: {e}")
+        print(f"Error extracting PST file {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
                 "action": "extract_pst",

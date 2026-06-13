@@ -15,6 +15,7 @@ import os
 import secrets
 import shutil
 import sqlite3
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -110,7 +111,7 @@ def quarantine(
         return ""
     if dry_run:
         for it in items:
-            print(f"Dry run: would quarantine {it}")
+            print(f"Dry run: would quarantine {it}", file=sys.stderr)
         return ""
 
     root = _ensure_trash_root(op_root, trash_dir)
@@ -266,12 +267,15 @@ def restore(
                 continue
             stored = root / item["stored"]
             if os.path.lexists(orig):
-                print(f"Conflict: {orig} already exists; leaving quarantined copy")
+                print(
+                    f"Conflict: {orig} already exists; leaving quarantined copy",
+                    file=sys.stderr,
+                )
                 logging.warning({"action": "restore", "status": "conflict", "path": str(orig)})
                 conflicted += 1
                 continue
             if not os.path.lexists(stored):
-                print(f"Missing in trash: {stored}")
+                print(f"Missing in trash: {stored}", file=sys.stderr)
                 logging.warning({"action": "restore", "status": "missing", "stored": str(stored)})
                 conflicted += 1
                 continue

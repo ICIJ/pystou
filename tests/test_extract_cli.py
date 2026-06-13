@@ -38,6 +38,16 @@ class TestExtractCommand(unittest.TestCase):
         self.assertTrue(self.zip_path.exists())  # default keep
         self.assertEqual(trash.list_runs(self.dir), [])
 
+    def test_extract_stdout_is_clean(self):
+        # extraction status ("Extracted ...") must go to stderr, not stdout
+        r = self.runner.invoke(
+            _app(),
+            [self.dir, "--action", "extract", "--log-dir", self.dir, "--db-dir", self.dir],
+        )
+        self.assertEqual(r.exit_code, 0)
+        self.assertNotIn("Extracted", r.stdout)
+        self.assertNotIn("\r", r.stdout)
+
     def test_remove_archives_quarantines(self):
         r = self.runner.invoke(_app(), self._common("--action", "extract", "--remove-archives"))
         self.assertEqual(r.exit_code, 0)

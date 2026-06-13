@@ -1,6 +1,7 @@
 import logging
 import os
 import sqlite3
+import sys
 from pathlib import Path
 
 from common.errors import PystouError
@@ -85,7 +86,7 @@ def prompt_use_existing_index() -> bool:
             return True
         elif choice in {"n", "no"}:
             return False
-        print("Invalid input. Please enter 'Y' or 'n'.")
+        print("Invalid input. Please enter 'Y' or 'n'.", file=sys.stderr)
 
 
 def index_has_data(conn: sqlite3.Connection) -> bool:
