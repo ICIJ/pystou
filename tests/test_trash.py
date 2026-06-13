@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -236,3 +237,52 @@ class TestRestore(unittest.TestCase):
         self.assertEqual(restored, 1)
         self.assertTrue(a.is_file())
         self.assertFalse(b.exists())  # only a restored
+
+
+class TestPurge(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_purge_run_deletes_files_and_ledger(self):
+        a = Path(self.root) / "a.txt"
+        a.write_text("x")
+        run_id = trash.quarantine([a], self.root, operation="cleanup", command="c")
+        removed = trash.purge(self.root, run_id=run_id)
+        self.assertEqual(removed, 1)
+        self.assertEqual(trash.list_runs(self.root), [])
+        self.assertFalse((Path(self.root) / ".pystou-trash" / run_id).exists())
+
+    def test_purge_all(self):
+        for name in ("a.txt", "b.txt"):
+            p = Path(self.root) / name
+            p.write_text("x")
+            trash.quarantine([p], self.root, operation="cleanup", command="c")
+        removed = trash.purge(self.root, all_runs=True)
+        self.assertEqual(removed, 2)
+        self.assertEqual(trash.list_runs(self.root), [])
+
+    def test_older_than_keeps_recent(self):
+        a = Path(self.root) / "a.txt"
+        a.write_text("x")
+        trash.quarantine([a], self.root, operation="cleanup", command="c")
+        # all_runs=True so the safety gate passes and the age filter is what decides.
+        removed = trash.purge(self.root, all_runs=True, older_than_days=7)
+        self.assertEqual(removed, 0)  # the run is younger than 7 days
+        self.assertEqual(len(trash.list_runs(self.root)), 1)
+
+    def test_older_than_purges_old(self):
+        a = Path(self.root) / "a.txt"
+        a.write_text("x")
+        run_id = trash.quarantine([a], self.root, operation="cleanup", command="c")
+        # Backdate the ledger header's started_at to 8 days ago.
+        ledger = Path(self.root) / ".pystou-trash" / "runs" / f"{run_id}.jsonl"
+        lines = [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
+        old = datetime.now(timezone.utc) - timedelta(days=8)
+        lines[0]["started_at"] = old.strftime("%Y-%m-%dT%H:%M:%SZ")
+        ledger.write_text("\n".join(json.dumps(obj) for obj in lines) + "\n")
+        removed = trash.purge(self.root, all_runs=True, older_than_days=7)
+        self.assertEqual(removed, 1)  # the run is older than 7 days
+        self.assertEqual(trash.list_runs(self.root), [])

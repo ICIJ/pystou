@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import secrets
+import shutil
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -299,3 +300,60 @@ def _reindex_restore(conn, path: Path, kind, is_symlink) -> None:
                 "error": str(e),
             }
         )
+
+
+def _run_age_days(run) -> Optional[float]:
+    if not run.started_at:
+        return None
+    try:
+        started = datetime.strptime(run.started_at, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError:
+        return None
+    return (datetime.now(timezone.utc) - started).total_seconds() / 86400.0
+
+
+def purge(
+    op_root,
+    *,
+    run_id: Optional[str] = None,
+    all_runs: bool = False,
+    older_than_days: Optional[int] = None,
+    trash_dir: Optional[str] = None,
+) -> int:
+    """Permanently deletes selected trash runs. Returns the number purged.
+
+    This is the only operation in PyStou that truly deletes; it is never automatic.
+
+    Args:
+        op_root: Operation root that hosts the trash.
+        run_id: Purge only this run.
+        all_runs: Purge every run (optionally narrowed by ``older_than_days``).
+        older_than_days: Only purge runs at least this many days old.
+        trash_dir: Trash root override.
+    """
+    root = trash_root(op_root, trash_dir)
+    runs = list_runs(op_root, trash_dir)
+    selected = []
+    for run in runs:
+        if run_id is not None and run.run_id != run_id:
+            continue
+        if run_id is None and not all_runs:
+            continue
+        if older_than_days is not None:
+            age = _run_age_days(run)
+            if age is None or age < older_than_days:
+                continue
+        selected.append(run)
+
+    count = 0
+    for run in selected:
+        run_dir = root / run.run_id
+        if run_dir.is_dir():
+            shutil.rmtree(run_dir)
+        if run.ledger_path.exists():
+            run.ledger_path.unlink()
+        count += 1
+        logging.info({"action": "purge", "run_id": run.run_id})
+    return count
