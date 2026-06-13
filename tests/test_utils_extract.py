@@ -50,6 +50,16 @@ class TestExtractArchiveSafety(unittest.TestCase):
         self.assertEqual(existing.read_text(), "original")
         self.assertTrue((Path(self.test_dir) / "plain.txt (1)").exists())
 
+    def test_failed_gz_extraction_cleans_up_reserved_file(self):
+        bad = Path(self.test_dir) / "corrupt.gz"
+        bad.write_bytes(b"this is not valid gzip data")  # gzip read will raise
+
+        result = utils.extract_compressed_file(bad)
+
+        self.assertFalse(result)
+        # The reserved output file must not be left behind on failure.
+        self.assertFalse((Path(self.test_dir) / "corrupt").exists())
+
     def _import_zstd_or_skip(self):
         try:
             import zstandard as zstd

@@ -308,6 +308,7 @@ def extract_compressed_file(archive_path: Path) -> bool:
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
+    target_path = None
     try:
         if archive_path.suffix == ".gz":
             import gzip
@@ -337,6 +338,8 @@ def extract_compressed_file(archive_path: Path) -> bool:
         print(f"Extracted compressed file: {archive_path}")
         return True
     except OSError as e:
+        if target_path is not None and target_path.exists():
+            target_path.unlink()
         print(f"Error extracting compressed file {archive_path}: {e}")
         logging.error(
             {
@@ -419,6 +422,7 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
             if temp_tar_path.exists():
                 temp_tar_path.unlink()
     else:
+        target_path = None
         try:
             target_path = reserve_unique_file(archive_path.with_suffix(""))
             with open(archive_path, "rb") as f_in, open(target_path, "wb") as f_out:
@@ -426,6 +430,8 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
             print(f"Decompressed ZST file: {archive_path}")
             return True
         except OSError as e:
+            if target_path is not None and target_path.exists():
+                target_path.unlink()
             print(f"Error extracting ZST archive {archive_path}: {e}")
             logging.error(
                 {
