@@ -7,13 +7,96 @@ import logging
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
-from common.cli import add_common_arguments
+import typer
+
+from common import console
+from common.cli import (
+    DbDirOpt,
+    DirectoryArg,
+    LogDirOpt,
+    RecursiveOpt,
+    add_common_arguments,
+)
 from common.fs_walker import is_excluded_dir
 from common.interrupt import scanning
 from common.logger import log_configuration, setup_logging
 from common.validation import validate_directory_or_exit
+
+
+def stats_command(
+    directory: DirectoryArg = ".",
+    recursive: RecursiveOpt = False,
+    top: Annotated[int, typer.Option("--top", help="Number of top items to show.")] = 10,
+    by_extension: Annotated[
+        bool, typer.Option("--by-extension", help="Show breakdown by extension.")
+    ] = False,
+    by_size: Annotated[bool, typer.Option("--by-size", help="Show largest files.")] = False,
+    json_out: Annotated[bool, typer.Option("--json", help="Output stats as JSON.")] = False,
+    log_dir: LogDirOpt = ".",
+    db_dir: DbDirOpt = ".",
+) -> None:
+    """Display directory statistics: file counts, sizes, extensions, largest files."""
+    setup_logging("stats", log_dir)
+    logging.info(
+        {
+            "action": "configuration",
+            "command": "stats",
+            "directory": directory,
+            "recursive": recursive,
+            "top": top,
+            "by_extension": by_extension,
+            "by_size": by_size,
+            "json": json_out,
+        }
+    )
+    validate_directory_or_exit(directory)
+
+    stats = collect_stats(directory, recursive, top_n=top)
+
+    if json_out:
+        output = {
+            "summary": stats["summary"],
+            "by_extension": dict(stats["by_extension"]),
+            "largest_files": [
+                {"path": path, "size": size} for path, size in stats["largest_files"][:top]
+            ],
+            "empty_directories": stats["empty_directories"][:top],
+        }
+        console.print_json(output)
+        return
+
+    # Summary table
+    summary = stats["summary"]
+    t = console.table("Directory Statistics", ["Metric", "Value"])
+    t.add_row("Total files", f"{summary['total_files']:,}")
+    t.add_row("Total directories", f"{summary['total_dirs']:,}")
+    t.add_row("Total size", format_size(summary["total_size"]))
+    t.add_row("Archive files", f"{summary['archive_files']:,}")
+    t.add_row("Empty directories", f"{summary['empty_dirs']:,}")
+    if summary["symlinks_skipped"] > 0:
+        t.add_row("Symlinks skipped", f"{summary['symlinks_skipped']:,}")
+    console.print_table(t)
+
+    # Extension breakdown
+    if by_extension:
+        sorted_by_count = sorted(
+            stats["by_extension"].items(),
+            key=lambda x: x[1]["count"],
+            reverse=True,
+        )[:top]
+        te = console.table(f"Top {top} Extensions by Count", ["Extension", "Files", "Size"])
+        for ext, data in sorted_by_count:
+            te.add_row(ext, f"{data['count']:,}", format_size(data["size"]))
+        console.print_table(te)
+
+    # Largest files
+    if by_size:
+        ts = console.table(f"Top {top} Largest Files", ["Size", "Path"])
+        for path, size in stats["largest_files"][:top]:
+            ts.add_row(format_size(size), path)
+        console.print_table(ts)
 
 
 def add_stats_arguments(parser: argparse.ArgumentParser) -> None:
