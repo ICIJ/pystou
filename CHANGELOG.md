@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v0.3.1 (2026-06-13)
+
+### Bug Fixes
+
+- **doctor**: Show clean version numbers for 7z and zstd
+  ([`c3be476`](https://github.com/ICIJ/pystou/commit/c3be47650e7c273a70378ece8fbc32daeae4fe5f))
+
+### Chores
+
+- **deps**: Sync uv.lock with typer and rich
+  ([`716bfdc`](https://github.com/ICIJ/pystou/commit/716bfdc456849ba5cb94cba9ec86fbc5155f2804))
+
+### Documentation
+
+- Align README version references with the 0.3.0 release
+  ([`496b9bb`](https://github.com/ICIJ/pystou/commit/496b9bb29bdb913cdb767e074b61b6bae147cdcb))
+
+### Testing
+
+- **cli**: Force stdout/stderr split in purity tests for Click <8.2 (py3.9)
+  ([`d7b2ec1`](https://github.com/ICIJ/pystou/commit/d7b2ec13da1afc45218907488f0cc88084369a8f))
+
+
 ## v0.3.0 (2026-06-13)
 
 ### Bug Fixes
