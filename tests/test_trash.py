@@ -1,11 +1,14 @@
 # tests/test_trash.py
 import json
+import os
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from common import trash
+from common.errors import CrossDeviceTrashError, TrashUnavailableError
 
 
 class TestQuarantineHappyPath(unittest.TestCase):
@@ -85,3 +88,60 @@ class TestQuarantineHappyPath(unittest.TestCase):
         self.assertEqual(run_id, "")
         self.assertTrue(victim.exists())
         self.assertFalse((Path(self.root) / ".pystou-trash").exists())
+
+
+class TestQuarantineEdgeCases(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_symlink_is_moved_as_link_not_dereferenced(self):
+        target = Path(self.root) / "target.txt"
+        target.write_text("real")
+        link = Path(self.root) / "link.txt"
+        link.symlink_to(target)
+        run_id = trash.quarantine([link], self.root, operation="cleanup", command="pystou cleanup")
+        self.assertFalse(link.is_symlink())  # link moved out
+        self.assertTrue(target.is_file())  # target untouched
+        ledger = Path(self.root) / ".pystou-trash" / "runs" / f"{run_id}.jsonl"
+        items = [
+            json.loads(x)
+            for x in ledger.read_text().splitlines()
+            if x.strip() and not json.loads(x).get("_header")
+        ]
+        self.assertTrue(items[0]["is_symlink"])
+        stored = Path(self.root) / ".pystou-trash" / items[0]["stored"]
+        self.assertTrue(stored.is_symlink())
+
+    def test_read_only_root_raises_trash_unavailable(self):
+        ro = Path(self.root) / "ro"
+        ro.mkdir()
+        victim = ro / "f.txt"
+        victim.write_text("x")
+        if os.geteuid() == 0:
+            self.skipTest("requires non-root user")
+        os.chmod(ro, 0o500)  # read+execute, no write
+        try:
+            with self.assertRaises(TrashUnavailableError):
+                trash.quarantine([victim], ro, operation="cleanup", command="pystou cleanup")
+        finally:
+            os.chmod(ro, 0o700)  # restore so tearDown can clean up
+
+    def test_cross_device_raises(self):
+        victim = Path(self.root) / "f.txt"
+        victim.write_text("x")
+        real_lstat = os.lstat
+
+        def fake_lstat(path, *a, **k):
+            st = real_lstat(path, *a, **k)
+            if str(path).endswith("f.txt"):
+                return os.stat_result((*tuple(st)[:2], st.st_dev + 1, *tuple(st)[3:]))
+            return st
+
+        with (
+            mock.patch("common.trash.os.lstat", side_effect=fake_lstat),
+            self.assertRaises(CrossDeviceTrashError),
+        ):
+            trash.quarantine([victim], self.root, operation="cleanup", command="pystou cleanup")

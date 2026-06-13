@@ -52,7 +52,7 @@ def _append_jsonl(path: Path, obj: dict) -> None:
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(obj) + "\n")
         f.flush()
-        os.fsync(f.fileno())
+        os.fsync(f.fileno())  # per-item durability: each ledger line survives a crash
 
 
 def _dir_size(path: Path) -> int:
@@ -140,6 +140,9 @@ def quarantine(
         kind = "dir" if (it.is_dir() and not is_link) else "file"
         size = _entry_size(it, is_link, kind)
         reserved = reserve_unique_name(run_dir, it.name)
+        # WAL invariant: the ledger line is written right after the rename, so the
+        # ledger always reflects exactly what was moved. An interrupt leaves at most
+        # one moved-but-unrecorded item; restore treats unledgered trash as orphans.
         os.rename(it, reserved)
         _append_jsonl(
             ledger,
