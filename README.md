@@ -616,11 +616,11 @@ pystou doctor [options]
 
 ## Migrating from 0.x
 
-PyStou 1.0.0 replaces the argparse-based CLI with [Typer](https://typer.tiangolo.com/), resulting in a cleaner, more consistent interface. Several flags changed shape.
+PyStou 0.3.0 replaces the argparse-based CLI of earlier (0.2.x) releases with [Typer](https://typer.tiangolo.com/), resulting in a cleaner, more consistent interface. Several flags changed shape.
 
 ### Flag Changes
 
-| Command | 0.x flag | 1.0.0 flag |
+| Command | Old flag (≤0.2.x) | 0.3.0 flag |
 |---------|-----------|------------|
 | `dedup` | `-c 1` | `--action delete` |
 | `dedup` | `-c 2` | `--action merge` |
@@ -636,9 +636,9 @@ PyStou 1.0.0 replaces the argparse-based CLI with [Typer](https://typer.tiangolo
 
 ### Behavior Notes
 
-- **Quarantine by default**: `cleanup`, `dedup`, and `extract` quarantine removed items to `.pystou-trash/` instead of permanently deleting them. This was introduced in 0.3.0 and is unchanged in 1.0.0. Pass `--hard-delete` to permanently delete immediately (old behavior).
-- **New commands**: `pystou restore` and `pystou trash list/purge` were introduced in 0.3.0 and are fully supported in 1.0.0 with the Typer interface.
-- **New in 1.0.0**: `pystou doctor` checks external tool availability. Use it after installation or in CI.
+- **Quarantine by default**: `cleanup`, `dedup`, and `extract` quarantine removed items to `.pystou-trash/` instead of permanently deleting them. Pass `--hard-delete` to permanently delete immediately (old behavior).
+- **New commands**: `pystou restore` and `pystou trash list/purge` manage quarantined files.
+- **`pystou doctor`**: checks external tool availability (`readpst`/`zstd`/`7z`). Use it after installation or in CI.
 - **Shell completion**: Run `pystou --install-completion` to enable tab-completion for your shell.
 
 ---
