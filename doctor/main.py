@@ -2,6 +2,7 @@
 """Doctor subcommand: preflight check of required external CLI tools."""
 
 import importlib.util
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -40,21 +41,36 @@ def _zstandard_module_available() -> bool:
     return importlib.util.find_spec("zstandard") is not None
 
 
-def _tool_version(name: str) -> Optional[str]:
-    """Returns a best-effort version string for a CLI tool.
+# How to elicit version output per tool. Most accept ``--version``; 7-Zip has
+# no such flag and instead prints a banner (with the version) when run with no
+# arguments.
+_VERSION_COMMANDS: dict[str, list[str]] = {
+    "7z": ["7z"],
+}
 
-    Runs ``<name> --version`` and returns the first non-empty output line.
-    Never raises: any OSError or subprocess error yields None.
+# A version number like 0.6.76, 16.02, or 1.5.5 (optional leading "v").
+_VERSION_RE = re.compile(r"\bv?(\d+\.\d+(?:\.\d+)?)\b")
+
+
+def _tool_version(name: str) -> Optional[str]:
+    """Returns a best-effort, cleaned version number for a CLI tool.
+
+    Runs the tool's version command (``--version``, or a per-tool override),
+    then extracts the first version-number-looking token (e.g. ``1.5.5``) from
+    the combined stdout/stderr. Falls back to the first non-empty line if no
+    version number is found. Never raises: any OSError or subprocess error
+    yields None.
 
     Args:
         name: The tool's command name.
 
     Returns:
-        The first non-empty line of version output, or None.
+        A cleaned version string, the first non-empty output line, or None.
     """
+    cmd = _VERSION_COMMANDS.get(name, [name, "--version"])
     try:
         result = subprocess.run(
-            [name, "--version"],
+            cmd,
             capture_output=True,
             text=True,
             timeout=5,
@@ -63,6 +79,9 @@ def _tool_version(name: str) -> Optional[str]:
         return None
 
     output = (result.stdout or "") + "\n" + (result.stderr or "")
+    match = _VERSION_RE.search(output)
+    if match:
+        return match.group(1)
     for line in output.splitlines():
         stripped = line.strip()
         if stripped:
