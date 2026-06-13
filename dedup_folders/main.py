@@ -8,11 +8,24 @@ import shlex
 import shutil
 import sqlite3
 import sys
+from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
-from common import trash
-from common.cli import add_common_arguments
+import typer
+from rich.tree import Tree
+
+from common import console, trash
+from common.cli import (
+    DbDirOpt,
+    DirectoryArg,
+    DryRunOpt,
+    HardDeleteOpt,
+    LogDirOpt,
+    RecursiveOpt,
+    TrashDirOpt,
+    add_common_arguments,
+)
 from common.fs_walker import collect_directories
 from common.indexer import (
     close_database,
@@ -28,6 +41,148 @@ from common.interrupt import scanning
 from common.logger import log_configuration, setup_logging
 from common.utils import group_directories, summarize_group
 from common.validation import validate_directory_or_exit
+
+
+class DedupAction(str, Enum):
+    delete = "delete"
+    merge = "merge"
+    skip = "skip"
+
+
+def dedup_command(
+    directory: DirectoryArg = ".",
+    recursive: RecursiveOpt = False,
+    level: Annotated[
+        Optional[int], typer.Option("-l", "--level", help="Max recursion depth.")
+    ] = None,
+    action: Annotated[
+        Optional[DedupAction],
+        typer.Option("--action", help="delete|merge|skip; omit to prompt per group."),
+    ] = None,
+    dry_run: DryRunOpt = False,
+    hard_delete: HardDeleteOpt = False,
+    trash_dir: TrashDirOpt = None,
+    log_dir: LogDirOpt = ".",
+    db_dir: DbDirOpt = ".",
+) -> None:
+    """Find duplicate folders (e.g. "data" / "data (1)") and delete, merge, or skip."""
+    setup_logging("dedup_folders", log_dir)
+    logging.info(
+        {
+            "action": "configuration",
+            "command": "dedup",
+            "directory": directory,
+            "recursive": recursive,
+            "level": level,
+            "dedup_action": action.value if action is not None else None,
+            "dry_run": dry_run,
+            "hard_delete": hard_delete,
+        }
+    )
+    validate_directory_or_exit(directory)
+
+    db_path = os.path.join(db_dir, "filesystem_index.db")
+    index_existed = os.path.exists(db_path)
+    conn = initialize_database(db_dir)
+
+    def rescan() -> None:
+        with console.progress() as p:
+            task = p.add_task("Scanning", total=None)
+            collect_directories(
+                conn,
+                directory,
+                recursive,
+                level,
+                progress_cb=lambda d, f: p.update(
+                    task, description=f"Scanning  dirs {d:,}  files {f:,}"
+                ),
+            )
+
+    if index_existed and index_has_data(conn):
+        if not console.confirm("Use the existing index?", default=True):
+            rescan()
+    else:
+        rescan()
+
+    groups = group_directories(conn)
+    if not groups:
+        console.status("No duplicate directories found.")
+        logging.info({"action": "no_duplicates_found"})
+        close_database(conn)
+        return
+
+    for group_key, dir_paths in groups.items():
+        parent_dir, base_name = group_key
+        base_dir, duplicate_dirs = identify_base_and_duplicates(dir_paths)
+
+        tree = Tree(str(base_dir))
+        for dup in duplicate_dirs:
+            tree.add(str(dup))
+        console.print_tree(tree)
+
+        logging.info(
+            {
+                "action": "found_duplicate_group",
+                "parent_directory": parent_dir,
+                "base_name": base_name,
+                "base_directory": str(base_dir),
+                "duplicate_directories": [str(d) for d in duplicate_dirs],
+            }
+        )
+
+        if action is not None:
+            action_val = action
+        else:
+            chosen = console.prompt_choice(
+                "Action for this group", ["delete", "merge", "skip"], default="skip"
+            )
+            action_val = DedupAction(chosen)
+
+        if action_val is DedupAction.delete:
+            logging.info(
+                {
+                    "action": "process_group",
+                    "method": "delete_duplicates",
+                    "group": f"{parent_dir}/{base_name}",
+                }
+            )
+            delete_duplicates(
+                duplicate_dirs,
+                dry_run,
+                conn,
+                directory,
+                hard_delete=hard_delete,
+                trash_dir=trash_dir,
+            )
+        elif action_val is DedupAction.merge:
+            logging.info(
+                {
+                    "action": "process_group",
+                    "method": "merge_contents",
+                    "group": f"{parent_dir}/{base_name}",
+                }
+            )
+            merge_contents(
+                base_dir,
+                duplicate_dirs,
+                dry_run,
+                conn,
+                directory,
+                hard_delete=hard_delete,
+                trash_dir=trash_dir,
+            )
+        else:
+            console.status("Skipping group.")
+            logging.info(
+                {
+                    "action": "process_group",
+                    "method": "skip",
+                    "group": f"{parent_dir}/{base_name}",
+                }
+            )
+
+    logging.info({"action": "script_complete"})
+    close_database(conn)
 
 
 def add_dedup_arguments(parser: argparse.ArgumentParser) -> None:

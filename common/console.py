@@ -47,6 +47,10 @@ def print_table(t: Table) -> None:
     _out.print(t)
 
 
+def print_tree(tree) -> None:
+    _out.print(tree)
+
+
 def status(msg: str) -> None:
     if not _quiet:
         _err.print(msg)
