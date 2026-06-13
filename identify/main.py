@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from common.cli import add_common_arguments
+from common.fs_walker import is_excluded_dir
 from common.interrupt import scanning
 from common.logger import log_configuration, setup_logging
 from common.validation import validate_directory_or_exit
@@ -184,7 +185,9 @@ def collect_files(
 
     if recursive:
         # followlinks=False prevents infinite loops from symlink cycles
-        for root, _, filenames in os.walk(directory_path, followlinks=False):
+        for root, dirs, filenames in os.walk(directory_path, followlinks=False):
+            # Prune the trash directory: removes it from results and prevents descent.
+            dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
             root_path = Path(root)
             scanned += 1
 
@@ -204,6 +207,9 @@ def collect_files(
             for entry in os.scandir(directory_path):
                 # Skip symlinks
                 if entry.is_symlink():
+                    continue
+                # Skip the trash directory
+                if entry.is_dir(follow_symlinks=False) and is_excluded_dir(entry.name):
                     continue
                 if entry.is_file(follow_symlinks=False):
                     file_path = Path(entry.path)

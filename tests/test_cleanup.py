@@ -2,6 +2,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 from unittest.mock import patch
 
 from cleanup.main import (
@@ -12,6 +13,7 @@ from cleanup.main import (
     main,
     remove_junk,
 )
+from common import trash
 
 
 class TestCleanupJunkDetection(unittest.TestCase):
@@ -131,7 +133,7 @@ class TestCleanupRemoveJunk(unittest.TestCase):
         junk_file = self.test_path / ".DS_Store"
         junk_file.touch()
 
-        removed, skipped = remove_junk([junk_file])
+        removed, skipped = remove_junk([junk_file], op_root=self.test_dir, hard_delete=True)
 
         self.assertEqual(removed, 1)
         self.assertEqual(skipped, 0)
@@ -143,7 +145,7 @@ class TestCleanupRemoveJunk(unittest.TestCase):
         junk_dir.mkdir()
         (junk_dir / "file.txt").touch()
 
-        removed, skipped = remove_junk([junk_dir])
+        removed, skipped = remove_junk([junk_dir], op_root=self.test_dir, hard_delete=True)
 
         self.assertEqual(removed, 1)
         self.assertEqual(skipped, 0)
@@ -156,7 +158,9 @@ class TestCleanupRemoveJunk(unittest.TestCase):
         junk_dir = self.test_path / "__MACOSX"
         junk_dir.mkdir()
 
-        removed, skipped = remove_junk([junk_file, junk_dir])
+        removed, skipped = remove_junk(
+            [junk_file, junk_dir], op_root=self.test_dir, hard_delete=True
+        )
 
         self.assertEqual(removed, 2)
         self.assertEqual(skipped, 0)
@@ -198,6 +202,8 @@ class TestCleanupMain(unittest.TestCase):
                 "log_dir": self.test_dir,
                 "include": None,
                 "list_only": False,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         main(args)
@@ -220,6 +226,8 @@ class TestCleanupMain(unittest.TestCase):
                 "log_dir": self.test_dir,
                 "include": None,
                 "list_only": True,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         main(args)
@@ -242,6 +250,8 @@ class TestCleanupMain(unittest.TestCase):
                 "log_dir": self.test_dir,
                 "include": None,
                 "list_only": False,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         main(args)
@@ -265,6 +275,8 @@ class TestCleanupMain(unittest.TestCase):
                 "log_dir": self.test_dir,
                 "include": None,
                 "list_only": False,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         main(args)
@@ -288,12 +300,67 @@ class TestCleanupMain(unittest.TestCase):
                 "log_dir": self.test_dir,
                 "include": ["custom.tmp"],
                 "list_only": False,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         main(args)
 
         # Custom file should be removed
         self.assertFalse((self.test_path / "custom.tmp").exists())
+
+
+class TestCleanupQuarantine(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_remove_junk_quarantines_by_default(self):
+        junk = Path(self.test_dir) / ".DS_Store"
+        junk.write_text("junk")
+        removed, _skipped = remove_junk([junk], op_root=self.test_dir, hard_delete=False)
+        self.assertEqual(removed, 1)
+        self.assertFalse(junk.exists())
+        self.assertEqual(len(trash.list_runs(self.test_dir)), 1)
+
+    def test_hard_delete_really_deletes(self):
+        junk = Path(self.test_dir) / ".DS_Store"
+        junk.write_text("junk")
+        removed, _skipped = remove_junk([junk], op_root=self.test_dir, hard_delete=True)
+        self.assertEqual(removed, 1)
+        self.assertFalse(junk.exists())
+        self.assertEqual(trash.list_runs(self.test_dir), [])  # no run created
+
+    def test_find_junk_skips_trash_recursive(self):
+        (Path(self.test_dir) / ".pystou-trash" / "r" / "0").mkdir(parents=True)
+        (Path(self.test_dir) / ".pystou-trash" / "r" / "0" / ".DS_Store").write_text("x")
+        (Path(self.test_dir) / "real").mkdir()
+        (Path(self.test_dir) / "real" / ".DS_Store").write_text("x")
+        items = find_junk(self.test_dir, True, {".DS_Store"}, set())
+        self.assertTrue(any("real" in str(p) for p in items))
+        self.assertFalse(any(".pystou-trash" in str(p) for p in items))
+
+    def test_find_junk_skips_trash_non_recursive(self):
+        (Path(self.test_dir) / ".pystou-trash" / "r" / "0").mkdir(parents=True)
+        (Path(self.test_dir) / ".pystou-trash" / "r" / "0" / ".DS_Store").write_text("x")
+        (Path(self.test_dir) / ".DS_Store").write_text("x")
+        items = find_junk(self.test_dir, False, {".DS_Store"}, set())
+        self.assertTrue(any(p.name == ".DS_Store" for p in items))
+        self.assertFalse(any(".pystou-trash" in str(p) for p in items))
+
+    def test_remove_junk_trash_error_skips_all(self):
+        junk = Path(self.test_dir) / ".DS_Store"
+        junk.write_text("x")
+        with mock.patch(
+            "cleanup.main.trash.quarantine",
+            side_effect=trash.TrashUnavailableError("boom"),
+        ):
+            removed, skipped = remove_junk([junk], op_root=self.test_dir, hard_delete=False)
+        self.assertEqual(removed, 0)
+        self.assertEqual(skipped, 1)
+        self.assertTrue(junk.exists())  # not removed when quarantine fails
 
 
 if __name__ == "__main__":

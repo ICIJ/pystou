@@ -7,10 +7,17 @@ from types import SimpleNamespace
 from unittest import mock
 from unittest.mock import patch
 
+from common import trash
 from common.fs_walker import collect_directories
 from common.indexer import close_database, initialize_database
 from common.utils import group_directories
-from dedup_folders.main import identify_base_and_duplicates, manage_index, process_group
+from dedup_folders.main import (
+    delete_duplicates,
+    identify_base_and_duplicates,
+    manage_index,
+    merge_contents,
+    process_group,
+)
 
 
 class TestDedupFolders(unittest.TestCase):
@@ -60,7 +67,17 @@ class TestDedupFolders(unittest.TestCase):
     @patch("builtins.print")
     def test_process_group_delete(self, mock_print):
         # Simulate user choice to delete duplicates
-        args = type("Args", (), {"dry_run": False, "default_choice": 1})
+        args = type(
+            "Args",
+            (),
+            {
+                "dry_run": False,
+                "default_choice": 1,
+                "directory": self.test_dir,
+                "hard_delete": True,
+                "trash_dir": None,
+            },
+        )
         groups = group_directories(self.conn)
         for group_key, dir_paths in groups.items():
             process_group(group_key, dir_paths, args, self.conn)
@@ -75,7 +92,17 @@ class TestDedupFolders(unittest.TestCase):
         self.tearDown()
         self.setUp()
         # Simulate user choice to merge duplicates
-        args = type("Args", (), {"dry_run": False, "default_choice": 2})
+        args = type(
+            "Args",
+            (),
+            {
+                "dry_run": False,
+                "default_choice": 2,
+                "directory": self.test_dir,
+                "hard_delete": True,
+                "trash_dir": None,
+            },
+        )
         groups = group_directories(self.conn)
         for group_key, dir_paths in groups.items():
             process_group(group_key, dir_paths, args, self.conn)
@@ -95,7 +122,6 @@ from unittest.mock import patch as _patch
 
 from common.indexer import close_database as _close_db
 from common.indexer import initialize_database as _init_db
-from dedup_folders.main import merge_contents
 
 
 class TestMergeConflictPreservesData(unittest.TestCase):
@@ -171,6 +197,49 @@ class TestDedupManageIndex(unittest.TestCase):
         manage_index(self.conn, self.args, index_existed=True)
         prompt.assert_called_once()
         collect.assert_called_once()
+
+
+class TestDedupQuarantine(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_delete_duplicates_quarantines(self):
+        dup = Path(self.test_dir) / "dup (1)"
+        dup.mkdir()
+        (dup / "f.txt").write_text("x")
+        conn = initialize_database(self.test_dir)
+        delete_duplicates([dup], dry_run=False, conn=conn, op_root=self.test_dir, hard_delete=False)
+        conn.close()
+        self.assertFalse(dup.exists())
+        self.assertEqual(len(trash.list_runs(self.test_dir)), 1)
+
+    def test_delete_duplicates_hard_delete(self):
+        dup = Path(self.test_dir) / "dup (1)"
+        dup.mkdir()
+        conn = initialize_database(self.test_dir)
+        delete_duplicates([dup], dry_run=False, conn=conn, op_root=self.test_dir, hard_delete=True)
+        conn.close()
+        self.assertFalse(dup.exists())
+        self.assertEqual(trash.list_runs(self.test_dir), [])
+
+    def test_merge_contents_quarantines_merged_dup(self):
+        base = Path(self.test_dir) / "base"
+        base.mkdir()
+        (base / "keep.txt").write_text("base")
+        dup = Path(self.test_dir) / "base (1)"
+        dup.mkdir()
+        (dup / "only_in_dup.txt").write_text("dup")  # no conflict -> moves cleanly
+        conn = initialize_database(self.test_dir)
+        merge_contents(
+            base, [dup], dry_run=False, conn=conn, op_root=self.test_dir, hard_delete=False
+        )
+        conn.close()
+        self.assertTrue((base / "only_in_dup.txt").is_file())  # merged into base
+        self.assertFalse(dup.exists())  # dup dir removed
+        self.assertEqual(len(trash.list_runs(self.test_dir)), 1)  # quarantined, not deleted
 
 
 if __name__ == "__main__":

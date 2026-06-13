@@ -7,9 +7,10 @@ from types import SimpleNamespace
 from unittest import mock
 from unittest.mock import patch
 
+from common import trash
 from common.indexer import close_database, initialize_database
 from common.utils import get_archive_files
-from extract.main import manage_index, process_archive
+from extract.main import delete_archive_file, manage_index, process_archive
 
 
 class TestExtract(unittest.TestCase):
@@ -69,6 +70,9 @@ class TestExtract(unittest.TestCase):
                 "default_delete_choice": None,
                 "nested": False,
                 "max_depth": 10,
+                "directory": self.test_dir,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         archive_files = get_archive_files(self.test_dir, recursive=False)
@@ -96,15 +100,19 @@ class TestExtract(unittest.TestCase):
                 "default_delete_choice": None,
                 "nested": False,
                 "max_depth": 10,
+                "directory": self.test_dir,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         archive_files = get_archive_files(self.test_dir, recursive=False)
         self.assertEqual(len(archive_files), 1)
         for archive_file in archive_files:
             process_archive(archive_file, args, self.conn)
-        # Check that the file was extracted and archive was deleted
+        # Check that the file was extracted and the archive was quarantined (default)
         self.assertTrue((Path(self.test_dir) / "test_file.txt").exists())
         self.assertFalse((Path(self.test_dir) / "archive.zip").exists())
+        self.assertEqual(len(trash.list_runs(self.test_dir)), 1)
 
     @patch("builtins.print")
     @patch("builtins.input", return_value="2")  # Mock user input to '2' (skip)
@@ -121,6 +129,9 @@ class TestExtract(unittest.TestCase):
                 "default_delete_choice": None,
                 "nested": False,
                 "max_depth": 10,
+                "directory": self.test_dir,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         archive_files = get_archive_files(self.test_dir, recursive=False)
@@ -147,6 +158,9 @@ class TestExtract(unittest.TestCase):
                 "default_delete_choice": None,
                 "nested": False,
                 "max_depth": 10,
+                "directory": self.test_dir,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         with patch("builtins.input", side_effect=["1", "2"]):
@@ -173,6 +187,9 @@ class TestExtract(unittest.TestCase):
                 "default_delete_choice": None,
                 "nested": False,
                 "max_depth": 10,
+                "directory": self.test_dir,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         with patch("builtins.input", side_effect=["1", "1"]):
@@ -200,6 +217,9 @@ class TestExtract(unittest.TestCase):
                 "default_delete_choice": 1,  # Delete after extraction
                 "nested": False,
                 "max_depth": 10,
+                "directory": self.test_dir,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         with patch("builtins.input", return_value="1"):
@@ -207,9 +227,10 @@ class TestExtract(unittest.TestCase):
             self.assertEqual(len(archive_files), 1)
             for archive_file in archive_files:
                 process_archive(archive_file, args, self.conn)
-        # Check that the file was extracted and archive was deleted
+        # Check that the file was extracted and the archive was quarantined (default)
         self.assertTrue((Path(self.test_dir) / "test_file.txt").exists())
         self.assertFalse((Path(self.test_dir) / "archive.zip").exists())
+        self.assertEqual(len(trash.list_runs(self.test_dir)), 1)
 
     @patch("builtins.print")
     @patch("builtins.input", return_value="2")  # Mock user input for default delete choice
@@ -226,6 +247,9 @@ class TestExtract(unittest.TestCase):
                 "default_delete_choice": 2,  # Keep after extraction
                 "nested": False,
                 "max_depth": 10,
+                "directory": self.test_dir,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         with patch("builtins.input", return_value="2"):
@@ -254,15 +278,19 @@ class TestExtract(unittest.TestCase):
                 "default_delete_choice": None,
                 "nested": False,
                 "max_depth": 10,
+                "directory": self.test_dir,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         archive_files = get_archive_files(self.test_dir, recursive=False)
         self.assertEqual(len(archive_files), 1)
         for archive_file in archive_files:
             process_archive(archive_file, args, self.conn)
-        # Check that the file was extracted and archive was deleted
+        # Check that the file was extracted and the archive was quarantined (default)
         self.assertTrue((Path(self.test_dir) / "test_file.txt").exists())
         self.assertFalse((Path(self.test_dir) / "archive.zip").exists())
+        self.assertEqual(len(trash.list_runs(self.test_dir)), 1)
 
     @patch("builtins.print")
     @patch("builtins.input", return_value="2")  # Mock user input to '2' (skip)
@@ -279,6 +307,9 @@ class TestExtract(unittest.TestCase):
                 "default_delete_choice": None,
                 "nested": False,
                 "max_depth": 10,
+                "directory": self.test_dir,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         archive_files = get_archive_files(self.test_dir, recursive=False)
@@ -309,6 +340,9 @@ class TestExtract(unittest.TestCase):
                 "parallel": 2,
                 "nested": False,
                 "max_depth": 10,
+                "directory": self.test_dir,
+                "hard_delete": False,
+                "trash_dir": None,
             },
         )
         process_archives_parallel([bad], args, self.conn)
@@ -360,6 +394,32 @@ class TestExtractManageIndex(unittest.TestCase):
         manage_index(self.conn, self.args, index_existed=True)
         prompt.assert_called_once()
         collect.assert_called_once()
+
+
+class TestExtractQuarantine(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_delete_archive_quarantines_by_default(self):
+        arc = Path(self.test_dir) / "a.zip"
+        arc.write_text("PK")
+        conn = initialize_database(self.test_dir)
+        delete_archive_file(arc, conn, dry_run=False, op_root=self.test_dir, hard_delete=False)
+        conn.close()
+        self.assertFalse(arc.exists())
+        self.assertEqual(len(trash.list_runs(self.test_dir)), 1)
+
+    def test_delete_archive_hard_delete(self):
+        arc = Path(self.test_dir) / "a.zip"
+        arc.write_text("PK")
+        conn = initialize_database(self.test_dir)
+        delete_archive_file(arc, conn, dry_run=False, op_root=self.test_dir, hard_delete=True)
+        conn.close()
+        self.assertFalse(arc.exists())
+        self.assertEqual(trash.list_runs(self.test_dir), [])
 
 
 if __name__ == "__main__":

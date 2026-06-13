@@ -99,3 +99,30 @@ def verify_then_delete(archive: Path, success: bool, delete_fn: Callable[[], Non
         )
         return
     delete_fn()
+
+
+def reserve_unique_name(dest_dir, basename) -> Path:
+    """Atomically reserves a collision-free path under ``dest_dir``.
+
+    Creates a numbered holding subdir (``dest_dir/0``, ``dest_dir/1``, ...) with
+    ``mkdir`` — the atomic claim — and returns ``<holding>/<basename>``. The
+    returned path does not exist yet; its parent is a freshly created empty dir,
+    so the caller can ``os.rename`` a file OR a directory into it with no
+    collision and no clobber. Works identically for files and directories.
+
+    Args:
+        dest_dir: Directory under which to reserve a name.
+        basename: Final name the reserved path should carry.
+
+    Returns:
+        Path: ``<dest_dir>/<n>/<basename>`` with the ``<n>`` holding dir created.
+    """
+    dest_dir = Path(dest_dir)
+    counter = 0
+    while True:
+        holding = dest_dir / str(counter)
+        try:
+            holding.mkdir(parents=True)
+            return holding / Path(basename).name
+        except FileExistsError:
+            counter += 1

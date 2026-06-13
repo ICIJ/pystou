@@ -18,6 +18,7 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
   - [Identify File Types](#identify-file-types)
   - [Directory Statistics](#directory-statistics)
   - [Empty Directories](#empty-directories)
+  - [Restore & Trash](#restore--trash)
 - [Running Tests](#running-tests)
 - [License](#license)
 
@@ -32,6 +33,7 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
 - Detect file type mismatches and encrypted archives.
 - Get comprehensive directory statistics including file counts, sizes, and types.
 - Find and remove empty directories safely.
+- Reversible deletes by default: cleanup, dedup, and extract quarantine removed items to `.pystou-trash/` — restore them any time with `pystou restore`, or reclaim space with `pystou trash purge`.
 - Choose to interact with each file/archive or set default actions for seamless automation.
 - Keep track of all actions with detailed JSON-formatted logs for easy troubleshooting.
 - Pure native Python scripts ready to run out-of-the-box (except for necessary command-line tools).
@@ -123,8 +125,14 @@ pystou dedup [directory] [options]
   - `2`: Merge contents and delete duplicates.
   - `3`: Skip (do nothing).
 - `-n`, `--dry-run`: Perform a dry run without making any changes.
+- `--hard-delete`: Permanently delete instead of quarantining (skips `.pystou-trash/`).
+- `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
 - `--log-dir LOG_DIR`: Directory to store log files (default: current directory).
 - `--db-dir DB_DIR`: Directory to store index database (default: current directory).
+
+> **Note:** Delete and merge actions quarantine removed items to `.pystou-trash/` by default.
+> Use `pystou restore` to undo, or `pystou trash purge` to reclaim space.
+> Pass `--hard-delete` to permanently delete immediately (old behavior).
 
 **Examples:**
 
@@ -175,14 +183,20 @@ pystou extract [directory] [options]
   - `1`: Extract archives.
   - `2`: Skip (do nothing).
 - `-dc DELETE_CHOICE`, `--default-delete-choice DELETE_CHOICE`: Default action when prompted to delete archives after extraction.
-  - `1`: Delete the archive after extraction.
+  - `1`: Delete the archive after extraction (quarantined by default, see below).
   - `2`: Keep the archive after extraction.
 - `-p N`, `--parallel N`: Number of parallel extraction workers (default: 1). Requires `-c` flag.
 - `-N`, `--nested`: Recursively extract archives found inside extracted content.
 - `--max-depth N`: Maximum nesting depth for `--nested` (default: 10).
 - `-n`, `--dry-run`: Perform a dry run without making any changes.
+- `--hard-delete`: Permanently delete source archives instead of quarantining them.
+- `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
 - `--log-dir LOG_DIR`: Directory to store log files (default: current directory).
 - `--db-dir DB_DIR`: Directory to store index database (default: current directory).
+
+> **Note:** Source archives deleted after extraction are quarantined to `.pystou-trash/` by default.
+> Use `pystou restore` to recover them, or `pystou trash purge` to reclaim space.
+> Pass `--hard-delete` to permanently delete immediately (old behavior).
 
 **Examples:**
 
@@ -238,6 +252,12 @@ pystou cleanup [directory] [options]
 - `--include PATTERN`: Additional file/directory names to remove (can be used multiple times).
 - `--list-only`: Only list junk files without removing them.
 - `-n`, `--dry-run`: Perform a dry run without making any changes.
+- `--hard-delete`: Permanently delete junk files instead of quarantining them.
+- `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
+
+> **Note:** Junk files are quarantined to `.pystou-trash/` by default rather than permanently deleted.
+> Use `pystou restore` to recover them, or `pystou trash purge` to reclaim space.
+> Pass `--hard-delete` to permanently delete immediately (old behavior).
 
 **Examples:**
 
@@ -371,6 +391,140 @@ pystou empty [directory] [options]
   ```bash
   pystou empty /path/to/folder -r --include-hidden
   ```
+
+### Restore & Trash
+
+**Purpose:** Manage the quarantine store — recover accidentally removed items or permanently reclaim
+disk space. All destructive commands (`cleanup`, `dedup`, `extract`) quarantine items to a
+`.pystou-trash/` directory by default instead of deleting them. These commands let you act on that
+quarantine.
+
+---
+
+#### Restore Quarantined Items
+
+**Command:**
+
+```bash
+pystou restore [directory] [options]
+```
+
+**Parameters:**
+
+- `directory`: (Optional) Root directory whose `.pystou-trash/` to inspect. Defaults to the current directory.
+
+**Options:**
+
+- `--run ID`: Restore all items from a specific quarantine run (use `pystou trash list` to find IDs).
+- `--all`: Restore every quarantined item across all runs.
+- `--path ORIGINAL`: Restore a single item by its original absolute path.
+- `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
+- `-n`, `--dry-run`: Show what would be restored without moving anything.
+
+> Restore never overwrites an occupied path. If the original destination already exists, the item is
+> left in the trash and reported as skipped.
+
+**Examples:**
+
+- **Restore a specific run:**
+
+  ```bash
+  pystou restore /path/to/folder --run 20260613_142501
+  ```
+
+- **Restore everything:**
+
+  ```bash
+  pystou restore /path/to/folder --all
+  ```
+
+- **Restore a single file by original path:**
+
+  ```bash
+  pystou restore /path/to/folder --path /path/to/folder/old-file.zip
+  ```
+
+---
+
+#### List Quarantine Runs
+
+**Purpose:** Display all quarantine runs with item counts and reclaimable disk space.
+
+**Command:**
+
+```bash
+pystou trash list [directory] [options]
+```
+
+**Parameters:**
+
+- `directory`: (Optional) Root directory whose `.pystou-trash/` to inspect. Defaults to the current directory.
+
+**Options:**
+
+- `--json`: Output run metadata in JSON format.
+
+**Examples:**
+
+- **List all runs (human-readable):**
+
+  ```bash
+  pystou trash list /path/to/folder
+  ```
+
+- **List runs as JSON:**
+
+  ```bash
+  pystou trash list /path/to/folder --json
+  ```
+
+---
+
+#### Purge Quarantined Runs
+
+**Purpose:** Permanently delete quarantined items — this is the *only* pystou command that truly
+deletes data. Use it to reclaim disk space once you are confident the quarantined items are no
+longer needed.
+
+**Command:**
+
+```bash
+pystou trash purge [directory] [options]
+```
+
+**Parameters:**
+
+- `directory`: (Optional) Root directory whose `.pystou-trash/` to purge. Defaults to the current directory.
+
+**Options:**
+
+- `--run ID`: Permanently delete a specific quarantine run.
+- `--all`: Permanently delete all quarantine runs.
+- `--older-than DAYS`: Permanently delete runs older than the given number of days.
+- `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
+- `-n`, `--dry-run`: Show what would be deleted without removing anything.
+
+**Examples:**
+
+- **Purge a specific run:**
+
+  ```bash
+  pystou trash purge /path/to/folder --run 20260613_142501
+  ```
+
+- **Purge all runs:**
+
+  ```bash
+  pystou trash purge /path/to/folder --all
+  ```
+
+- **Purge runs older than 30 days:**
+
+  ```bash
+  pystou trash purge /path/to/folder --older-than 30
+  ```
+
+---
 
 ## Running Tests
 

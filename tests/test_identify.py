@@ -352,5 +352,44 @@ class TestIdentifyMain(unittest.TestCase):
         self.assertTrue(args.check_encrypted)
 
 
+class TestIdentifySkipsTrash(unittest.TestCase):
+    """Tests that identify never scans anything under .pystou-trash."""
+
+    def setUp(self):
+        """Set up a temporary directory."""
+        self.test_dir = tempfile.mkdtemp()
+        self.test_path = Path(self.test_dir)
+
+    def tearDown(self):
+        """Clean up temporary directory."""
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_identify_ignores_trash(self):
+        """Files inside .pystou-trash must not be collected; normal files are."""
+        trash_file = self.test_path / ".pystou-trash" / "r" / "0" / "junk.txt"
+        trash_file.parent.mkdir(parents=True)
+        trash_file.write_text("junk")
+
+        real_file = self.test_path / "real" / "data.txt"
+        real_file.parent.mkdir(parents=True)
+        real_file.write_text("hi")
+
+        files = [str(p) for p in collect_files(self.test_dir, True)]
+
+        self.assertTrue(any("data.txt" in p for p in files))
+        self.assertFalse(any(".pystou-trash" in p for p in files))
+
+    def test_identify_ignores_trash_non_recursive(self):
+        """The non-recursive scandir branch must also skip .pystou-trash."""
+        (self.test_path / ".pystou-trash").mkdir()
+        real_file = self.test_path / "data.txt"
+        real_file.write_text("hi")
+
+        files = [str(p) for p in collect_files(self.test_dir, False)]
+
+        self.assertTrue(any("data.txt" in p for p in files))
+        self.assertFalse(any(".pystou-trash" in p for p in files))
+
+
 if __name__ == "__main__":
     unittest.main()

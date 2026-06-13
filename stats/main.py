@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from common.cli import add_common_arguments
+from common.fs_walker import is_excluded_dir
 from common.interrupt import scanning
 from common.logger import log_configuration, setup_logging
 from common.validation import validate_directory_or_exit
@@ -119,6 +120,8 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> dict:
     if recursive:
         # followlinks=False prevents infinite loops from symlink cycles
         for root, dirs, files in os.walk(directory_path, followlinks=False):
+            # Prune the trash directory: removes it from results and prevents descent.
+            dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
             root_path = Path(root)
             scanned += 1
 
@@ -166,6 +169,9 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> dict:
                     continue
 
                 if entry.is_dir(follow_symlinks=False):
+                    # Skip the trash directory
+                    if is_excluded_dir(entry.name):
+                        continue
                     stats["summary"]["total_dirs"] += 1
                     try:
                         if not any(Path(entry.path).iterdir()):

@@ -17,8 +17,12 @@ from extract.main import main as extract_main
 from identify.main import add_identify_arguments
 from identify.main import main as identify_main
 from pystou import __version__
+from restore.main import add_restore_arguments
+from restore.main import main as restore_main
 from stats.main import add_stats_arguments
 from stats.main import main as stats_main
+from trash.main import add_trash_arguments
+from trash.main import main as trash_main
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -97,6 +101,24 @@ def create_parser() -> argparse.ArgumentParser:
     )
     add_empty_arguments(empty_parser)
     empty_parser.set_defaults(func=empty_main)
+
+    # restore subcommand
+    restore_parser = subparsers.add_parser(
+        "restore",
+        help="Restore files quarantined by cleanup/dedup/extract",
+        description="Restore quarantined files to their original locations.",
+    )
+    add_restore_arguments(restore_parser)
+    restore_parser.set_defaults(func=restore_main)
+
+    # trash subcommand
+    trash_parser = subparsers.add_parser(
+        "trash",
+        help="List or purge quarantined files (.pystou-trash)",
+        description="Manage the PyStou trash: list runs or permanently purge them.",
+    )
+    add_trash_arguments(trash_parser)
+    trash_parser.set_defaults(func=trash_main)
 
     return parser
 

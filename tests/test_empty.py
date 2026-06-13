@@ -371,5 +371,40 @@ class TestEmptyMain(unittest.TestCase):
         self.assertFalse(hidden_empty.exists())
 
 
+class TestEmptySkipsTrash(unittest.TestCase):
+    """Tests that the empty finder never reports anything under .pystou-trash."""
+
+    def setUp(self):
+        """Set up a temporary directory."""
+        self.test_dir = tempfile.mkdtemp()
+        self.test_path = Path(self.test_dir)
+
+    def tearDown(self):
+        """Clean up temporary directory."""
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_empty_ignores_trash(self):
+        """An empty dir inside .pystou-trash must not be reported, even bottom-up."""
+        # Genuinely empty directory inside the trash - WOULD be reported if not excluded
+        (self.test_path / ".pystou-trash" / "r" / "0").mkdir(parents=True)
+        # Normal sibling that SHOULD be found
+        (self.test_path / "really_empty").mkdir()
+
+        found = [str(p) for p in find_empty_directories(self.test_dir, True, True)]
+
+        self.assertTrue(any("really_empty" in p for p in found))
+        self.assertFalse(any(".pystou-trash" in p for p in found))
+
+    def test_empty_ignores_trash_non_recursive(self):
+        """The non-recursive scandir branch must also skip .pystou-trash."""
+        (self.test_path / ".pystou-trash").mkdir()
+        (self.test_path / "really_empty").mkdir()
+
+        found = [str(p) for p in find_empty_directories(self.test_dir, False, True)]
+
+        self.assertTrue(any("really_empty" in p for p in found))
+        self.assertFalse(any(".pystou-trash" in p for p in found))
+
+
 if __name__ == "__main__":
     unittest.main()
