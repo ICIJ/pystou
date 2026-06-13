@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from common.safe_extract import safe_extract_tar, safe_extract_zip
-from common.safe_ops import make_unique_dir, unique_path
+from common.safe_ops import make_unique_dir, reserve_unique_file
 
 
 def group_directories(conn) -> dict:
@@ -312,7 +312,7 @@ def extract_compressed_file(archive_path: Path) -> bool:
         if archive_path.suffix == ".gz":
             import gzip
 
-            target_path = unique_path(archive_path.with_suffix(""))
+            target_path = reserve_unique_file(archive_path.with_suffix(""))
             with (
                 gzip.open(archive_path, "rb") as f_in,
                 open(target_path, "wb") as f_out,
@@ -321,7 +321,7 @@ def extract_compressed_file(archive_path: Path) -> bool:
         elif archive_path.suffix == ".bz2":
             import bz2
 
-            target_path = unique_path(archive_path.with_suffix(""))
+            target_path = reserve_unique_file(archive_path.with_suffix(""))
             with bz2.open(archive_path, "rb") as f_in, open(target_path, "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
         else:
@@ -394,7 +394,7 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
     suffixes = "".join(archive_path.suffixes)
     is_tar = ".tar.zst" in suffixes or ".tzst" in suffixes
     if is_tar:
-        temp_tar_path = unique_path(archive_path.with_suffix(".tar"))
+        temp_tar_path = reserve_unique_file(archive_path.with_suffix(".tar"))
         try:
             with open(archive_path, "rb") as f_in, open(temp_tar_path, "wb") as f_out:
                 zstd.ZstdDecompressor().copy_stream(f_in, f_out)
@@ -420,7 +420,7 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
                 temp_tar_path.unlink()
     else:
         try:
-            target_path = unique_path(archive_path.with_suffix(""))
+            target_path = reserve_unique_file(archive_path.with_suffix(""))
             with open(archive_path, "rb") as f_in, open(target_path, "wb") as f_out:
                 zstd.ZstdDecompressor().copy_stream(f_in, f_out)
             print(f"Decompressed ZST file: {archive_path}")
@@ -449,9 +449,9 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
     """
     suffixes = "".join(archive_path.suffixes)
     is_tar = ".tar.zst" in suffixes or ".tzst" in suffixes
-    output_path = unique_path(archive_path.with_suffix(""))
+    output_path = reserve_unique_file(archive_path.with_suffix(""))
     try:
-        cmd = ["zstd", "-d", str(archive_path), "-o", str(output_path)]
+        cmd = ["zstd", "-d", "-f", str(archive_path), "-o", str(output_path)]
         subprocess.run(cmd, check=True, capture_output=True)
         if is_tar:
             try:
