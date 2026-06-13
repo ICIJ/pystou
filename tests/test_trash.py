@@ -145,3 +145,35 @@ class TestQuarantineEdgeCases(unittest.TestCase):
             self.assertRaises(CrossDeviceTrashError),
         ):
             trash.quarantine([victim], self.root, operation="cleanup", command="pystou cleanup")
+
+
+class TestListRuns(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_lists_runs_with_counts_and_sizes(self):
+        a = Path(self.root) / "a.txt"
+        a.write_text("0123456789")  # 10 bytes
+        trash.quarantine([a], self.root, operation="cleanup", command="pystou cleanup")
+        runs = trash.list_runs(self.root)
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0].item_count, 1)
+        self.assertEqual(runs[0].total_size, 10)
+        self.assertEqual(runs[0].operation, "cleanup")
+
+    def test_empty_when_no_trash(self):
+        self.assertEqual(trash.list_runs(self.root), [])
+
+    def test_tolerates_partial_trailing_line(self):
+        a = Path(self.root) / "a.txt"
+        a.write_text("x")
+        run_id = trash.quarantine([a], self.root, operation="cleanup", command="pystou cleanup")
+        ledger = Path(self.root) / ".pystou-trash" / "runs" / f"{run_id}.jsonl"
+        with open(ledger, "a", encoding="utf-8") as f:
+            f.write('{"original": "/half/written')  # truncated, no newline
+        runs = trash.list_runs(self.root)
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0].item_count, 1)  # partial line ignored

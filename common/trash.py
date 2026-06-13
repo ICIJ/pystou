@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import secrets
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -156,3 +157,61 @@ def quarantine(
         )
         logging.info({"action": "quarantine", "original": str(it.absolute()), "run_id": run_id})
     return run_id
+
+
+@dataclass
+class TrashRun:
+    run_id: str
+    started_at: str
+    command: str
+    operation: str
+    op_root: str
+    item_count: int
+    total_size: int
+    ledger_path: Path
+
+
+def _read_ledger(ledger_path: Path):
+    """Returns (header_dict_or_None, [item_dicts]); tolerates a partial last line."""
+    header = None
+    items = []
+    with open(ledger_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue  # truncated trailing line from an interrupted run
+            if obj.get("_header"):
+                header = obj
+            else:
+                items.append(obj)
+    return header, items
+
+
+def list_runs(op_root, trash_dir: Optional[str] = None) -> list[TrashRun]:
+    """Lists quarantine runs newest-last (sorted by run id)."""
+    root = trash_root(op_root, trash_dir)
+    runs_dir = root / "runs"
+    runs: list[TrashRun] = []
+    if not runs_dir.is_dir():
+        return runs
+    for ledger in sorted(runs_dir.glob("*.jsonl")):
+        header, items = _read_ledger(ledger)
+        if header is None:
+            continue
+        runs.append(
+            TrashRun(
+                run_id=header["run_id"],
+                started_at=header.get("started_at", ""),
+                command=header.get("command", ""),
+                operation=header.get("operation", ""),
+                op_root=header.get("op_root", ""),
+                item_count=len(items),
+                total_size=sum(int(i.get("size", 0)) for i in items),
+                ledger_path=ledger,
+            )
+        )
+    return runs
