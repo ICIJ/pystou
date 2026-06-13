@@ -10,6 +10,8 @@ from cleanup.main import main as cleanup_main
 from common.errors import PystouError
 from dedup_folders.main import add_dedup_arguments
 from dedup_folders.main import main as dedup_main
+from doctor.main import add_doctor_arguments
+from doctor.main import main as doctor_main
 from empty.main import add_empty_arguments
 from empty.main import main as empty_main
 from extract.main import add_extract_arguments
@@ -120,6 +122,15 @@ def create_parser() -> argparse.ArgumentParser:
     add_trash_arguments(trash_parser)
     trash_parser.set_defaults(func=trash_main)
 
+    # doctor subcommand
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Check that required external tools are installed",
+        description="Check that required external tools (readpst, 7z, zstd) are installed.",
+    )
+    add_doctor_arguments(doctor_parser)
+    doctor_parser.set_defaults(func=doctor_main)
+
     return parser
 
 
@@ -133,7 +144,9 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        args.func(args)
+        result = args.func(args)
+        if isinstance(result, int):
+            sys.exit(result)
     except KeyboardInterrupt:
         print("\nInterrupted by user.")
         sys.exit(130)
