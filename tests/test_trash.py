@@ -239,6 +239,32 @@ class TestRestore(unittest.TestCase):
         self.assertFalse(b.exists())  # only a restored
 
 
+class TestRestoreReindex(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_restore_readds_file_to_index(self):
+        from common.indexer import initialize_database
+
+        victim = Path(self.root) / "f.txt"
+        victim.write_text("data")
+        run_id = trash.quarantine([victim], self.root, operation="cleanup", command="c")
+        conn = initialize_database(self.root)
+        # index starts empty for this path; restore with conn should add it
+        trash.restore(self.root, run_id=run_id, conn=conn)
+        cur = conn.execute(
+            "SELECT 1 FROM files WHERE directory_path = ? AND name = ?",
+            (str(victim.parent.absolute()), "f.txt"),
+        )
+        row = cur.fetchone()
+        conn.close()
+        self.assertIsNotNone(row)  # restored file is back in the index
+        self.assertTrue(victim.is_file())
+
+
 class TestPurge(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp()

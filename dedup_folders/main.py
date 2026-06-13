@@ -4,8 +4,10 @@ import argparse
 import logging
 import os
 import re
+import shlex
 import shutil
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -262,7 +264,7 @@ def _remove_or_quarantine_dir(
                 [dup_dir],
                 op_root,
                 operation="dedup",
-                command="pystou dedup",
+                command=shlex.join(sys.argv),
                 trash_dir=trash_dir,
             )
         logging.info({"action": "delete", "status": "success", "directory": str(dup_dir)})

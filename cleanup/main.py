@@ -4,7 +4,9 @@
 import argparse
 import logging
 import os
+import shlex
 import shutil
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -268,7 +270,7 @@ def remove_junk(
                 existing,
                 op_root,
                 operation="cleanup",
-                command="pystou cleanup",
+                command=shlex.join(sys.argv),
                 trash_dir=trash_dir,
             )
         except (trash.CrossDeviceTrashError, trash.TrashUnavailableError) as e:

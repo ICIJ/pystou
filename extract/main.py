@@ -3,6 +3,8 @@
 import argparse
 import logging
 import os
+import shlex
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
@@ -418,7 +420,7 @@ def delete_archive_file(
                 files_to_delete,
                 op_root,
                 operation="extract",
-                command="pystou extract",
+                command=shlex.join(sys.argv),
                 trash_dir=trash_dir,
             )
             for f in files_to_delete:
