@@ -160,6 +160,22 @@ class TestCollapseRedundantRoot(unittest.TestCase):
         self.assertTrue(out.is_dir())
         self.assertEqual(list(out.iterdir()), [])
 
+    def test_noop_on_single_symlink_to_dir(self):
+        out = Path(self.test_dir) / "out"
+        out.mkdir()
+        real_target = Path(self.test_dir) / "elsewhere"
+        (real_target / "mail").mkdir(parents=True)
+        link = out / "linked"
+        link.symlink_to(real_target, target_is_directory=True)
+
+        utils._collapse_redundant_root(out)
+
+        # The collapse must NOT fire: out is unchanged and still a real dir
+        # holding the symlink (not replaced by a bare symlink).
+        self.assertTrue(out.is_dir() and not out.is_symlink())
+        self.assertTrue(link.is_symlink())
+        self.assertEqual([p.name for p in out.iterdir()], ["linked"])
+
     def test_rollback_on_second_rename_failure(self):
         from unittest.mock import patch
 

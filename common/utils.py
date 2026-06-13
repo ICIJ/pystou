@@ -502,7 +502,7 @@ def _collapse_redundant_root(output_dir: Path) -> None:
         output_dir (Path): The unique directory pystou created for the PST.
     """
     entries = list(output_dir.iterdir())
-    if len(entries) != 1 or not entries[0].is_dir():
+    if len(entries) != 1 or not entries[0].is_dir() or entries[0].is_symlink():
         return
     inner_name = entries[0].name
     wrapper_tmp = make_unique_dir(output_dir.parent / f"{output_dir.name}.tmp")
