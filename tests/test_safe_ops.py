@@ -1,4 +1,5 @@
 # tests/test_safe_ops.py
+import os
 import shutil
 import tempfile
 import threading
@@ -8,6 +9,7 @@ from pathlib import Path
 from common.safe_ops import (
     make_unique_dir,
     reserve_unique_file,
+    reserve_unique_name,
     unique_path,
     verify_then_delete,
 )
@@ -139,6 +141,53 @@ class TestReserveUniqueFile(unittest.TestCase):
         self.assertEqual(len(set(results)), 16)
         for p in results:
             self.assertTrue(p.is_file())
+
+
+class TestReserveUniqueName(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_returns_path_inside_fresh_empty_holding_dir(self):
+        dest = Path(self.test_dir)
+        reserved = reserve_unique_name(dest, "report.pdf")
+        self.assertEqual(reserved.name, "report.pdf")
+        self.assertTrue(reserved.parent.is_dir())
+        self.assertEqual(list(reserved.parent.iterdir()), [])  # empty, ready for rename
+
+    def test_two_same_basenames_get_distinct_holding_dirs(self):
+        dest = Path(self.test_dir)
+        a = reserve_unique_name(dest, "report.pdf")
+        b = reserve_unique_name(dest, "report.pdf")
+        self.assertNotEqual(a.parent, b.parent)
+        self.assertEqual(a.name, b.name)
+
+    def test_rename_a_directory_into_reservation(self):
+        src = Path(self.test_dir) / "srcdir"
+        (src / "inner").mkdir(parents=True)
+        reserved = reserve_unique_name(Path(self.test_dir), "srcdir")
+        os.rename(src, reserved)
+        self.assertTrue((reserved / "inner").is_dir())
+
+    def test_concurrent_calls_get_distinct_dirs(self):
+        dest = Path(self.test_dir)
+        results = []
+        lock = threading.Lock()
+
+        def worker():
+            p = reserve_unique_name(dest, "x")
+            with lock:
+                results.append(p)
+
+        threads = [threading.Thread(target=worker) for _ in range(16)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(len({p.parent for p in results}), 16)
 
 
 if __name__ == "__main__":
