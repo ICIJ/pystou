@@ -456,20 +456,18 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
     suffixes = "".join(archive_path.suffixes)
     is_tar = ".tar.zst" in suffixes or ".tzst" in suffixes
     output_path = reserve_unique_file(archive_path.with_suffix(""))
+    keep_output = False
     try:
         cmd = ["zstd", "-d", "-f", str(archive_path), "-o", str(output_path)]
         subprocess.run(cmd, check=True, capture_output=True)
         if is_tar:
-            try:
-                with tarfile.open(output_path, "r") as tar_ref:
-                    if not safe_extract_tar(tar_ref, archive_path.parent):
-                        print(f"Refused unsafe TAR.ZST archive: {archive_path}")
-                        return False
-                print(f"Extracted TAR.ZST archive using zstd command: {archive_path}")
-                return True
-            finally:
-                if output_path.exists():
-                    output_path.unlink()
+            with tarfile.open(output_path, "r") as tar_ref:
+                if not safe_extract_tar(tar_ref, archive_path.parent):
+                    print(f"Refused unsafe TAR.ZST archive: {archive_path}")
+                    return False
+            print(f"Extracted TAR.ZST archive using zstd command: {archive_path}")
+            return True
+        keep_output = True  # the decompressed plain file IS the result
         print(f"Decompressed ZST file using zstd command: {archive_path}")
         return True
     except (subprocess.CalledProcessError, tarfile.TarError, OSError) as e:
@@ -482,9 +480,13 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
                 "error": str(e),
             }
         )
-        if output_path.exists():
-            output_path.unlink()
         return False
+    finally:
+        # Remove the reserved output unless it is the kept plain-file result.
+        # For a TAR.ZST the decompressed .tar is always a temp to discard; on any
+        # failure or abrupt exit (e.g. KeyboardInterrupt) the placeholder is removed.
+        if not keep_output and output_path.exists():
+            output_path.unlink()
 
 
 def _collapse_redundant_root(output_dir: Path) -> None:

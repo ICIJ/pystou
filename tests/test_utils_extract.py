@@ -112,6 +112,25 @@ class TestZstdCommandPath(unittest.TestCase):
         # The temporary decompressed tar was cleaned up.
         self.assertFalse(expected_output.exists())
 
+    def test_keyboardinterrupt_cleans_up_reserved_output(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "blob.zst"
+        archive.write_bytes(b"placeholder-zst-bytes")
+        reserved = archive.with_suffix("")  # blob
+
+        def boom(cmd, *args, **kwargs):
+            raise KeyboardInterrupt()
+
+        with (
+            patch.object(utils.subprocess, "run", side_effect=boom),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            utils._extract_zst_with_command(archive)
+
+        # The reserved placeholder must not be left behind on abrupt exit.
+        self.assertFalse(reserved.exists())
+
 
 class TestCollapseRedundantRoot(unittest.TestCase):
     def setUp(self):
