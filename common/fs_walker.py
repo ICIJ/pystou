@@ -2,7 +2,7 @@ import logging
 import os
 import sqlite3
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 EXCLUDED_DIR_NAMES = {".pystou-trash"}
 
@@ -15,13 +15,18 @@ def is_excluded_dir(name: str) -> bool:
 class ScanContext:
     """Context object to track scanning state efficiently."""
 
-    __slots__ = ("_last_update", "dir_count", "file_count", "update_interval")
+    __slots__ = ("_last_update", "_progress_cb", "dir_count", "file_count", "update_interval")
 
-    def __init__(self, update_interval: int = 100):
+    def __init__(
+        self,
+        update_interval: int = 100,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
+    ):
         self.dir_count = 0
         self.file_count = 0
         self.update_interval = update_interval
         self._last_update = 0
+        self._progress_cb = progress_cb
 
     def increment_dirs(self) -> None:
         self.dir_count += 1
@@ -35,11 +40,12 @@ class ScanContext:
         total = self.dir_count + self.file_count
         if total - self._last_update >= self.update_interval:
             self._last_update = total
-            update_live_output(self.dir_count, self.file_count)
+            if self._progress_cb is not None:
+                self._progress_cb(self.dir_count, self.file_count)
 
     def final_update(self) -> None:
-        update_live_output(self.dir_count, self.file_count)
-        print()  # Newline after scanning complete
+        if self._progress_cb is not None:
+            self._progress_cb(self.dir_count, self.file_count)
 
 
 def collect_directories(
@@ -47,6 +53,7 @@ def collect_directories(
     directory: str,
     recursive: bool,
     level: Optional[int] = None,
+    progress_cb: Optional[Callable[[int, int], None]] = None,
 ) -> None:
     """Scans the filesystem and populates the database.
 
@@ -55,8 +62,11 @@ def collect_directories(
         directory (str): Directory to start scanning from.
         recursive (bool): Whether to scan directories recursively.
         level (Optional[int]): Maximum depth level for recursion (default: unlimited).
+        progress_cb: Optional callback invoked as ``progress_cb(dir_count, file_count)``
+            at regular intervals during the scan and once on completion.  When
+            *None* (the default) no progress output is produced.
     """
-    ctx = ScanContext(update_interval=100)
+    ctx = ScanContext(update_interval=100, progress_cb=progress_cb)
     clear_database(conn)
     scan_tree(Path(directory), conn, recursive, level, ctx)
     ctx.final_update()
@@ -143,22 +153,6 @@ def clear_database(conn: sqlite3.Connection) -> None:
     cursor.execute("DELETE FROM directories")
     cursor.execute("DELETE FROM files")
     conn.commit()
-
-
-def update_live_output(dir_count: int, file_count: int) -> None:
-    """Updates the live scanning output.
-
-    Args:
-        dir_count (int): Number of directories scanned.
-        file_count (int): Number of files scanned.
-    """
-    formatted_dir_count = f"{dir_count:,}"
-    formatted_file_count = f"{file_count:,}"
-    print(
-        f"Scanning directories: {formatted_dir_count}, files: {formatted_file_count}",
-        end="\r",
-        flush=True,
-    )
 
 
 def insert_entries(
