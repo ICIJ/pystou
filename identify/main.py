@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Identify subcommand for detecting file types and mismatches."""
 
-import argparse
 import logging
 import os
 from enum import Enum
@@ -16,11 +15,9 @@ from common.cli import (
     DirectoryArg,
     LogDirOpt,
     RecursiveOpt,
-    add_common_arguments,
 )
 from common.fs_walker import is_excluded_dir
-from common.interrupt import scanning
-from common.logger import log_configuration, setup_logging
+from common.logger import setup_logging
 from common.validation import validate_directory_or_exit
 
 
@@ -145,110 +142,6 @@ EXTENSION_TYPE_MAP: dict[str, set[str]] = {
     ".xls": {"doc/xls/ppt"},
     ".ppt": {"doc/xls/ppt"},
 }
-
-
-def add_identify_arguments(parser: argparse.ArgumentParser) -> None:
-    """Adds identify-specific arguments to the parser.
-
-    Args:
-        parser: ArgumentParser to add arguments to.
-    """
-    add_common_arguments(parser)
-    parser.add_argument(
-        "--check-mismatch",
-        action="store_true",
-        help="Check for files with mismatched extensions",
-    )
-    parser.add_argument(
-        "--check-encrypted",
-        action="store_true",
-        help="Check for encrypted ZIP archives",
-    )
-    parser.add_argument(
-        "--check-all",
-        action="store_true",
-        help="Run all checks (mismatch, encrypted)",
-    )
-    parser.add_argument(
-        "--extensions",
-        type=str,
-        metavar="EXT",
-        help="Comma-separated list of extensions to check (e.g., '.zip,.pdf')",
-    )
-
-
-def main(args: Optional[argparse.Namespace] = None) -> None:
-    """Main entry point for identify.
-
-    Args:
-        args: Parsed arguments. If None, parses from command line.
-    """
-    if args is None:
-        parser = argparse.ArgumentParser(description="Identify file types script.")
-        add_identify_arguments(parser)
-        args = parser.parse_args()
-
-    setup_logging("identify", args.log_dir)
-    log_configuration(args)
-
-    validate_directory_or_exit(args.directory)
-
-    # Enable all checks if --check-all is set
-    if args.check_all:
-        args.check_mismatch = True
-        args.check_encrypted = True
-
-    # Default to mismatch check if no specific check is requested
-    if not args.check_mismatch and not args.check_encrypted:
-        args.check_mismatch = True
-
-    # Parse extensions filter if provided
-    extensions_filter: Optional[set[str]] = None
-    if args.extensions:
-        extensions_filter = {
-            ext.strip().lower() if ext.startswith(".") else f".{ext.strip().lower()}"
-            for ext in args.extensions.split(",")
-        }
-
-    # Collect files to analyze
-    with scanning("scan"):
-        files = collect_files(args.directory, args.recursive, extensions_filter)
-
-    print(f"Found {len(files)} files to analyze.")
-    logging.info({"action": "files_found", "count": len(files)})
-
-    if not files:
-        print("No files to analyze.")
-        return
-
-    issues: list[tuple[Path, str]] = []
-
-    # Run checks
-    with scanning("analysis"):
-        if args.check_mismatch:
-            print("Checking for extension mismatches...")
-            issues.extend(check_extension_mismatches(files))
-        if args.check_encrypted:
-            print("Checking for encrypted archives...")
-            issues.extend(check_encrypted_archives(files))
-
-    # Report results
-    if not issues:
-        print("No issues found.")
-        logging.info({"action": "no_issues_found"})
-        return
-
-    print(f"\nFound {len(issues)} issue(s):\n")
-    for file_path, issue in issues:
-        print(f"  [{issue}] {file_path}")
-
-    logging.info(
-        {
-            "action": "issues_found",
-            "count": len(issues),
-            "issues": [{"path": str(p), "issue": i} for p, i in issues],
-        }
-    )
 
 
 def collect_files(
@@ -488,7 +381,3 @@ def check_encrypted_archives(files: list[Path]) -> list[tuple[Path, str]]:
         print(f"Checked {checked} archives.      ")  # Clear progress line
 
     return issues
-
-
-if __name__ == "__main__":
-    main()

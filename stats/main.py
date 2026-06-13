@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Stats subcommand for displaying directory statistics."""
 
-import argparse
 import heapq
 import logging
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -17,11 +16,9 @@ from common.cli import (
     DirectoryArg,
     LogDirOpt,
     RecursiveOpt,
-    add_common_arguments,
 )
 from common.fs_walker import is_excluded_dir
-from common.interrupt import scanning
-from common.logger import log_configuration, setup_logging
+from common.logger import setup_logging
 from common.validation import validate_directory_or_exit
 
 
@@ -97,65 +94,6 @@ def stats_command(
         for path, size in stats["largest_files"][:top]:
             ts.add_row(format_size(size), path)
         console.print_table(ts)
-
-
-def add_stats_arguments(parser: argparse.ArgumentParser) -> None:
-    """Adds stats-specific arguments to the parser.
-
-    Args:
-        parser: ArgumentParser to add arguments to.
-    """
-    add_common_arguments(parser)
-    parser.add_argument(
-        "--top",
-        type=int,
-        default=10,
-        metavar="N",
-        help="Number of top items to show (default: 10)",
-    )
-    parser.add_argument(
-        "--by-extension",
-        action="store_true",
-        help="Show breakdown by file extension",
-    )
-    parser.add_argument(
-        "--by-size",
-        action="store_true",
-        help="Show largest files",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output statistics in JSON format",
-    )
-
-
-def main(args: Optional[argparse.Namespace] = None) -> None:
-    """Main entry point for stats.
-
-    Args:
-        args: Parsed arguments. If None, parses from command line.
-    """
-    if args is None:
-        parser = argparse.ArgumentParser(description="Directory statistics script.")
-        add_stats_arguments(parser)
-        args = parser.parse_args()
-
-    setup_logging("stats", args.log_dir)
-    log_configuration(args)
-
-    validate_directory_or_exit(args.directory)
-
-    # Collect statistics
-    with scanning("scan"):
-        stats = collect_stats(args.directory, args.recursive, args.top)
-
-    if args.json:
-        output_json(stats, args.top)
-    else:
-        output_text(stats, args.top, args.by_extension, args.by_size)
-
-    logging.info({"action": "stats_complete", **stats["summary"]})
 
 
 def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> dict:
@@ -336,81 +274,3 @@ def format_size(size: int) -> str:
             return f"{size:.1f} {unit}"
         size /= 1024
     return f"{size:.1f} PB"
-
-
-def output_text(
-    stats: dict,
-    top_n: int,
-    show_by_extension: bool,
-    show_by_size: bool,
-) -> None:
-    """Outputs statistics in text format.
-
-    Args:
-        stats: Collected statistics.
-        top_n: Number of top items to show.
-        show_by_extension: Whether to show extension breakdown.
-        show_by_size: Whether to show largest files.
-    """
-    summary = stats["summary"]
-
-    print("\n=== Directory Statistics ===\n")
-    print(f"Total files:       {summary['total_files']:,}")
-    print(f"Total directories: {summary['total_dirs']:,}")
-    print(f"Total size:        {format_size(summary['total_size'])}")
-    print(f"Archive files:     {summary['archive_files']:,}")
-    print(f"Empty directories: {summary['empty_dirs']:,}")
-
-    if summary["symlinks_skipped"] > 0:
-        print(f"Symlinks skipped:  {summary['symlinks_skipped']:,}")
-    if summary["errors"] > 0:
-        print(f"Errors:            {summary['errors']:,}")
-
-    # Show extension breakdown if requested or by default
-    if show_by_extension or (not show_by_extension and not show_by_size):
-        print(f"\n--- Top {top_n} Extensions by Count ---\n")
-        sorted_by_count = sorted(
-            stats["by_extension"].items(),
-            key=lambda x: x[1]["count"],
-            reverse=True,
-        )[:top_n]
-
-        for ext, data in sorted_by_count:
-            print(f"  {ext:15} {data['count']:>8,} files  ({format_size(data['size']):>10})")
-
-    # Show largest files if requested
-    if show_by_size:
-        print(f"\n--- Top {top_n} Largest Files ---\n")
-        for file_path, size in stats["largest_files"][:top_n]:
-            print(f"  {format_size(size):>10}  {file_path}")
-
-    # Show empty directories if any
-    if summary["empty_dirs"] > 0 and summary["empty_dirs"] <= top_n:
-        print(f"\n--- Empty Directories ({summary['empty_dirs']}) ---\n")
-        for dir_path in stats["empty_directories"][:top_n]:
-            print(f"  {dir_path}")
-
-
-def output_json(stats: dict, top_n: int) -> None:
-    """Outputs statistics in JSON format.
-
-    Args:
-        stats: Collected statistics.
-        top_n: Number of top items to include.
-    """
-    import json
-
-    output = {
-        "summary": stats["summary"],
-        "by_extension": dict(stats["by_extension"]),
-        "largest_files": [
-            {"path": path, "size": size} for path, size in stats["largest_files"][:top_n]
-        ],
-        "empty_directories": stats["empty_directories"][:top_n],
-    }
-
-    print(json.dumps(output, indent=2))
-
-
-if __name__ == "__main__":
-    main()

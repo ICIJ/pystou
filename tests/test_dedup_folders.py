@@ -3,8 +3,6 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
-from unittest import mock
 from unittest.mock import patch
 
 from common import trash
@@ -14,9 +12,7 @@ from common.utils import group_directories
 from dedup_folders.main import (
     delete_duplicates,
     identify_base_and_duplicates,
-    manage_index,
     merge_contents,
-    process_group,
 )
 
 
@@ -65,48 +61,27 @@ class TestDedupFolders(unittest.TestCase):
         self.assertEqual(len(duplicate_dirs), 2)
 
     @patch("builtins.print")
-    def test_process_group_delete(self, mock_print):
-        # Simulate user choice to delete duplicates
-        args = type(
-            "Args",
-            (),
-            {
-                "dry_run": False,
-                "default_choice": 1,
-                "directory": self.test_dir,
-                "hard_delete": True,
-                "trash_dir": None,
-            },
-        )
+    def test_delete_duplicates_removes_dups(self, mock_print):
+        # Exercise the still-present delete_duplicates core logic.
         groups = group_directories(self.conn)
-        for group_key, dir_paths in groups.items():
-            process_group(group_key, dir_paths, args, self.conn)
-        # Check that duplicate directories are deleted
+        for _group_key, dir_paths in groups.items():
+            _base, dups = identify_base_and_duplicates(dir_paths)
+            delete_duplicates(
+                dups, dry_run=False, conn=self.conn, op_root=self.test_dir, hard_delete=True
+            )
         self.assertFalse((Path(self.test_dir) / "folder (1)").exists())
         self.assertFalse((Path(self.test_dir) / "folder (2)").exists())
         self.assertTrue((Path(self.test_dir) / "folder").exists())
 
     @patch("builtins.print")
-    def test_process_group_merge(self, mock_print):
-        # Reset test directories
-        self.tearDown()
-        self.setUp()
-        # Simulate user choice to merge duplicates
-        args = type(
-            "Args",
-            (),
-            {
-                "dry_run": False,
-                "default_choice": 2,
-                "directory": self.test_dir,
-                "hard_delete": True,
-                "trash_dir": None,
-            },
-        )
+    def test_merge_contents_merges_dups(self, mock_print):
+        # Exercise the still-present merge_contents core logic.
         groups = group_directories(self.conn)
-        for group_key, dir_paths in groups.items():
-            process_group(group_key, dir_paths, args, self.conn)
-        # Check that duplicate directories are deleted
+        for _group_key, dir_paths in groups.items():
+            base, dups = identify_base_and_duplicates(dir_paths)
+            merge_contents(
+                base, dups, dry_run=False, conn=self.conn, op_root=self.test_dir, hard_delete=True
+            )
         self.assertFalse((Path(self.test_dir) / "folder (1)").exists())
         self.assertFalse((Path(self.test_dir) / "folder (2)").exists())
         self.assertTrue((Path(self.test_dir) / "folder").exists())
@@ -150,53 +125,6 @@ class TestMergeConflictPreservesData(unittest.TestCase):
         self.assertEqual((self.dup / "shared.txt").read_text(), "dup-version")
         # Base copy is untouched.
         self.assertEqual((self.base / "shared.txt").read_text(), "base-version")
-
-
-class TestDedupManageIndex(unittest.TestCase):
-    def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.conn = initialize_database(self.test_dir)
-        self.args = SimpleNamespace(directory=self.test_dir, recursive=True, level=None)
-
-    def tearDown(self):
-        close_database(self.conn)
-        shutil.rmtree(self.test_dir, ignore_errors=True)
-
-    def _populate(self):
-        self.conn.execute(
-            "INSERT INTO directories (path, parent_path, mtime) VALUES ('/a', '/', 0)"
-        )
-        self.conn.commit()
-
-    @mock.patch("dedup_folders.main.collect_directories")
-    @mock.patch("dedup_folders.main.prompt_use_existing_index")
-    def test_no_file_scans_without_prompt(self, prompt, collect):
-        manage_index(self.conn, self.args, index_existed=False)
-        prompt.assert_not_called()
-        collect.assert_called_once()
-
-    @mock.patch("dedup_folders.main.collect_directories")
-    @mock.patch("dedup_folders.main.prompt_use_existing_index")
-    def test_empty_file_scans_without_prompt(self, prompt, collect):
-        manage_index(self.conn, self.args, index_existed=True)
-        prompt.assert_not_called()
-        collect.assert_called_once()
-
-    @mock.patch("dedup_folders.main.collect_directories")
-    @mock.patch("dedup_folders.main.prompt_use_existing_index", return_value=True)
-    def test_populated_file_reused_skips_scan(self, prompt, collect):
-        self._populate()
-        manage_index(self.conn, self.args, index_existed=True)
-        prompt.assert_called_once()
-        collect.assert_not_called()
-
-    @mock.patch("dedup_folders.main.collect_directories")
-    @mock.patch("dedup_folders.main.prompt_use_existing_index", return_value=False)
-    def test_populated_file_rescan_calls_collect(self, prompt, collect):
-        self._populate()
-        manage_index(self.conn, self.args, index_existed=True)
-        prompt.assert_called_once()
-        collect.assert_called_once()
 
 
 class TestDedupQuarantine(unittest.TestCase):

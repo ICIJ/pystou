@@ -3,14 +3,12 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest.mock import patch
 
 from identify.main import (
     check_encrypted_archives,
     check_extension_mismatches,
     collect_files,
     detect_file_type,
-    main,
 )
 
 
@@ -227,129 +225,6 @@ class TestIdentifyCollectFiles(unittest.TestCase):
         files = collect_files(self.test_dir, recursive=True, extensions_filter={".zip", ".pdf"})
 
         self.assertEqual(len(files), 3)
-
-
-class TestIdentifyMain(unittest.TestCase):
-    """Tests for the main identify function."""
-
-    def setUp(self):
-        """Set up a temporary directory."""
-        self.test_dir = tempfile.mkdtemp()
-        self.test_path = Path(self.test_dir)
-
-    def tearDown(self):
-        """Clean up temporary directory."""
-        shutil.rmtree(self.test_dir)
-
-    @patch("builtins.print")
-    def test_main_no_files(self, mock_print):
-        """Test main when no files are found."""
-        # Create a separate directory for scanning (log file goes to test_dir)
-        scan_dir = self.test_path / "scan"
-        scan_dir.mkdir()
-
-        args = type(
-            "Args",
-            (),
-            {
-                "directory": str(scan_dir),
-                "recursive": False,
-                "dry_run": False,
-                "log_dir": self.test_dir,
-                "check_mismatch": True,
-                "check_encrypted": False,
-                "check_all": False,
-                "extensions": None,
-            },
-        )
-        main(args)
-
-        # Should print a message about 0 files
-        calls = [str(call) for call in mock_print.call_args_list]
-        found_zero_files = any("0 files" in call or "No files" in call for call in calls)
-        self.assertTrue(found_zero_files, f"Expected '0 files' message, got: {calls}")
-
-    @patch("builtins.print")
-    def test_main_no_issues(self, mock_print):
-        """Test main when no issues are found."""
-        # Create a correctly named ZIP
-        zip_path = self.test_path / "test.zip"
-        with zipfile.ZipFile(zip_path, "w") as zf:
-            zf.writestr("test.txt", "content")
-
-        args = type(
-            "Args",
-            (),
-            {
-                "directory": self.test_dir,
-                "recursive": False,
-                "dry_run": False,
-                "log_dir": self.test_dir,
-                "check_mismatch": True,
-                "check_encrypted": False,
-                "check_all": False,
-                "extensions": None,
-            },
-        )
-        main(args)
-
-        mock_print.assert_any_call("No issues found.")
-
-    @patch("builtins.print")
-    def test_main_finds_mismatch(self, mock_print):
-        """Test main finds extension mismatches."""
-        # Create a ZIP disguised as JPG
-        fake_jpg = self.test_path / "fake.jpg"
-        with zipfile.ZipFile(fake_jpg, "w") as zf:
-            zf.writestr("test.txt", "content")
-
-        args = type(
-            "Args",
-            (),
-            {
-                "directory": self.test_dir,
-                "recursive": False,
-                "dry_run": False,
-                "log_dir": self.test_dir,
-                "check_mismatch": True,
-                "check_encrypted": False,
-                "check_all": False,
-                "extensions": None,
-            },
-        )
-        main(args)
-
-        # Check that issues were found
-        calls = [str(call) for call in mock_print.call_args_list]
-        found_issue = any("issue" in call.lower() or "mismatch" in call.lower() for call in calls)
-        self.assertTrue(found_issue)
-
-    @patch("builtins.print")
-    def test_main_check_all(self, mock_print):
-        """Test main with --check-all flag."""
-        zip_path = self.test_path / "test.zip"
-        with zipfile.ZipFile(zip_path, "w") as zf:
-            zf.writestr("test.txt", "content")
-
-        args = type(
-            "Args",
-            (),
-            {
-                "directory": self.test_dir,
-                "recursive": False,
-                "dry_run": False,
-                "log_dir": self.test_dir,
-                "check_mismatch": False,
-                "check_encrypted": False,
-                "check_all": True,
-                "extensions": None,
-            },
-        )
-        main(args)
-
-        # Should enable both checks
-        self.assertTrue(args.check_mismatch)
-        self.assertTrue(args.check_encrypted)
 
 
 class TestIdentifySkipsTrash(unittest.TestCase):

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Cleanup subcommand for removing junk files from directories."""
 
-import argparse
 import logging
 import os
 import shlex
@@ -21,11 +20,9 @@ from common.cli import (
     LogDirOpt,
     RecursiveOpt,
     TrashDirOpt,
-    add_common_arguments,
 )
 from common.fs_walker import is_excluded_dir
-from common.interrupt import scanning
-from common.logger import log_configuration, setup_logging
+from common.logger import setup_logging
 from common.validation import validate_directory_or_exit
 
 # Default junk file patterns
@@ -53,38 +50,6 @@ JUNK_DIRS: set[str] = {
     ".TemporaryItems",
     ".fseventsd",
 }
-
-
-def add_cleanup_arguments(parser: argparse.ArgumentParser) -> None:
-    """Adds cleanup-specific arguments to the parser.
-
-    Args:
-        parser: ArgumentParser to add arguments to.
-    """
-    add_common_arguments(parser)
-    parser.add_argument(
-        "--include",
-        type=str,
-        action="append",
-        metavar="PATTERN",
-        help="Additional file/directory names to remove (can be used multiple times)",
-    )
-    parser.add_argument(
-        "--list-only",
-        action="store_true",
-        help="Only list junk files without removing them",
-    )
-    parser.add_argument(
-        "--hard-delete",
-        action="store_true",
-        help="Permanently delete instead of moving to .pystou-trash",
-    )
-    parser.add_argument(
-        "--trash-dir",
-        default=None,
-        metavar="PATH",
-        help="Override the trash location (must be on the same filesystem)",
-    )
 
 
 def cleanup_command(
@@ -151,81 +116,6 @@ def cleanup_command(
     verb = "Deleted" if hard_delete else "Quarantined"
     console.success(
         f"{verb} {removed}/{len(junk_items)} item(s)" + (f", skipped {skipped}" if skipped else "")
-    )
-
-
-def main(args: Optional[argparse.Namespace] = None) -> None:
-    """Main entry point for cleanup.
-
-    Args:
-        args: Parsed arguments. If None, parses from command line.
-    """
-    if args is None:
-        parser = argparse.ArgumentParser(description="Cleanup junk files script.")
-        add_cleanup_arguments(parser)
-        args = parser.parse_args()
-
-    setup_logging("cleanup", args.log_dir)
-    log_configuration(args)
-
-    validate_directory_or_exit(args.directory)
-
-    # Build the set of patterns to match
-    junk_files = JUNK_FILES.copy()
-    junk_dirs = JUNK_DIRS.copy()
-    if args.include:
-        for pattern in args.include:
-            junk_files.add(pattern)
-
-    # Find junk files
-    with scanning("scan"):
-        junk_items = find_junk(args.directory, args.recursive, junk_files, junk_dirs)
-
-    if not junk_items:
-        print("No junk files found.")
-        logging.info({"action": "no_junk_found"})
-        return
-
-    print(f"Found {len(junk_items)} junk item(s):")
-    for item in junk_items:
-        print(f"  {item}")
-
-    logging.info(
-        {
-            "action": "junk_found",
-            "count": len(junk_items),
-            "items": [str(i) for i in junk_items],
-        }
-    )
-
-    if args.list_only:
-        print("\n(Use without --list-only to remove)")
-        return
-
-    if args.dry_run:
-        print("\nDry run: would remove the above items")
-        logging.info({"action": "cleanup", "status": "dry_run"})
-        return
-
-    # Remove junk files
-    with scanning("removal"):
-        removed_count, skipped_count = remove_junk(
-            junk_items,
-            args.directory,
-            hard_delete=args.hard_delete,
-            trash_dir=args.trash_dir,
-        )
-
-    print(f"\nRemoved {removed_count}/{len(junk_items)} item(s)")
-    if skipped_count > 0:
-        print(f"Skipped {skipped_count} item(s) due to errors")
-    logging.info(
-        {
-            "action": "cleanup_complete",
-            "removed": removed_count,
-            "skipped": skipped_count,
-            "total": len(junk_items),
-        }
     )
 
 
@@ -380,7 +270,3 @@ def remove_junk(
             )
             skipped += 1
     return removed, skipped
-
-
-if __name__ == "__main__":
-    main()
