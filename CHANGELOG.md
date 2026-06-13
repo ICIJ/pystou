@@ -1,70 +1,162 @@
 # CHANGELOG
 
 
-## v1.0.0 (2026-06-13)
-
-### Breaking Changes
-
-- **dependencies**: PyStou now requires `typer` and `rich`. It is no longer zero-dependency or
-  "pure native Python" — both packages are declared as runtime dependencies and are installed
-  automatically via `pip install pystou`.
-
-- **cli**: The argument parser was rewritten from argparse to [Typer](https://typer.tiangolo.com/).
-  All flags are backward-incompatible:
-  - `dedup`: `-c 1|2|3` / `--default-choice` replaced by `--action delete|merge|skip`.
-  - `extract`: `-c 1|2` / `--default-choice` replaced by `--action extract|skip`; `-dc 1|2` /
-    `--default-delete-choice` replaced by `--remove-archives` / `--keep-archives`; `-N` short flag
-    replaced by `--nested` (long form only).
-  - `identify`: `--check-mismatch`, `--check-encrypted`, `--check-all` replaced by a single
-    repeatable `--check mismatch|encrypted|all` option.
-
-### Features
-
-- **output**: Rich terminal output throughout — formatted tables for stats and trash listings,
-  live progress bars during scanning and extraction, colored status indicators, and styled
-  interactive prompts.
-
-- **global**: `--no-color` flag disables all rich styling (useful for piping and CI).
-
-- **global**: `-q` / `--quiet` flag suppresses progress bars and status messages; only errors
-  are emitted.
-
-- **completion**: Shell tab-completion for bash, zsh, and fish via `pystou --install-completion`
-  (provided by Typer/click).
-
-- **doctor**: New `pystou doctor [--json]` subcommand that checks whether required external tools
-  (`readpst`, `zstd`, `7z`) are installed and reachable on the system `PATH`.
-
-
 ## v0.3.0 (2026-06-13)
 
-### Breaking Changes
+### Bug Fixes
 
-- **quarantine**: `cleanup`, `dedup` (delete/merge), and `extract` source-delete now **quarantine
-  files by default** into a co-located `.pystou-trash/` directory instead of permanently deleting
-  them. Pass `--hard-delete` to restore the previous permanent-delete behavior. `empty` is unaffected
-  (empty directories hold no data).
+- **cli**: Route all chrome to stderr in reused core fns; restore --json purity
+  ([`466234a`](https://github.com/ICIJ/pystou/commit/466234aace973bcdd19589f2bdb587f2d762adbe))
+
+- **cli**: Route shared-module chrome to stderr; complete stdout/stderr split
+  ([`d6f448c`](https://github.com/ICIJ/pystou/commit/d6f448cfd002749d493c7d812cbb70d7844344df))
+
+- **extract**: Clean up reserved output file when decompression fails
+  ([`899339f`](https://github.com/ICIJ/pystou/commit/899339f1cdb21dadd5f0e98605c14a9926689d3c))
+
+- **extract**: Clean up reserved zst output on interrupt or failure
+  ([`7232646`](https://github.com/ICIJ/pystou/commit/723264676d011aa6386bee38ef2b11f3073436aa))
+
+- **extract**: Collapse redundant PST root directory
+  ([`b6840eb`](https://github.com/ICIJ/pystou/commit/b6840eb81dc0e42a720811b7a8200ac820eb748c))
+
+- **extract**: Do not collapse a single symlink entry
+  ([`7af78e6`](https://github.com/ICIJ/pystou/commit/7af78e6bf1be4ca4f7c30ca17e69aed108d73d8d))
+
+- **extract**: Reserve decompressed file outputs atomically (race-free)
+  ([`a644cd7`](https://github.com/ICIJ/pystou/commit/a644cd7c24b88050d239b6fc87a782099ffef3f6))
+
+- **extract**: Reserve PST output dirs atomically (race-free)
+  ([`12fcd85`](https://github.com/ICIJ/pystou/commit/12fcd853b56ff2c5f6a8007ab5e9a844c36e89db))
+
+- **extract**: Return False when PST extraction produced no output
+  ([`af6383d`](https://github.com/ICIJ/pystou/commit/af6383d52ce4827cb7e33c11a6b955dae36992f5))
+
+- **extract**: Roll back collapse on failure so output_dir survives
+  ([`fa618eb`](https://github.com/ICIJ/pystou/commit/fa618eb8ee54307980f1f56cd907735a7cf3bd11))
+
+### Build System
+
+- Add typer + rich deps, bump to 1.0.0
+  ([`a342304`](https://github.com/ICIJ/pystou/commit/a3423047061ce78d41facd6020bf27b89e39974c))
+
+### Chores
+
+- Gitignore .claude/worktrees/
+  ([`62a2844`](https://github.com/ICIJ/pystou/commit/62a2844375fa344bf882184d6a47cb17cac8297b))
+
+- **release**: Quarantine-by-default trash system (0.3.0)
+  ([`9458fb1`](https://github.com/ICIJ/pystou/commit/9458fb1c1e1d1994d6d300fd8e4c9d9da2167881))
+
+### Documentation
+
+- 1.0.0 Typer+rich CLI — README usage, migration table, CHANGELOG
+  ([`c609f4c`](https://github.com/ICIJ/pystou/commit/c609f4cdaa1a53080b454e46f3705316129fe2a7))
 
 ### Features
 
-- **restore**: New `pystou restore [directory] --run <id> | --all | --path <original>` subcommand
-  to move quarantined items back to their original paths (never overwrites an occupied path).
+- **cleanup**: Quarantine junk by default, add --hard-delete/--trash-dir, skip trash
+  ([`0439243`](https://github.com/ICIJ/pystou/commit/04392431f1875d37e1e3609d2d34360c50f44f13))
 
-- **trash**: New `pystou trash list [directory] [--json]` subcommand to display quarantine runs with
-  item counts and reclaimable size.
+- **cleanup**: Typer command + rich output
+  ([`36a17a2`](https://github.com/ICIJ/pystou/commit/36a17a27eaad5edf7058143398dc2c6d93ad37e0))
 
-- **trash**: New `pystou trash purge [directory] [--run <id> | --all] [--older-than DAYS]`
-  subcommand to permanently delete quarantined runs — the only command that truly deletes.
+- **cli**: Add restore and trash subcommands
+  ([`fe55b00`](https://github.com/ICIJ/pystou/commit/fe55b00aa6594c4e1c48ea94e07938d88ffe48e1))
 
-- **quarantine**: `--hard-delete` flag on `cleanup`, `dedup`, and `extract` to skip quarantine and
-  permanently delete immediately (previous default behavior).
+- **cli**: Assemble Typer app, delete argparse/cursor/interrupt scaffolding
+  ([`52fd14a`](https://github.com/ICIJ/pystou/commit/52fd14ad001d9ed4f5ea56cd822245bbd85eaedc))
 
-- **quarantine**: `--trash-dir PATH` flag on `cleanup`, `dedup`, and `extract` (and accepted by
-  `restore` and `trash` list/purge) to relocate the trash directory away from the default
-  `.pystou-trash/` co-located path.
+- **cli**: Shared Annotated Typer option types
+  ([`51f709e`](https://github.com/ICIJ/pystou/commit/51f709e9037c7d2b67d5d088ba28f0e90f52992b))
 
-- **ledger**: Run-scoped write-ahead JSON Lines audit ledger recording every item removed, enabling
-  reliable restore and purge operations.
+- **console**: Rich output facade (stdout data, stderr chrome, pure json)
+  ([`00347b0`](https://github.com/ICIJ/pystou/commit/00347b00380433cbe6cd58fd7408c25997dbcd41))
+
+- **dedup**: Quarantine duplicates by default, add --hard-delete/--trash-dir
+  ([`c14295b`](https://github.com/ICIJ/pystou/commit/c14295ba34189d7029a6ffef1c7c23a155a97ab3))
+
+- **dedup**: Typer command + rich tree/progress/prompt
+  ([`21877e9`](https://github.com/ICIJ/pystou/commit/21877e957bfa808aee36e0f9d514371cbb749cb3))
+
+- **doctor**: Add environment preflight command for required tools
+  ([`ec3891a`](https://github.com/ICIJ/pystou/commit/ec3891ad76e6a68b425ba38cff59c75979893d9f))
+
+- **doctor**: Typer command + rich table, typer.Exit code
+  ([`0d57794`](https://github.com/ICIJ/pystou/commit/0d57794089fd16f4857ed464478224a30fe52876))
+
+- **empty**: Typer command + rich output
+  ([`e275bef`](https://github.com/ICIJ/pystou/commit/e275bef4cd0444c31dfcf53b893cba794919f89d))
+
+- **empty,stats,identify**: Exclude .pystou-trash from directory walks
+  ([`64ff5c9`](https://github.com/ICIJ/pystou/commit/64ff5c91cb797c3239272343fb1c191b823a91ef))
+
+- **errors**: Add CrossDeviceTrashError and TrashUnavailableError
+  ([`8d059c2`](https://github.com/ICIJ/pystou/commit/8d059c222d024e74e1137b1c428a490e2368a0f4))
+
+- **extract**: Add _collapse_redundant_root helper
+  ([`d505732`](https://github.com/ICIJ/pystou/commit/d505732b2d338352b0daddc4d4999412968a582c))
+
+- **extract**: Quarantine source archives by default, add --hard-delete/--trash-dir
+  ([`5206be1`](https://github.com/ICIJ/pystou/commit/5206be15631c6aa73c96faf71af9be3b3a2c3c9d))
+
+- **extract**: Typer command + rich progress
+  ([`35bf6e7`](https://github.com/ICIJ/pystou/commit/35bf6e7e61ce56f7299e69af0257c39ee6b90681))
+
+- **fs_walker**: Add is_excluded_dir and skip .pystou-trash when scanning
+  ([`2d63ffb`](https://github.com/ICIJ/pystou/commit/2d63ffb65c676df3c12c7f1c313495c4a0a6acaa))
+
+- **identify**: Typer command + rich findings table
+  ([`f1fed88`](https://github.com/ICIJ/pystou/commit/f1fed884981fd6357b9800150da7256e250acfda))
+
+- **restore**: Typer command
+  ([`1cd0117`](https://github.com/ICIJ/pystou/commit/1cd0117f835f80d34232f8fd58c9ee5ca0ea1691))
+
+- **safe_ops**: Add atomic make_unique_dir and reserve_unique_file
+  ([`b68ceaf`](https://github.com/ICIJ/pystou/commit/b68ceaf41b04bb7764e7bd75f2b982e7bb50d34c))
+
+- **safe_ops**: Add reserve_unique_name for collision-safe renames
+  ([`d819673`](https://github.com/ICIJ/pystou/commit/d819673aedeefd79c8d3a266e0c9632fc51bfe69))
+
+- **stats**: Typer command + rich tables, pure --json
+  ([`ea30843`](https://github.com/ICIJ/pystou/commit/ea3084324150bd03067cf8cdb907df78a5438348))
+
+- **trash**: Add conflict-safe restore with optional index reconcile
+  ([`5a0737d`](https://github.com/ICIJ/pystou/commit/5a0737dca3e92d4bb08532ddeab1147f54359cc4))
+
+- **trash**: Add list_runs with tolerant ledger reader
+  ([`7ddd932`](https://github.com/ICIJ/pystou/commit/7ddd932bc65584d072ff8fd3c75f0c376606d0f4))
+
+- **trash**: Add purge with run/all/older-than selection
+  ([`4745e96`](https://github.com/ICIJ/pystou/commit/4745e96d321376943738a25275b10a58eeba2bf4))
+
+- **trash**: Add quarantine with write-ahead ledger
+  ([`f298dca`](https://github.com/ICIJ/pystou/commit/f298dcade6482bd2e43015077bead1962ef1ddc4))
+
+- **trash**: Record real invocation in ledger; test restore index reconcile
+  ([`4e6fa20`](https://github.com/ICIJ/pystou/commit/4e6fa2054681c3ad8047b3e320812db248b765cd))
+
+- **trash**: Typer list/purge sub-app, pure --json
+  ([`cdbd0fd`](https://github.com/ICIJ/pystou/commit/cdbd0fdb9f032892f6135016f9d2f2d76b80ced4))
+
+### Refactoring
+
+- **fs_walker**: Emit scan progress via callback, drop self-print
+  ([`4ac4961`](https://github.com/ICIJ/pystou/commit/4ac4961607e30f34f3cb09c2f354848ffa24cb7c))
+
+### Testing
+
+- **extract**: Cover best-effort collapse failure; clarify docstring
+  ([`a3e8c91`](https://github.com/ICIJ/pystou/commit/a3e8c91a3f611731ecf67eca3638e4970f413fef))
+
+- **extract**: Cover collapse rollback end-to-end through extract_pst_archive
+  ([`6106303`](https://github.com/ICIJ/pystou/commit/610630399b977ac7a519bb1327f170b4ddaec730))
+
+- **extract**: Give collapse-failure test real output for the no-output gate
+  ([`e59ff1a`](https://github.com/ICIJ/pystou/commit/e59ff1a1c95a79a19e05aa141c4abfd83a851fd7))
+
+- **trash**: Cover symlink, read-only, and cross-device quarantine paths
+  ([`5d35fd4`](https://github.com/ICIJ/pystou/commit/5d35fd4a0fdceb0123fa8e9c8cfffcef838c8c68))
 
 
 ## v0.2.0 (2026-06-12)
