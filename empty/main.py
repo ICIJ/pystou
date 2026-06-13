@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from common.cli import add_common_arguments
+from common.fs_walker import is_excluded_dir
 from common.interrupt import scanning
 from common.logger import log_configuration, setup_logging
 from common.validation import validate_directory_or_exit
@@ -134,6 +135,11 @@ def find_empty_directories(
             if root_path.is_symlink():
                 continue
 
+            # Skip the trash directory and anything inside it. Bottom-up walks
+            # cannot prune via dirs[:], so guard at the collection point.
+            if any(is_excluded_dir(p) for p in root_path.parts):
+                continue
+
             # Skip hidden directories if not included
             if not include_hidden and root_path.name.startswith("."):
                 continue
@@ -150,6 +156,10 @@ def find_empty_directories(
 
                 if entry.is_dir(follow_symlinks=False):
                     dir_path = Path(entry.path)
+
+                    # Skip the trash directory
+                    if is_excluded_dir(entry.name):
+                        continue
 
                     # Skip hidden directories if not included
                     if not include_hidden and dir_path.name.startswith("."):
