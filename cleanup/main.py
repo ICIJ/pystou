@@ -8,7 +8,9 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+from common import trash
 from common.cli import add_common_arguments
+from common.fs_walker import is_excluded_dir
 from common.interrupt import scanning
 from common.logger import log_configuration, setup_logging
 from common.validation import validate_directory_or_exit
@@ -58,6 +60,17 @@ def add_cleanup_arguments(parser: argparse.ArgumentParser) -> None:
         "--list-only",
         action="store_true",
         help="Only list junk files without removing them",
+    )
+    parser.add_argument(
+        "--hard-delete",
+        action="store_true",
+        help="Permanently delete instead of moving to .pystou-trash",
+    )
+    parser.add_argument(
+        "--trash-dir",
+        default=None,
+        metavar="PATH",
+        help="Override the trash location (must be on the same filesystem)",
     )
 
 
@@ -116,7 +129,12 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
 
     # Remove junk files
     with scanning("removal"):
-        removed_count, skipped_count = remove_junk(junk_items)
+        removed_count, skipped_count = remove_junk(
+            junk_items,
+            args.directory,
+            hard_delete=args.hard_delete,
+            trash_dir=args.trash_dir,
+        )
 
     print(f"\nRemoved {removed_count}/{len(junk_items)} item(s)")
     if skipped_count > 0:
@@ -164,6 +182,9 @@ def find_junk(
 
             # Check for junk directories
             for dir_name in dirs[:]:  # Copy to allow modification
+                if is_excluded_dir(dir_name):
+                    dirs.remove(dir_name)  # Don't descend into excluded dirs
+                    continue
                 dir_path = root_path / dir_name
                 # Skip symlinks to avoid issues
                 if dir_path.is_symlink():
@@ -183,6 +204,9 @@ def find_junk(
     else:
         try:
             for entry in os.scandir(directory_path):
+                # Skip the trash directory and other excluded dirs
+                if entry.is_dir(follow_symlinks=False) and is_excluded_dir(entry.name):
+                    continue
                 # Skip symlinks
                 if entry.is_symlink():
                     continue
@@ -217,77 +241,53 @@ def is_junk_file(filename: str, junk_files: set[str]) -> bool:
     return any(filename.startswith(prefix) for prefix in JUNK_PREFIXES)
 
 
-def remove_junk(junk_items: list[Path]) -> tuple:
-    """Removes junk files and directories.
+def remove_junk(
+    junk_items: list[Path],
+    op_root: str = ".",
+    *,
+    hard_delete: bool = False,
+    trash_dir: Optional[str] = None,
+) -> tuple:
+    """Removes junk items, quarantining by default (hard-delete on request).
 
     Args:
-        junk_items: List of paths to remove.
+        junk_items: Paths to remove.
+        op_root: Directory hosting the trash (the cleanup target dir).
+        hard_delete: If True, permanently delete instead of quarantining.
+        trash_dir: Optional trash location override.
 
     Returns:
         Tuple of (removed_count, skipped_count).
     """
-    removed = 0
-    skipped = 0
-    total = len(junk_items)
+    existing = [item for item in junk_items if item.exists() or item.is_symlink()]
+    skipped = len(junk_items) - len(existing)
 
-    for i, item in enumerate(junk_items, 1):
-        # Progress indicator
-        if total > 10 and i % 10 == 0:
-            print(f"Removing {i}/{total}...", end="\r")
-
+    if not hard_delete:
         try:
-            if not item.exists():
-                # File was already deleted (race condition)
-                logging.warning(
-                    {
-                        "action": "remove_junk",
-                        "status": "already_deleted",
-                        "path": str(item),
-                    }
-                )
-                skipped += 1
-                continue
+            trash.quarantine(
+                existing,
+                op_root,
+                operation="cleanup",
+                command="pystou cleanup",
+                trash_dir=trash_dir,
+            )
+        except (trash.CrossDeviceTrashError, trash.TrashUnavailableError) as e:
+            print(f"Error: {e}")
+            logging.error({"action": "cleanup", "status": "trash_error", "error": str(e)})
+            return 0, len(junk_items)
+        return len(existing), skipped
 
+    removed = 0
+    for item in existing:
+        try:
             if item.is_symlink():
-                # Don't follow symlinks, just remove the link
                 item.unlink()
             elif item.is_dir():
                 shutil.rmtree(item)
             else:
                 item.unlink()
-
             removed += 1
-            logging.info(
-                {
-                    "action": "remove_junk",
-                    "status": "success",
-                    "path": str(item),
-                }
-            )
-
-        except FileNotFoundError:
-            # Race condition: file deleted between check and removal
-            logging.warning(
-                {
-                    "action": "remove_junk",
-                    "status": "not_found",
-                    "path": str(item),
-                }
-            )
-            skipped += 1
-
-        except PermissionError as e:
-            print(f"Permission denied: {item}")
-            logging.error(
-                {
-                    "action": "remove_junk",
-                    "status": "permission_denied",
-                    "path": str(item),
-                    "error": str(e),
-                }
-            )
-            skipped += 1
-
+            logging.info({"action": "remove_junk", "status": "success", "path": str(item)})
         except OSError as e:
             print(f"Error removing {item}: {e}")
             logging.error(
@@ -299,10 +299,6 @@ def remove_junk(junk_items: list[Path]) -> tuple:
                 }
             )
             skipped += 1
-
-    if total > 10:
-        print(f"Removed {removed}/{total} items.    ")  # Clear progress line
-
     return removed, skipped
 
 
