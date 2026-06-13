@@ -13,12 +13,14 @@ import json
 import logging
 import os
 import secrets
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from common.errors import CrossDeviceTrashError, TrashUnavailableError
+from common.indexer import update_index_after_change
 from common.safe_ops import reserve_unique_name
 
 TRASH_DIR_NAME = ".pystou-trash"
@@ -215,3 +217,85 @@ def list_runs(op_root, trash_dir: Optional[str] = None) -> list[TrashRun]:
             )
         )
     return runs
+
+
+def _select_runs(runs, run_id, all_runs):
+    if run_id is not None:
+        return [r for r in runs if r.run_id == run_id]
+    if all_runs:
+        return runs
+    return []
+
+
+def restore(
+    op_root,
+    *,
+    run_id: Optional[str] = None,
+    all_runs: bool = False,
+    original_path: Optional[str] = None,
+    trash_dir: Optional[str] = None,
+    conn=None,
+) -> tuple[int, int]:
+    """Restores quarantined items to their original paths.
+
+    Reserves-or-refuses on conflict: if an original path is re-occupied, the
+    quarantined copy is left in place and counted as a conflict (never clobbered).
+
+    Args:
+        op_root: Operation root that hosts the trash.
+        run_id: Restore only this run.
+        all_runs: Restore every run.
+        original_path: Restore only the item whose original matches this path.
+        trash_dir: Trash root override.
+        conn: Optional sqlite connection; when given, the index is re-populated
+            for restored paths.
+
+    Returns:
+        tuple[int, int]: (restored_count, conflict_count).
+    """
+    root = trash_root(op_root, trash_dir)
+    runs = _select_runs(list_runs(op_root, trash_dir), run_id, all_runs)
+    target = str(Path(original_path).absolute()) if original_path else None
+    restored = conflicted = 0
+    for run in runs:
+        _header, items = _read_ledger(run.ledger_path)
+        for item in items:
+            orig = Path(item["original"])
+            if target is not None and str(orig) != target:
+                continue
+            stored = root / item["stored"]
+            if os.path.lexists(orig):
+                print(f"Conflict: {orig} already exists; leaving quarantined copy")
+                logging.warning({"action": "restore", "status": "conflict", "path": str(orig)})
+                conflicted += 1
+                continue
+            if not os.path.lexists(stored):
+                print(f"Missing in trash: {stored}")
+                logging.warning({"action": "restore", "status": "missing", "stored": str(stored)})
+                conflicted += 1
+                continue
+            orig.parent.mkdir(parents=True, exist_ok=True)
+            os.rename(stored, orig)
+            restored += 1
+            logging.info({"action": "restore", "status": "success", "path": str(orig)})
+            if conn is not None:
+                _reindex_restore(conn, orig, item.get("kind"), item.get("is_symlink"))
+    return restored, conflicted
+
+
+def _reindex_restore(conn, path: Path, kind, is_symlink) -> None:
+    """Re-adds a restored path to the sqlite index (best effort)."""
+    if is_symlink:
+        return  # symlinks are not indexed as dirs/files
+    action = "add_directory" if kind == "dir" else "add_file"
+    try:
+        update_index_after_change(conn, action, path)
+    except sqlite3.Error as e:  # index is a rebuildable cache; never block restore
+        logging.warning(
+            {
+                "action": "reindex_restore",
+                "status": "error",
+                "path": str(path),
+                "error": str(e),
+            }
+        )

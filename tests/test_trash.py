@@ -177,3 +177,62 @@ class TestListRuns(unittest.TestCase):
         runs = trash.list_runs(self.root)
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].item_count, 1)  # partial line ignored
+
+
+class TestRestore(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_round_trip_file(self):
+        victim = Path(self.root) / "a" / "f.txt"
+        victim.parent.mkdir(parents=True)
+        victim.write_text("data")
+        run_id = trash.quarantine(
+            [victim], self.root, operation="cleanup", command="pystou cleanup"
+        )
+        restored, conflicted = trash.restore(self.root, run_id=run_id)
+        self.assertEqual((restored, conflicted), (1, 0))
+        self.assertTrue(victim.is_file())
+        self.assertEqual(victim.read_text(), "data")
+
+    def test_restore_all(self):
+        for name in ("a.txt", "b.txt"):
+            p = Path(self.root) / name
+            p.write_text(name)
+            trash.quarantine([p], self.root, operation="cleanup", command="c")
+        restored, _conflicted = trash.restore(self.root, all_runs=True)
+        self.assertEqual(restored, 2)
+        self.assertTrue((Path(self.root) / "a.txt").is_file())
+        self.assertTrue((Path(self.root) / "b.txt").is_file())
+
+    def test_conflict_is_not_clobbered(self):
+        victim = Path(self.root) / "f.txt"
+        victim.write_text("old")
+        run_id = trash.quarantine([victim], self.root, operation="cleanup", command="c")
+        victim.write_text("new occupant")  # path re-occupied
+        restored, conflicted = trash.restore(self.root, run_id=run_id)
+        self.assertEqual((restored, conflicted), (0, 1))
+        self.assertEqual(victim.read_text(), "new occupant")  # not overwritten
+
+    def test_symlink_restored_as_link(self):
+        target = Path(self.root) / "t.txt"
+        target.write_text("real")
+        link = Path(self.root) / "l.txt"
+        link.symlink_to(target)
+        run_id = trash.quarantine([link], self.root, operation="cleanup", command="c")
+        trash.restore(self.root, run_id=run_id)
+        self.assertTrue(link.is_symlink())
+
+    def test_restore_by_path(self):
+        a = Path(self.root) / "a.txt"
+        b = Path(self.root) / "b.txt"
+        a.write_text("a")
+        b.write_text("b")
+        trash.quarantine([a, b], self.root, operation="cleanup", command="c")
+        restored, _ = trash.restore(self.root, all_runs=True, original_path=str(a))
+        self.assertEqual(restored, 1)
+        self.assertTrue(a.is_file())
+        self.assertFalse(b.exists())  # only a restored
