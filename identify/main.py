@@ -4,14 +4,101 @@
 import argparse
 import logging
 import os
+from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
-from common.cli import add_common_arguments
+import typer
+
+from common import console
+from common.cli import (
+    DbDirOpt,
+    DirectoryArg,
+    LogDirOpt,
+    RecursiveOpt,
+    add_common_arguments,
+)
 from common.fs_walker import is_excluded_dir
 from common.interrupt import scanning
 from common.logger import log_configuration, setup_logging
 from common.validation import validate_directory_or_exit
+
+
+class CheckKind(str, Enum):
+    mismatch = "mismatch"
+    encrypted = "encrypted"
+    all = "all"
+
+
+def identify_command(
+    directory: DirectoryArg = ".",
+    recursive: RecursiveOpt = False,
+    check: Annotated[
+        Optional[list[CheckKind]],
+        typer.Option("--check", help="mismatch|encrypted|all (repeatable)."),
+    ] = None,
+    extensions: Annotated[
+        Optional[str],
+        typer.Option("--extensions", help="Comma-separated extensions to check (e.g. .zip,.pdf)."),
+    ] = None,
+    log_dir: LogDirOpt = ".",
+    db_dir: DbDirOpt = ".",
+) -> None:
+    """Identify file-type mismatches and encrypted archives."""
+    setup_logging("identify", log_dir)
+    logging.info(
+        {
+            "action": "configuration",
+            "command": "identify",
+            "directory": directory,
+            "recursive": recursive,
+            "check": [c.value for c in check] if check else None,
+            "extensions": extensions,
+        }
+    )
+    validate_directory_or_exit(directory)
+
+    # Determine which checks to run; default to all when nothing specified.
+    checks = set(check) if check else {CheckKind.all}
+    run_mismatch = CheckKind.mismatch in checks or CheckKind.all in checks
+    run_encrypted = CheckKind.encrypted in checks or CheckKind.all in checks
+
+    # Parse extensions filter if provided.
+    extensions_filter: Optional[set[str]] = None
+    if extensions:
+        extensions_filter = {
+            ext.strip().lower() if ext.startswith(".") else f".{ext.strip().lower()}"
+            for ext in extensions.split(",")
+        }
+
+    files = collect_files(directory, recursive, extensions_filter)
+    logging.info({"action": "files_found", "count": len(files)})
+
+    issues: list[tuple[Path, str]] = []
+
+    if run_mismatch:
+        issues.extend(check_extension_mismatches(files))
+    if run_encrypted:
+        issues.extend(check_encrypted_archives(files))
+
+    if not issues:
+        console.status("No issues found.")
+        logging.info({"action": "no_issues_found"})
+        return
+
+    t = console.table("Issues", ["Path", "Issue"])
+    for file_path, issue in issues:
+        t.add_row(str(file_path), issue)
+    console.print_table(t)
+
+    logging.info(
+        {
+            "action": "issues_found",
+            "count": len(issues),
+            "issues": [{"path": str(p), "issue": i} for p, i in issues],
+        }
+    )
+
 
 # File signatures (magic bytes) for common file types
 FILE_SIGNATURES: dict[bytes, str] = {
