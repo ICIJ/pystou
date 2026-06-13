@@ -12,6 +12,7 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
   - [Install from PyPI](#install-from-pypi)
   - [Install from source](#install-from-source)
 - [Usage](#usage)
+  - [Global Options](#global-options)
   - [Deduplicate Folders](#deduplicate-folders)
   - [Extract Archives](#extract-archives)
   - [Cleanup Junk Files](#cleanup-junk-files)
@@ -19,6 +20,8 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
   - [Directory Statistics](#directory-statistics)
   - [Empty Directories](#empty-directories)
   - [Restore & Trash](#restore--trash)
+  - [Doctor](#doctor)
+- [Migrating from 0.x](#migrating-from-0x)
 - [Running Tests](#running-tests)
 - [License](#license)
 
@@ -36,7 +39,10 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
 - Reversible deletes by default: cleanup, dedup, and extract quarantine removed items to `.pystou-trash/` — restore them any time with `pystou restore`, or reclaim space with `pystou trash purge`.
 - Choose to interact with each file/archive or set default actions for seamless automation.
 - Keep track of all actions with detailed JSON-formatted logs for easy troubleshooting.
-- Pure native Python scripts ready to run out-of-the-box (except for necessary command-line tools).
+- Rich terminal output: tables, progress bars, colored status indicators, and interactive prompts.
+- Global `--no-color` and `-q/--quiet` flags for scripting and CI pipelines.
+- Shell completion for bash, zsh, and fish via `pystou --install-completion`.
+- `pystou doctor` verifies that all required external tools are installed.
 
 ## Installation
 
@@ -45,10 +51,13 @@ PyStou is published on [PyPI](https://pypi.org/project/pystou/) and installs in 
 ### Prerequisites
 
 - **Python 3.9 or higher** is required.
+- **Python dependencies**: `pip install pystou` automatically installs `typer` and `rich`. PyStou is no longer zero-dependency.
 - **Command-Line Tools** (only needed for the matching archive formats):
   - **`p7zip-full`**: Required for extracting split ZIP archives (`.z01`, `.z02`, etc.).
   - **`pst-utils`**: Required for extracting `.pst` files.
   - **`zstd`**: Required for handling `.zst` files.
+
+  Run `pystou doctor` after installation to verify all external tools are present.
 
 ### Install from PyPI
 
@@ -100,6 +109,34 @@ pystou cleanup --help
 pystou identify --help
 pystou stats --help
 pystou empty --help
+pystou restore --help
+pystou trash --help
+pystou doctor --help
+```
+
+### Global Options
+
+These options apply to every subcommand and must be placed before the subcommand name.
+
+| Flag | Description |
+|------|-------------|
+| `--no-color` | Disable all colored output. Useful for piping or CI environments. |
+| `-q`, `--quiet` | Suppress progress bars and status messages; only errors are shown. |
+| `--version` | Print the installed version and exit. |
+| `--install-completion` | Install shell completion for the current shell (bash, zsh, fish). |
+| `--show-completion` | Print the completion script so you can copy or customize it. |
+
+**Examples:**
+
+```bash
+# Run dedup with no color output
+pystou --no-color dedup /path/to/folder -r
+
+# Run extract quietly (suitable for cron jobs)
+pystou --quiet extract /path/to/archives -r --action extract
+
+# Install shell completion
+pystou --install-completion
 ```
 
 ### Deduplicate Folders
@@ -119,16 +156,13 @@ pystou dedup [directory] [options]
 **Options:**
 
 - `-r`, `--recursive`: Recursively process subdirectories.
-- `-l LEVEL`, `--level LEVEL`: Maximum depth level for recursion (default: unlimited).
-- `-c CHOICE`, `--default-choice CHOICE`: Default action to apply to all duplicate groups.
-  - `1`: Delete duplicates.
-  - `2`: Merge contents and delete duplicates.
-  - `3`: Skip (do nothing).
+- `-l N`, `--level N`: Maximum recursion depth.
+- `--action delete|merge|skip`: Default action to apply to all duplicate groups (omit to prompt per group).
 - `-n`, `--dry-run`: Perform a dry run without making any changes.
 - `--hard-delete`: Permanently delete instead of quarantining (skips `.pystou-trash/`).
 - `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
-- `--log-dir LOG_DIR`: Directory to store log files (default: current directory).
-- `--db-dir DB_DIR`: Directory to store index database (default: current directory).
+- `--log-dir PATH`: Directory to store log files (default: current directory).
+- `--db-dir PATH`: Directory to store index database (default: current directory).
 
 > **Note:** Delete and merge actions quarantine removed items to `.pystou-trash/` by default.
 > Use `pystou restore` to undo, or `pystou trash purge` to reclaim space.
@@ -142,12 +176,18 @@ pystou dedup [directory] [options]
   pystou dedup /path/to/your/folders -r
   ```
 
-  *The script will prompt you for each duplicate group found.*
+  *PyStou will prompt you for each duplicate group found.*
 
-- **Automated Mode with Default Choice (Delete Duplicates):**
+- **Automated Mode — Delete Duplicates:**
 
   ```bash
-  pystou dedup /path/to/your/folders -r -c 1
+  pystou dedup /path/to/your/folders -r --action delete
+  ```
+
+- **Automated Mode — Merge Contents:**
+
+  ```bash
+  pystou dedup /path/to/your/folders -r --action merge
   ```
 
 - **Dry Run Mode:**
@@ -179,22 +219,19 @@ pystou extract [directory] [options]
 **Options:**
 
 - `-r`, `--recursive`: Recursively search subdirectories for archives.
-- `-c CHOICE`, `--default-choice CHOICE`: Default action to apply to all archives.
-  - `1`: Extract archives.
-  - `2`: Skip (do nothing).
-- `-dc DELETE_CHOICE`, `--default-delete-choice DELETE_CHOICE`: Default action when prompted to delete archives after extraction.
-  - `1`: Delete the archive after extraction (quarantined by default, see below).
-  - `2`: Keep the archive after extraction.
-- `-p N`, `--parallel N`: Number of parallel extraction workers (default: 1). Requires `-c` flag.
-- `-N`, `--nested`: Recursively extract archives found inside extracted content.
+- `--action extract|skip`: Default action to apply to all archives (omit to prompt per archive).
+- `--remove-archives` / `--keep-archives`: Remove (quarantine) source archives after successful extraction, or keep them (default: `--keep-archives`).
+- `-p N`, `--parallel N`: Number of parallel extraction workers (default: 1).
+- `--nested`: Recursively extract archives found inside extracted content.
 - `--max-depth N`: Maximum nesting depth for `--nested` (default: 10).
+- `--type T`: Only process archives of this type (repeatable, e.g. `--type zip --type pst`).
 - `-n`, `--dry-run`: Perform a dry run without making any changes.
 - `--hard-delete`: Permanently delete source archives instead of quarantining them.
 - `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
-- `--log-dir LOG_DIR`: Directory to store log files (default: current directory).
-- `--db-dir DB_DIR`: Directory to store index database (default: current directory).
+- `--log-dir PATH`: Directory to store log files (default: current directory).
+- `--db-dir PATH`: Directory to store index database (default: current directory).
 
-> **Note:** Source archives deleted after extraction are quarantined to `.pystou-trash/` by default.
+> **Note:** When `--remove-archives` is passed, removed archives are quarantined to `.pystou-trash/` by default.
 > Use `pystou restore` to recover them, or `pystou trash purge` to reclaim space.
 > Pass `--hard-delete` to permanently delete immediately (old behavior).
 
@@ -206,24 +243,36 @@ pystou extract [directory] [options]
   pystou extract /path/to/archives -r
   ```
 
-  *The script will prompt you for each archive found, asking whether to extract or skip.*
+  *PyStou will prompt you for each archive found.*
 
-- **Automated Mode with Default Choices (Extract and Delete Archives):**
+- **Automated Mode — Extract and Remove Archives:**
 
   ```bash
-  pystou extract /path/to/archives -r -c 1 -dc 1
+  pystou extract /path/to/archives -r --action extract --remove-archives
+  ```
+
+- **Automated Mode — Extract and Keep Archives:**
+
+  ```bash
+  pystou extract /path/to/archives -r --action extract --keep-archives
   ```
 
 - **Parallel Extraction (4 workers):**
 
   ```bash
-  pystou extract /path/to/archives -r -c 1 -dc 2 -p 4
+  pystou extract /path/to/archives -r --action extract --keep-archives -p 4
   ```
 
 - **Nested Extraction (archives inside archives):**
 
   ```bash
-  pystou extract /path/to/archives -r -c 1 -dc 1 --nested
+  pystou extract /path/to/archives -r --action extract --remove-archives --nested
+  ```
+
+- **Filter by archive type:**
+
+  ```bash
+  pystou extract /path/to/archives -r --action extract --type zip --type pst
   ```
 
 - **Dry Run Mode:**
@@ -249,11 +298,13 @@ pystou cleanup [directory] [options]
 **Options:**
 
 - `-r`, `--recursive`: Recursively process subdirectories.
-- `--include PATTERN`: Additional file/directory names to remove (can be used multiple times).
+- `--include NAME`: Additional file/directory names to remove (repeatable).
 - `--list-only`: Only list junk files without removing them.
 - `-n`, `--dry-run`: Perform a dry run without making any changes.
 - `--hard-delete`: Permanently delete junk files instead of quarantining them.
 - `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
+- `--log-dir PATH`: Directory to store log files (default: current directory).
+- `--db-dir PATH`: Directory to store index database (default: current directory).
 
 > **Note:** Junk files are quarantined to `.pystou-trash/` by default rather than permanently deleted.
 > Use `pystou restore` to recover them, or `pystou trash purge` to reclaim space.
@@ -292,29 +343,35 @@ pystou identify [directory] [options]
 **Options:**
 
 - `-r`, `--recursive`: Recursively process subdirectories.
-- `--check-mismatch`: Check for files with mismatched extensions.
-- `--check-encrypted`: Check for encrypted ZIP archives.
-- `--check-all`: Run all checks.
-- `--extensions EXT`: Comma-separated list of extensions to check (e.g., `.zip,.pdf`).
+- `--check mismatch|encrypted|all`: Which check(s) to run (repeatable). Omit to run all checks.
+- `--extensions EXT`: Comma-separated list of extensions to filter on (e.g., `.zip,.pdf`).
+- `--log-dir PATH`: Directory to store log files (default: current directory).
+- `--db-dir PATH`: Directory to store index database (default: current directory).
 
 **Examples:**
 
 - **Find mismatched extensions:**
 
   ```bash
-  pystou identify /path/to/folder -r --check-mismatch
+  pystou identify /path/to/folder -r --check mismatch
   ```
 
 - **Find encrypted archives:**
 
   ```bash
-  pystou identify /path/to/folder -r --check-encrypted
+  pystou identify /path/to/folder -r --check encrypted
   ```
 
-- **Run all checks on specific extensions:**
+- **Run all checks:**
 
   ```bash
-  pystou identify /path/to/folder -r --check-all --extensions ".zip,.pdf,.docx"
+  pystou identify /path/to/folder -r --check all
+  ```
+
+- **Run multiple checks on specific extensions:**
+
+  ```bash
+  pystou identify /path/to/folder -r --check mismatch --check encrypted --extensions ".zip,.pdf,.docx"
   ```
 
 ### Directory Statistics
@@ -419,7 +476,8 @@ pystou restore [directory] [options]
 - `--all`: Restore every quarantined item across all runs.
 - `--path ORIGINAL`: Restore a single item by its original absolute path.
 - `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
-- `-n`, `--dry-run`: Show what would be restored without moving anything.
+- `--log-dir PATH`: Directory to store log files (default: current directory).
+- `--db-dir PATH`: Directory to store index database (default: current directory).
 
 > Restore never overwrites an occupied path. If the original destination already exists, the item is
 > left in the trash and reported as skipped.
@@ -502,7 +560,7 @@ pystou trash purge [directory] [options]
 - `--all`: Permanently delete all quarantine runs.
 - `--older-than DAYS`: Permanently delete runs older than the given number of days.
 - `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
-- `-n`, `--dry-run`: Show what would be deleted without removing anything.
+- `--log-dir PATH`: Directory to store log files (default: current directory).
 
 **Examples:**
 
@@ -523,6 +581,65 @@ pystou trash purge [directory] [options]
   ```bash
   pystou trash purge /path/to/folder --older-than 30
   ```
+
+---
+
+### Doctor
+
+**Purpose:** Check that all required external tools (`readpst`, `zstd`, `7z`) are installed and accessible on your `PATH`.
+
+**Command:**
+
+```bash
+pystou doctor [options]
+```
+
+**Options:**
+
+- `--json`: Output results in JSON format.
+
+**Examples:**
+
+- **Check tool availability:**
+
+  ```bash
+  pystou doctor
+  ```
+
+- **Check as JSON (for scripting):**
+
+  ```bash
+  pystou doctor --json
+  ```
+
+---
+
+## Migrating from 0.x
+
+PyStou 1.0.0 replaces the argparse-based CLI with [Typer](https://typer.tiangolo.com/), resulting in a cleaner, more consistent interface. Several flags changed shape.
+
+### Flag Changes
+
+| Command | 0.x flag | 1.0.0 flag |
+|---------|-----------|------------|
+| `dedup` | `-c 1` | `--action delete` |
+| `dedup` | `-c 2` | `--action merge` |
+| `dedup` | `-c 3` | `--action skip` |
+| `extract` | `-c 1` | `--action extract` |
+| `extract` | `-c 2` | `--action skip` |
+| `extract` | `-dc 1` | `--remove-archives` |
+| `extract` | `-dc 2` | `--keep-archives` |
+| `extract` | `-N` | `--nested` |
+| `identify` | `--check-mismatch` | `--check mismatch` |
+| `identify` | `--check-encrypted` | `--check encrypted` |
+| `identify` | `--check-all` | `--check all` |
+
+### Behavior Notes
+
+- **Quarantine by default**: `cleanup`, `dedup`, and `extract` quarantine removed items to `.pystou-trash/` instead of permanently deleting them. This was introduced in 0.3.0 and is unchanged in 1.0.0. Pass `--hard-delete` to permanently delete immediately (old behavior).
+- **New commands**: `pystou restore` and `pystou trash list/purge` were introduced in 0.3.0 and are fully supported in 1.0.0 with the Typer interface.
+- **New in 1.0.0**: `pystou doctor` checks external tool availability. Use it after installation or in CI.
+- **Shell completion**: Run `pystou --install-completion` to enable tab-completion for your shell.
 
 ---
 
