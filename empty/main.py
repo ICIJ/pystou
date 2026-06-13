@@ -5,13 +5,93 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
-from common.cli import add_common_arguments
+import typer
+
+from common import console
+from common.cli import (
+    DbDirOpt,
+    DirectoryArg,
+    DryRunOpt,
+    LogDirOpt,
+    RecursiveOpt,
+    add_common_arguments,
+)
 from common.fs_walker import is_excluded_dir
 from common.interrupt import scanning
 from common.logger import log_configuration, setup_logging
 from common.validation import validate_directory_or_exit
+
+
+def empty_command(
+    directory: DirectoryArg = ".",
+    recursive: RecursiveOpt = False,
+    list_only: Annotated[
+        bool, typer.Option("--list-only", help="List empty dirs without removing.")
+    ] = False,
+    include_hidden: Annotated[
+        bool, typer.Option("--include-hidden", help="Include hidden directories.")
+    ] = False,
+    dry_run: DryRunOpt = False,
+    log_dir: LogDirOpt = ".",
+    db_dir: DbDirOpt = ".",
+) -> None:
+    """Find and remove empty directories; no quarantine (empty dirs hold no data)."""
+    setup_logging("empty", log_dir)
+    logging.info(
+        {
+            "action": "configuration",
+            "command": "empty",
+            "directory": directory,
+            "recursive": recursive,
+            "list_only": list_only,
+            "include_hidden": include_hidden,
+            "dry_run": dry_run,
+        }
+    )
+    validate_directory_or_exit(directory)
+
+    empty_dirs = find_empty_directories(directory, recursive, include_hidden)
+
+    if not empty_dirs:
+        console.status("No empty directories found.")
+        logging.info({"action": "no_empty_dirs_found"})
+        return
+
+    console.status(f"Found {len(empty_dirs)} empty directory(ies):")
+    for d in empty_dirs:
+        console.status(f"  {d}")
+    logging.info(
+        {
+            "action": "empty_dirs_found",
+            "count": len(empty_dirs),
+            "directories": [str(d) for d in empty_dirs],
+        }
+    )
+
+    if list_only:
+        console.status("(use without --list-only to remove)")
+        return
+
+    if dry_run:
+        console.status("Dry run: would remove the above directories")
+        logging.info({"action": "remove_empty", "status": "dry_run"})
+        return
+
+    removed_count, skipped_count = remove_empty_directories(empty_dirs)
+    console.success(
+        f"Removed {removed_count}/{len(empty_dirs)} directory(ies)"
+        + (f", skipped {skipped_count}" if skipped_count else "")
+    )
+    logging.info(
+        {
+            "action": "remove_empty_complete",
+            "removed": removed_count,
+            "skipped": skipped_count,
+            "total": len(empty_dirs),
+        }
+    )
 
 
 def add_empty_arguments(parser: argparse.ArgumentParser) -> None:
