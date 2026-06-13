@@ -9,6 +9,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
+from common import trash
 from common.cli import add_common_arguments
 from common.fs_walker import collect_directories
 from common.indexer import (
@@ -47,6 +48,17 @@ def add_dedup_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         choices=[1, 2, 3],
         help="Default choice to apply to all groups (1: delete duplicates, 2: merge and delete duplicates, 3: skip)",
+    )
+    parser.add_argument(
+        "--hard-delete",
+        action="store_true",
+        help="Permanently delete instead of moving to .pystou-trash",
+    )
+    parser.add_argument(
+        "--trash-dir",
+        default=None,
+        metavar="PATH",
+        help="Override the trash location (must be on the same filesystem)",
     )
 
 
@@ -145,7 +157,14 @@ def process_group(
                 "group": f"{parent_dir}/{base_name}",
             }
         )
-        delete_duplicates(duplicate_dirs, args.dry_run, conn)
+        delete_duplicates(
+            duplicate_dirs,
+            args.dry_run,
+            conn,
+            args.directory,
+            hard_delete=args.hard_delete,
+            trash_dir=args.trash_dir,
+        )
     elif action == "2":
         logging.info(
             {
@@ -154,7 +173,15 @@ def process_group(
                 "group": f"{parent_dir}/{base_name}",
             }
         )
-        merge_contents(base_dir, duplicate_dirs, args.dry_run, conn)
+        merge_contents(
+            base_dir,
+            duplicate_dirs,
+            args.dry_run,
+            conn,
+            args.directory,
+            hard_delete=args.hard_delete,
+            trash_dir=args.trash_dir,
+        )
     elif action == "3":
         print("Skipping this group.")
         logging.info(
@@ -216,39 +243,83 @@ def prompt_user_action(default_choice: Optional[int]) -> str:
             print("Invalid input. Please enter 1, 2, or 3.")
 
 
-def delete_duplicates(duplicate_dirs: list[Path], dry_run: bool, conn: sqlite3.Connection) -> None:
-    """Deletes the duplicate directories.
+def _remove_or_quarantine_dir(
+    dup_dir: Path,
+    conn: sqlite3.Connection,
+    op_root: str,
+    hard_delete: bool,
+    trash_dir: Optional[str],
+) -> None:
+    """Removes one duplicate dir (quarantine by default, hard-delete on request),
+    then updates the index. Errors are logged, not raised."""
+    try:
+        if hard_delete:
+            print(f"Deleting {dup_dir}")
+            shutil.rmtree(dup_dir)
+        else:
+            print(f"Quarantining {dup_dir}")
+            trash.quarantine(
+                [dup_dir],
+                op_root,
+                operation="dedup",
+                command="pystou dedup",
+                trash_dir=trash_dir,
+            )
+        logging.info({"action": "delete", "status": "success", "directory": str(dup_dir)})
+        update_index_after_change(conn, "delete_directory", dup_dir)
+    except (trash.CrossDeviceTrashError, trash.TrashUnavailableError) as e:
+        print(f"Error: {e}")
+        logging.error(
+            {
+                "action": "delete",
+                "status": "trash_error",
+                "directory": str(dup_dir),
+                "error": str(e),
+            }
+        )
+    except OSError as e:
+        print(f"Error deleting {dup_dir}: {e}")
+        logging.error(
+            {"action": "delete", "status": "error", "directory": str(dup_dir), "error": str(e)}
+        )
+
+
+def delete_duplicates(
+    duplicate_dirs: list[Path],
+    dry_run: bool,
+    conn: sqlite3.Connection,
+    op_root: str = ".",
+    *,
+    hard_delete: bool = False,
+    trash_dir: Optional[str] = None,
+) -> None:
+    """Removes duplicate directories, quarantining by default.
 
     Args:
-        duplicate_dirs (List[Path]): List of duplicate directories to delete.
-        dry_run (bool): Whether to perform a dry run.
-        conn (sqlite3.Connection): SQLite database connection.
+        duplicate_dirs: Directories to remove.
+        dry_run: Whether to perform a dry run.
+        conn: SQLite database connection.
+        op_root: Directory hosting the trash.
+        hard_delete: If True, permanently delete instead of quarantining.
+        trash_dir: Optional trash location override.
     """
     for dup_dir in duplicate_dirs:
         if dry_run:
-            print(f"Dry run: would delete {dup_dir}")
+            print(f"Dry run: would {'delete' if hard_delete else 'quarantine'} {dup_dir}")
             logging.info({"action": "delete", "status": "dry_run", "directory": str(dup_dir)})
-        else:
-            try:
-                print(f"Deleting {dup_dir}")
-                shutil.rmtree(dup_dir)
-                logging.info({"action": "delete", "status": "success", "directory": str(dup_dir)})
-                # Update index
-                update_index_after_change(conn, "delete_directory", dup_dir)
-            except OSError as e:
-                print(f"Error deleting {dup_dir}: {e}")
-                logging.error(
-                    {
-                        "action": "delete",
-                        "status": "error",
-                        "directory": str(dup_dir),
-                        "error": str(e),
-                    }
-                )
+            continue
+        _remove_or_quarantine_dir(dup_dir, conn, op_root, hard_delete, trash_dir)
 
 
 def merge_contents(
-    base_dir: Path, duplicate_dirs: list[Path], dry_run: bool, conn: sqlite3.Connection
+    base_dir: Path,
+    duplicate_dirs: list[Path],
+    dry_run: bool,
+    conn: sqlite3.Connection,
+    op_root: str = ".",
+    *,
+    hard_delete: bool = False,
+    trash_dir: Optional[str] = None,
 ) -> None:
     """Merges duplicate directories into the base, preserving conflicting files.
 
@@ -261,6 +332,9 @@ def merge_contents(
         duplicate_dirs (List[Path]): Duplicate directories to merge.
         dry_run (bool): Whether to perform a dry run.
         conn (sqlite3.Connection): SQLite database connection.
+        op_root (str): Directory hosting the trash.
+        hard_delete (bool): If True, permanently delete instead of quarantining.
+        trash_dir (Optional[str]): Optional trash location override.
     """
     for dup_dir in duplicate_dirs:
         had_conflict = False
@@ -331,21 +405,7 @@ def merge_contents(
             print(f"Dry run: would delete {dup_dir}")
             logging.info({"action": "delete", "status": "dry_run", "directory": str(dup_dir)})
         else:
-            try:
-                print(f"Deleting {dup_dir}")
-                shutil.rmtree(dup_dir)
-                logging.info({"action": "delete", "status": "success", "directory": str(dup_dir)})
-                update_index_after_change(conn, "delete_directory", dup_dir)
-            except OSError as e:
-                print(f"Error deleting {dup_dir}: {e}")
-                logging.error(
-                    {
-                        "action": "delete",
-                        "status": "error",
-                        "directory": str(dup_dir),
-                        "error": str(e),
-                    }
-                )
+            _remove_or_quarantine_dir(dup_dir, conn, op_root, hard_delete, trash_dir)
 
 
 if __name__ == "__main__":
