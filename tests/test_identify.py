@@ -135,6 +135,24 @@ class TestIdentifyExtensionMismatch(unittest.TestCase):
         issues = check_extension_mismatches([unknown])
         self.assertEqual(len(issues), 0)
 
+    def test_ost_with_valid_header_no_mismatch(self):
+        """An .ost file with the shared !BDN header is not a mismatch."""
+        ost = self.test_path / "mailbox.ost"
+        ost.write_bytes(b"\x21\x42\x44\x4e" + b"\x00" * 100)
+
+        issues = check_extension_mismatches([ost])
+        self.assertEqual(len(issues), 0)
+
+    def test_ost_with_wrong_header_is_mismatch(self):
+        """An .ost file whose content is actually a ZIP is flagged."""
+        fake_ost = self.test_path / "fake.ost"
+        with zipfile.ZipFile(fake_ost, "w") as zf:
+            zf.writestr("test.txt", "content")
+
+        issues = check_extension_mismatches([fake_ost])
+        self.assertEqual(len(issues), 1)
+        self.assertIn("mismatch", issues[0][1].lower())
+
 
 class TestIdentifyEncryptedArchives(unittest.TestCase):
     """Tests for encrypted archive detection."""

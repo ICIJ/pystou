@@ -130,6 +130,7 @@ EXTENSION_TYPE_MAP: dict[str, set[str]] = {
     ".rar": {"rar"},
     ".7z": {"7z"},
     ".pst": {"pst"},
+    ".ost": {"pst"},  # OST shares the PST !BDN signature; cannot differ by magic
     ".jpg": {"jpeg"},
     ".jpeg": {"jpeg"},
     ".png": {"png"},
