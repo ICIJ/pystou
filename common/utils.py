@@ -549,8 +549,9 @@ def extract_outlook_archive(archive_path: Path) -> bool:
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
-    action = "extract_ost" if archive_path.suffix.lower() == ".ost" else "extract_pst"
-    label = "OST" if action == "extract_ost" else "PST"
+    is_ost = archive_path.suffix.lower() == ".ost"
+    action = "extract_ost" if is_ost else "extract_pst"
+    label = "OST" if is_ost else "PST"
 
     if shutil.which("readpst") is None:
         print(
