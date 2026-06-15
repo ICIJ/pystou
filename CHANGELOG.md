@@ -12,6 +12,19 @@
 - **identify**: Recognize `.ost` files, which share the PST `!BDN` signature, so a
   valid OST is not reported as a mismatched extension.
 
+- **extract**: Add `--tolerant` for PST/OST extraction. `readpst` can exit non-zero
+  on some files (notably Office 365 `.ost` caches) while still writing most of the
+  mail; `--tolerant` keeps that partial output (with a warning) instead of discarding
+  it. The default stays strict: a non-zero exit removes the partial output and leaves
+  the source archive untouched.
+
+### Bug Fixes
+
+- **extract**: Capture and log `readpst`'s diagnostics and exit code on a non-zero
+  exit. Previously only a generic Python exception string was recorded, making PST/OST
+  failures hard to diagnose; the partial output directory is now also cleaned up on a
+  strict failure.
+
 
 ## v0.3.1 (2026-06-13)
 

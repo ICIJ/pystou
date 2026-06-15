@@ -225,6 +225,7 @@ pystou extract [directory] [options]
 - `--nested`: Recursively extract archives found inside extracted content.
 - `--max-depth N`: Maximum nesting depth for `--nested` (default: 10).
 - `--type T`: Only process archives of this type (repeatable, e.g. `--type zip --type pst`).
+- `--tolerant`: For Outlook `.pst`/`.ost` files, keep the partial output when `readpst` exits with an error but still wrote messages (see the note below). Off by default.
 - `-n`, `--dry-run`: Perform a dry run without making any changes.
 - `--hard-delete`: Permanently delete source archives instead of quarantining them.
 - `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
@@ -234,6 +235,12 @@ pystou extract [directory] [options]
 > **Note:** When `--remove-archives` is passed, removed archives are quarantined to `.pystou-trash/` by default.
 > Use `pystou restore` to recover them, or `pystou trash purge` to reclaim space.
 > Pass `--hard-delete` to permanently delete immediately (old behavior).
+
+> **Outlook PST/OST note:** `readpst` (libpst) sometimes exits with an error on a `.pst`/`.ost` — most
+> often a modern Office 365 `.ost` cache — even when it has already extracted most of the mail. By
+> default PyStou treats this as a failure: the partial output is discarded and the source archive is
+> left in place. Pass `--tolerant` to keep whatever messages `readpst` managed to write (reported with
+> a warning). The recovered mail may be incomplete, so `--tolerant` is opt-in.
 
 **Examples:**
 

@@ -65,6 +65,13 @@ def extract_command(
     types: Annotated[
         Optional[list[str]], typer.Option("--type", help="Only this archive type (repeatable).")
     ] = None,
+    tolerant: Annotated[
+        bool,
+        typer.Option(
+            "--tolerant",
+            help="Keep partial output when readpst exits non-zero on a PST/OST but wrote files.",
+        ),
+    ] = False,
     dry_run: DryRunOpt = False,
     hard_delete: HardDeleteOpt = False,
     trash_dir: TrashDirOpt = None,
@@ -85,6 +92,7 @@ def extract_command(
             "nested": nested,
             "max_depth": max_depth,
             "types": types,
+            "tolerant": tolerant,
             "dry_run": dry_run,
             "hard_delete": hard_delete,
         }
@@ -152,6 +160,7 @@ def extract_command(
             nested=nested,
             max_depth=max_depth,
             types=types,
+            tolerant=tolerant,
             hard_delete=hard_delete,
             trash_dir=trash_dir,
         )
@@ -169,6 +178,7 @@ def extract_command(
                     nested=nested,
                     max_depth=max_depth,
                     types=types,
+                    tolerant=tolerant,
                     hard_delete=hard_delete,
                     trash_dir=trash_dir,
                 )
@@ -188,6 +198,7 @@ def _extract_one(
     nested: bool,
     max_depth: int,
     types: Optional[list[str]],
+    tolerant: bool,
     hard_delete: bool,
     trash_dir: Optional[str],
     depth: int = 0,
@@ -198,7 +209,7 @@ def _extract_one(
         logging.info({"action": "extract", "status": "dry_run", "archive": str(archive)})
         return
 
-    success = extract_archive(archive)
+    success = extract_archive(archive, tolerant=tolerant)
     if not success:
         console.error(f"Failed to extract {archive}")
         logging.error({"action": "extract", "status": "error", "archive": str(archive)})
@@ -215,6 +226,7 @@ def _extract_one(
             remove_archives=remove_archives,
             max_depth=max_depth,
             types=types,
+            tolerant=tolerant,
             hard_delete=hard_delete,
             trash_dir=trash_dir,
             depth=depth + 1,
@@ -242,6 +254,7 @@ def _extract_nested(
     remove_archives: bool,
     max_depth: int,
     types: Optional[list[str]],
+    tolerant: bool,
     hard_delete: bool,
     trash_dir: Optional[str],
     depth: int,
@@ -269,6 +282,7 @@ def _extract_nested(
             nested=True,
             max_depth=max_depth,
             types=types,
+            tolerant=tolerant,
             hard_delete=hard_delete,
             trash_dir=trash_dir,
             depth=depth,
@@ -285,6 +299,7 @@ def _extract_parallel(
     nested: bool,
     max_depth: int,
     types: Optional[list[str]],
+    tolerant: bool,
     hard_delete: bool,
     trash_dir: Optional[str],
 ) -> None:
@@ -300,7 +315,7 @@ def _extract_parallel(
         task = p.add_task("Extracting", total=len(archives))
         with ThreadPoolExecutor(max_workers=workers) as executor:
             future_to_archive = {
-                executor.submit(extract_archive, archive): archive for archive in archives
+                executor.submit(extract_archive, archive, tolerant): archive for archive in archives
             }
             for future in as_completed(future_to_archive):
                 archive = future_to_archive[future]
@@ -338,6 +353,7 @@ def _extract_parallel(
                 remove_archives=remove_archives,
                 max_depth=max_depth,
                 types=types,
+                tolerant=tolerant,
                 hard_delete=hard_delete,
                 trash_dir=trash_dir,
                 depth=1,

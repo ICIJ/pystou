@@ -146,11 +146,14 @@ def get_archive_files(
     return archive_files
 
 
-def extract_archive(archive_path: Path) -> bool:
+def extract_archive(archive_path: Path, tolerant: bool = False) -> bool:
     """Extracts an archive file to its directory.
 
     Args:
         archive_path (Path): The path to the archive file.
+        tolerant (bool): For Outlook (``.pst``/``.ost``) archives, keep partial
+            output when readpst exits non-zero but wrote files. Ignored by other
+            archive formats. Defaults to False.
 
     Returns:
         bool: True if extraction was successful, False otherwise.
@@ -178,7 +181,7 @@ def extract_archive(archive_path: Path) -> bool:
         ):
             return extract_zst_archive(archive_path)
         elif suffixes.endswith(".pst") or suffixes.endswith(".ost"):
-            return extract_outlook_archive(archive_path)
+            return extract_outlook_archive(archive_path, tolerant=tolerant)
         else:
             print(f"Unsupported archive format: {archive_path}", file=sys.stderr)
             logging.error(
@@ -536,18 +539,49 @@ def _collapse_redundant_root(output_dir: Path) -> None:
     wrapper_tmp.rmdir()
 
 
-def extract_outlook_archive(archive_path: Path) -> bool:
+def _has_extracted_files(output_dir: Path) -> bool:
+    """Returns True if ``output_dir`` exists and holds at least one regular file."""
+    return output_dir.is_dir() and any(p.is_file() for p in output_dir.rglob("*"))
+
+
+def _safe_collapse(output_dir: Path, action: str, archive_path: Path) -> None:
+    """Collapses the redundant readpst root, logging (but not raising) on failure."""
+    try:
+        _collapse_redundant_root(output_dir)
+    except OSError as e:
+        logging.warning(
+            {
+                "action": action,
+                "status": "collapse_failed",
+                "archive": str(archive_path),
+                "error": str(e),
+            }
+        )
+
+
+def extract_outlook_archive(archive_path: Path, tolerant: bool = False) -> bool:
     """Extracts an Outlook PST or OST file using readpst into a unique folder.
 
     PST and OST share the same on-disk format, so readpst handles both with the
     same flags. The structured log ``action`` stays distinct per format
     (``extract_pst`` / ``extract_ost``) so logs can be filtered by type.
 
+    ``readpst`` (libpst) is known to exit non-zero on some files — notably modern
+    Office 365 ``.ost`` caches — while still writing a substantially complete mail
+    tree. By default a non-zero exit is treated as a failure: the partial output is
+    removed and the source archive is left untouched. When ``tolerant`` is True, a
+    non-zero exit that nonetheless produced files is kept and reported as success
+    (with a ``partial_extraction`` warning). readpst's own diagnostics and exit code
+    are always captured and logged on a non-zero exit.
+
     Args:
         archive_path (Path): The path to the PST or OST file.
+        tolerant (bool): Keep partial output when readpst exits non-zero but wrote
+            files, instead of discarding it. Defaults to False (strict).
 
     Returns:
-        bool: True if extraction was successful, False otherwise.
+        bool: True if extraction was successful (or partial under ``tolerant``),
+        False otherwise.
     """
     is_ost = archive_path.suffix.lower() == ".ost"
     action = "extract_ost" if is_ost else "extract_pst"
@@ -567,37 +601,14 @@ def extract_outlook_archive(archive_path: Path) -> bool:
         )
         return False
 
+    base_output_dir = archive_path.parent / archive_path.stem
+    unique_output_dir = make_unique_dir(base_output_dir)
+    cmd = ["readpst", "-reD", "-o", str(unique_output_dir), str(archive_path)]
     try:
-        base_output_dir = archive_path.parent / archive_path.stem
-        unique_output_dir = make_unique_dir(base_output_dir)
-        cmd = ["readpst", "-reD", "-o", str(unique_output_dir), str(archive_path)]
-        subprocess.run(cmd, check=True)
-        try:
-            _collapse_redundant_root(unique_output_dir)
-        except OSError as e:
-            logging.warning(
-                {
-                    "action": action,
-                    "status": "collapse_failed",
-                    "archive": str(archive_path),
-                    "error": str(e),
-                }
-            )
-        if not (
-            unique_output_dir.is_dir() and any(p.is_file() for p in unique_output_dir.rglob("*"))
-        ):
-            print(f"{label} extraction produced no output: {archive_path}", file=sys.stderr)
-            logging.warning(
-                {
-                    "action": action,
-                    "status": "no_output",
-                    "archive": str(archive_path),
-                }
-            )
-            return False
-        print(f"Extracted {label} file to {unique_output_dir}", file=sys.stderr)
-        return True
-    except subprocess.CalledProcessError as e:
+        # errors="replace": readpst echoes mail folder names (often non-ASCII) to its
+        # output; never let a stray byte raise UnicodeDecodeError mid-extraction.
+        proc = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
+    except OSError as e:
         print(f"Error extracting {label} file {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
@@ -607,10 +618,68 @@ def extract_outlook_archive(archive_path: Path) -> bool:
                 "error": str(e),
             }
         )
+        shutil.rmtree(unique_output_dir, ignore_errors=True)
         return False
 
+    if proc.returncode != 0:
+        # readpst prints diagnostics to stderr; fall back to stdout. Cap the tail
+        # kept in the log so a chatty run can't bloat the log record.
+        diagnostics = (proc.stderr or "").strip() or (proc.stdout or "").strip()
+        diag_tail = diagnostics[-2000:]
+        if tolerant and _has_extracted_files(unique_output_dir):
+            print(
+                f"{label} extraction completed with errors (readpst exit "
+                f"{proc.returncode}); keeping partial output: {archive_path}",
+                file=sys.stderr,
+            )
+            logging.warning(
+                {
+                    "action": action,
+                    "status": "partial_extraction",
+                    "returncode": proc.returncode,
+                    "archive": str(archive_path),
+                    "output_dir": str(unique_output_dir),
+                    "readpst_output": diag_tail,
+                }
+            )
+            _safe_collapse(unique_output_dir, action, archive_path)
+            return True
 
-def extract_pst_archive(archive_path: Path) -> bool:
+        print(
+            f"Error extracting {label} file {archive_path}: "
+            f"readpst exited with status {proc.returncode}",
+            file=sys.stderr,
+        )
+        if diag_tail:
+            print(diag_tail, file=sys.stderr)
+        logging.error(
+            {
+                "action": action,
+                "status": "error",
+                "returncode": proc.returncode,
+                "archive": str(archive_path),
+                "readpst_output": diag_tail,
+            }
+        )
+        shutil.rmtree(unique_output_dir, ignore_errors=True)
+        return False
+
+    _safe_collapse(unique_output_dir, action, archive_path)
+    if not _has_extracted_files(unique_output_dir):
+        print(f"{label} extraction produced no output: {archive_path}", file=sys.stderr)
+        logging.warning(
+            {
+                "action": action,
+                "status": "no_output",
+                "archive": str(archive_path),
+            }
+        )
+        return False
+    print(f"Extracted {label} file to {unique_output_dir}", file=sys.stderr)
+    return True
+
+
+def extract_pst_archive(archive_path: Path, tolerant: bool = False) -> bool:
     """Backward-compatible alias for :func:`extract_outlook_archive`.
 
     Retained so existing imports/callers keep working. Routes to the shared
@@ -618,11 +687,12 @@ def extract_pst_archive(archive_path: Path) -> bool:
 
     Args:
         archive_path (Path): The path to the PST (or OST) file.
+        tolerant (bool): See :func:`extract_outlook_archive`.
 
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
-    return extract_outlook_archive(archive_path)
+    return extract_outlook_archive(archive_path, tolerant=tolerant)
 
 
 def get_split_archive_parts(archive_path: Path) -> list[Path]:

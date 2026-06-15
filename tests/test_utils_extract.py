@@ -1,5 +1,6 @@
 # tests/test_utils_extract.py
 import shutil
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -449,6 +450,130 @@ class TestGetArchiveFilesOst(unittest.TestCase):
         found = utils.get_archive_files(self.test_dir, recursive=False, filter_types=["ost"])
         self.assertIn(ost, found)
         self.assertNotIn(zip_path, found)
+
+
+class TestExtractOutlookNonZeroExit(unittest.TestCase):
+    """readpst non-zero exit: strict default vs --tolerant partial output."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def _archive(self, name="mailbox.ost"):
+        archive = Path(self.test_dir) / name
+        archive.write_bytes(b"!BDN" + b"\x00" * 100)
+        return archive
+
+    def _fake_readpst(self, returncode, *, with_output, stderr=""):
+        """Returns a subprocess.run replacement mimicking readpst's exit + output."""
+
+        def fake_run(cmd, *args, **kwargs):
+            if with_output:
+                o_dir = Path(cmd[cmd.index("-o") + 1])
+                mail = o_dir / "mailbox" / "Inbox"
+                mail.mkdir(parents=True)
+                (mail / "0001.eml").write_text("from: a@b")
+            return subprocess.CompletedProcess(
+                cmd, returncode, stdout="Processing Folder ...", stderr=stderr
+            )
+
+        return fake_run
+
+    def test_strict_nonzero_exit_returns_false_and_cleans_up(self):
+        from unittest.mock import patch
+
+        archive = self._archive()
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(
+                utils.subprocess, "run", side_effect=self._fake_readpst(11, with_output=True)
+            ),
+        ):
+            result = utils.extract_outlook_archive(archive)  # tolerant defaults False
+
+        self.assertFalse(result)
+        # The partial output directory is removed on a strict failure...
+        self.assertFalse((Path(self.test_dir) / "mailbox").exists())
+        # ...and the source archive is left untouched for the caller to keep.
+        self.assertTrue(archive.exists())
+
+    def test_strict_nonzero_exit_logs_readpst_diagnostics(self):
+        from unittest.mock import patch
+
+        archive = self._archive()
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(
+                utils.subprocess,
+                "run",
+                side_effect=self._fake_readpst(
+                    11, with_output=True, stderr="libpst: pst_decode failed"
+                ),
+            ),
+            self.assertLogs(level="ERROR") as captured,
+        ):
+            utils.extract_outlook_archive(archive)
+
+        joined = "\n".join(captured.output)
+        self.assertIn("libpst: pst_decode failed", joined)
+        self.assertIn("11", joined)
+
+    def test_tolerant_nonzero_exit_keeps_partial_output_and_succeeds(self):
+        from unittest.mock import patch
+
+        archive = self._archive()
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(
+                utils.subprocess, "run", side_effect=self._fake_readpst(11, with_output=True)
+            ),
+            self.assertLogs(level="WARNING") as captured,
+        ):
+            result = utils.extract_outlook_archive(archive, tolerant=True)
+
+        self.assertTrue(result)
+        # Partial output is preserved and the redundant root is still collapsed.
+        out = Path(self.test_dir) / "mailbox"
+        self.assertTrue((out / "Inbox" / "0001.eml").exists())
+        self.assertTrue(any("partial_extraction" in m for m in captured.output))
+
+    def test_tolerant_nonzero_exit_without_output_returns_false(self):
+        from unittest.mock import patch
+
+        archive = self._archive()
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(
+                utils.subprocess, "run", side_effect=self._fake_readpst(11, with_output=False)
+            ),
+        ):
+            result = utils.extract_outlook_archive(archive, tolerant=True)
+
+        self.assertFalse(result)
+        self.assertTrue(archive.exists())
+
+    def test_extract_archive_forwards_tolerant(self):
+        from unittest.mock import patch
+
+        strict = self._archive("strict.ost")
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(
+                utils.subprocess, "run", side_effect=self._fake_readpst(11, with_output=True)
+            ),
+        ):
+            self.assertFalse(utils.extract_archive(strict))  # default strict -> False
+
+        lenient = self._archive("lenient.ost")
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(
+                utils.subprocess, "run", side_effect=self._fake_readpst(11, with_output=True)
+            ),
+        ):
+            self.assertTrue(utils.extract_archive(lenient, tolerant=True))  # forwarded -> True
 
 
 if __name__ == "__main__":

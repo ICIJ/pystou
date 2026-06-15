@@ -92,3 +92,31 @@ class TestExtractCommand(unittest.TestCase):
         self.assertEqual(r.exit_code, 0)
         self.assertTrue(self.zip_path.exists())  # nothing removed
         self.assertEqual(trash.list_runs(self.dir), [])
+
+    def test_tolerant_flag_threads_through(self):
+        from unittest.mock import patch
+
+        calls = {}
+
+        def fake_extract(archive, tolerant=False):
+            calls["tolerant"] = tolerant
+            return True
+
+        with patch("extract.main.extract_archive", side_effect=fake_extract):
+            r = self.runner.invoke(_app(), self._common("--action", "extract", "--tolerant"))
+        self.assertEqual(r.exit_code, 0)
+        self.assertTrue(calls.get("tolerant"))
+
+    def test_default_is_not_tolerant(self):
+        from unittest.mock import patch
+
+        calls = {}
+
+        def fake_extract(archive, tolerant=False):
+            calls["tolerant"] = tolerant
+            return True
+
+        with patch("extract.main.extract_archive", side_effect=fake_extract):
+            r = self.runner.invoke(_app(), self._common("--action", "extract"))
+        self.assertEqual(r.exit_code, 0)
+        self.assertFalse(calls.get("tolerant"))
