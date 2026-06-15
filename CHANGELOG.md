@@ -1,35 +1,44 @@
 # CHANGELOG
 
 
-## [Unreleased]
-
-### Features
-
-- **extract**: Extract Microsoft Outlook `.ost` files via `readpst`. OST shares the
-  PST on-disk format, so extraction reuses the shared `extract_outlook_archive`
-  path; `.ost` files are now discovered and filterable with `--type ost`.
-
-- **identify**: Recognize `.ost` files, which share the PST `!BDN` signature, so a
-  valid OST is not reported as a mismatched extension.
-
-- **extract**: Add `--tolerant` for PST/OST extraction. `readpst` can exit non-zero
-  on some files (notably Office 365 `.ost` caches) while still writing most of the
-  mail; `--tolerant` keeps that partial output (with a warning) instead of discarding
-  it. The default stays strict: a non-zero exit removes the partial output and leaves
-  the source archive untouched.
+## v0.4.0 (2026-06-15)
 
 ### Bug Fixes
 
-- **packaging**: Include the `doctor` package in the built wheel. It was missing from
-  the wheel's package list, so installed builds (e.g. via pipx/pip) crashed on startup
-  with `ModuleNotFoundError: No module named 'doctor'`.
+- **extract**: Handle readpst non-zero exits on PST/OST with --tolerant
+  ([`4df808f`](https://github.com/ICIJ/pystou/commit/4df808f3b3fdfc2f2f660377ba8c1323e29cefdc))
 
-- **extract**: Capture and log `readpst`'s diagnostics and exit code on a non-zero
-  exit. Previously only a generic Python exception string was recorded, making PST/OST
-  failures hard to diagnose; the partial output directory is now also cleaned up on a
-  strict failure.
+- **packaging**: Include doctor package in the wheel
+  ([`9636053`](https://github.com/ICIJ/pystou/commit/963605378b5e1c4f55d65ea05a7c0b4103ebaeb7))
 
-- **doctor**: Report that `readpst` enables both `.pst` and `.ost` archives.
+### Code Style
+
+- **extract**: Unwrap readpst message to satisfy ruff format
+  ([`a7b46d0`](https://github.com/ICIJ/pystou/commit/a7b46d0495f64a128ebb9ec357c843cf9acd9822))
+
+### Documentation
+
+- Align CHANGELOG OST entry with conventional-changelog style
+  ([`608fa2e`](https://github.com/ICIJ/pystou/commit/608fa2ea20bcd3c601d9498c2688d483247c1f19))
+
+- Document OST file support
+  ([`6352c41`](https://github.com/ICIJ/pystou/commit/6352c419d4e0ad51536dcc9f1ba4907eed6f27bf))
+
+### Features
+
+- **extract**: Discover .ost files and support --type ost
+  ([`277df01`](https://github.com/ICIJ/pystou/commit/277df01ca05b33ddfb88713cee980309c45a01d7))
+
+- **extract**: Extract OST files via readpst (shared Outlook extractor)
+  ([`022a7a1`](https://github.com/ICIJ/pystou/commit/022a7a12d4787b710c77396a01bd2c6513d91f71))
+
+- **identify**: Recognize .ost files (shared PST signature)
+  ([`cc8f677`](https://github.com/ICIJ/pystou/commit/cc8f677e6388428b0597ddcb30ae8338966e4218))
+
+### Refactoring
+
+- **extract**: Derive action and label from suffix directly
+  ([`1896ce3`](https://github.com/ICIJ/pystou/commit/1896ce3dd21ebf2c0dd9998c1bbcbc2a1e7718a3))
 
 
 ## v0.3.1 (2026-06-13)
