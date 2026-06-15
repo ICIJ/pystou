@@ -20,10 +20,16 @@
 
 ### Bug Fixes
 
+- **packaging**: Include the `doctor` package in the built wheel. It was missing from
+  the wheel's package list, so installed builds (e.g. via pipx/pip) crashed on startup
+  with `ModuleNotFoundError: No module named 'doctor'`.
+
 - **extract**: Capture and log `readpst`'s diagnostics and exit code on a non-zero
   exit. Previously only a generic Python exception string was recorded, making PST/OST
   failures hard to diagnose; the partial output directory is now also cleaned up on a
   strict failure.
+
+- **doctor**: Report that `readpst` enables both `.pst` and `.ost` archives.
 
 
 ## v0.3.1 (2026-06-13)

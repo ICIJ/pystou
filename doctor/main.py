@@ -99,14 +99,14 @@ def check_environment() -> list[ToolStatus]:
     """
     statuses: list[ToolStatus] = []
 
-    # readpst — PST archives
+    # readpst — Outlook PST/OST archives
     readpst_available = shutil.which("readpst") is not None
     statuses.append(
         ToolStatus(
             name="readpst",
             available=readpst_available,
             version=_tool_version("readpst") if readpst_available else None,
-            enables="PST archives (.pst)",
+            enables="Outlook archives (.pst, .ost)",
             install_hint="Install pst-utils (apt install pst-utils / brew install libpst).",
         )
     )

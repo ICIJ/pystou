@@ -41,6 +41,7 @@ packages = [
     "cleanup",
     "common",
     "dedup_folders",
+    "doctor",
     "empty",
     "extract",
     "identify",
