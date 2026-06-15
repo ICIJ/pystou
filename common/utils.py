@@ -554,8 +554,7 @@ def extract_outlook_archive(archive_path: Path) -> bool:
 
     if shutil.which("readpst") is None:
         print(
-            "readpst command not found. Please install readpst to extract "
-            ".pst and .ost files.",
+            "readpst command not found. Please install readpst to extract .pst and .ost files.",
             file=sys.stderr,
         )
         logging.error(
