@@ -357,6 +357,75 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
         # ...with no stray .tmp wrapper left behind.
         self.assertFalse((archive.parent / "555555.tmp").exists())
 
+    def test_ost_routes_through_outlook_extractor(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "mailbox.ost"
+        archive.write_bytes(b"!BDN" + b"\x00" * 100)
+        seen = {}
+
+        def fake_run(cmd, *args, **kwargs):
+            seen["cmd"] = cmd
+            o_dir = Path(cmd[cmd.index("-o") + 1])
+            mail = o_dir / "mailbox" / "Inbox"
+            mail.mkdir(parents=True)
+            (mail / "0001.eml").write_text("from: a@b")
+
+            class _R:
+                returncode = 0
+
+            return _R()
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(utils.subprocess, "run", side_effect=fake_run),
+        ):
+            result = utils.extract_archive(archive)
+
+        self.assertTrue(result)
+        self.assertEqual(seen["cmd"][:2], ["readpst", "-reD"])
+        self.assertTrue((archive.parent / "mailbox" / "Inbox" / "0001.eml").exists())
+
+    def test_ost_missing_readpst_logs_extract_ost_action(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "mailbox.ost"
+        archive.write_bytes(b"!BDN" + b"\x00" * 100)
+
+        with (
+            patch.object(utils.shutil, "which", return_value=None),
+            self.assertLogs(level="ERROR") as captured,
+        ):
+            result = utils.extract_outlook_archive(archive)
+
+        self.assertFalse(result)
+        self.assertTrue(any("extract_ost" in msg for msg in captured.output))
+
+    def test_pst_alias_still_works(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "555555.pst"
+        archive.write_bytes(b"!BDN" + b"\x00" * 100)
+
+        def fake_run(cmd, *args, **kwargs):
+            o_dir = Path(cmd[cmd.index("-o") + 1])
+            mail = o_dir / "555555" / "Inbox"
+            mail.mkdir(parents=True)
+            (mail / "0001.eml").write_text("from: a@b")
+
+            class _R:
+                returncode = 0
+
+            return _R()
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(utils.subprocess, "run", side_effect=fake_run),
+        ):
+            result = utils.extract_pst_archive(archive)
+
+        self.assertTrue(result)
+
 
 if __name__ == "__main__":
     unittest.main()

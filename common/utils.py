@@ -176,8 +176,8 @@ def extract_archive(archive_path: Path) -> bool:
             suffixes.endswith(".tar.zst") or suffixes.endswith(".tzst") or suffixes.endswith(".zst")
         ):
             return extract_zst_archive(archive_path)
-        elif suffixes.endswith(".pst"):
-            return extract_pst_archive(archive_path)
+        elif suffixes.endswith(".pst") or suffixes.endswith(".ost"):
+            return extract_outlook_archive(archive_path)
         else:
             print(f"Unsupported archive format: {archive_path}", file=sys.stderr)
             logging.error(
@@ -535,23 +535,31 @@ def _collapse_redundant_root(output_dir: Path) -> None:
     wrapper_tmp.rmdir()
 
 
-def extract_pst_archive(archive_path: Path) -> bool:
-    """Extracts a PST file using readpst, ensuring the output is in a unique folder.
+def extract_outlook_archive(archive_path: Path) -> bool:
+    """Extracts an Outlook PST or OST file using readpst into a unique folder.
+
+    PST and OST share the same on-disk format, so readpst handles both with the
+    same flags. The structured log ``action`` stays distinct per format
+    (``extract_pst`` / ``extract_ost``) so logs can be filtered by type.
 
     Args:
-        archive_path (Path): The path to the PST file.
+        archive_path (Path): The path to the PST or OST file.
 
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
+    action = "extract_ost" if archive_path.suffix.lower() == ".ost" else "extract_pst"
+    label = "OST" if action == "extract_ost" else "PST"
+
     if shutil.which("readpst") is None:
         print(
-            "readpst command not found. Please install readpst to extract .pst files.",
+            "readpst command not found. Please install readpst to extract "
+            ".pst and .ost files.",
             file=sys.stderr,
         )
         logging.error(
             {
-                "action": "extract_pst",
+                "action": action,
                 "status": "missing_dependency",
                 "archive": str(archive_path),
             }
@@ -568,7 +576,7 @@ def extract_pst_archive(archive_path: Path) -> bool:
         except OSError as e:
             logging.warning(
                 {
-                    "action": "extract_pst",
+                    "action": action,
                     "status": "collapse_failed",
                     "archive": str(archive_path),
                     "error": str(e),
@@ -577,28 +585,43 @@ def extract_pst_archive(archive_path: Path) -> bool:
         if not (
             unique_output_dir.is_dir() and any(p.is_file() for p in unique_output_dir.rglob("*"))
         ):
-            print(f"PST extraction produced no output: {archive_path}", file=sys.stderr)
+            print(f"{label} extraction produced no output: {archive_path}", file=sys.stderr)
             logging.warning(
                 {
-                    "action": "extract_pst",
+                    "action": action,
                     "status": "no_output",
                     "archive": str(archive_path),
                 }
             )
             return False
-        print(f"Extracted PST file to {unique_output_dir}", file=sys.stderr)
+        print(f"Extracted {label} file to {unique_output_dir}", file=sys.stderr)
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Error extracting PST file {archive_path}: {e}", file=sys.stderr)
+        print(f"Error extracting {label} file {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
-                "action": "extract_pst",
+                "action": action,
                 "status": "error",
                 "archive": str(archive_path),
                 "error": str(e),
             }
         )
         return False
+
+
+def extract_pst_archive(archive_path: Path) -> bool:
+    """Backward-compatible alias for :func:`extract_outlook_archive`.
+
+    Retained so existing imports/callers keep working. Routes to the shared
+    Outlook extractor.
+
+    Args:
+        archive_path (Path): The path to the PST (or OST) file.
+
+    Returns:
+        bool: True if extraction was successful, False otherwise.
+    """
+    return extract_outlook_archive(archive_path)
 
 
 def get_split_archive_parts(archive_path: Path) -> list[Path]:
