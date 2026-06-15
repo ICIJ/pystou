@@ -1,6 +1,13 @@
 # CHANGELOG
 
 
+## [Unreleased]
+
+### Added
+
+- `extract` and `identify` now support Microsoft Outlook `.ost` files. OST shares the PST on-disk format, so extraction reuses `readpst` (the shared `extract_outlook_archive` path) and `identify` recognizes the shared `!BDN` signature.
+
+
 ## v0.3.1 (2026-06-13)
 
 ### Bug Fixes

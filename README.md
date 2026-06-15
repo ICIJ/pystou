@@ -28,7 +28,7 @@ Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy
 ## Features
 
 - Automatically identify and manage duplicate directories, ensuring you only keep what you need.
-- Effortlessly extract a wide range of archive formats, including `.zip`, `.tar.gz`, `.zst`, and `.pst`.
+- Effortlessly extract a wide range of archive formats, including `.zip`, `.tar.gz`, `.zst`, `.pst`, and `.ost`.
 - Support for split ZIP archives (`.z01`, `.z02`, etc.) with automatic detection.
 - Nested archive extraction for archives containing other archives.
 - Parallel archive extraction for faster processing of multiple archives.
@@ -54,7 +54,7 @@ PyStou is published on [PyPI](https://pypi.org/project/pystou/) and installs in 
 - **Python dependencies**: `pip install pystou` automatically installs `typer` and `rich`. PyStou is no longer zero-dependency.
 - **Command-Line Tools** (only needed for the matching archive formats):
   - **`p7zip-full`**: Required for extracting split ZIP archives (`.z01`, `.z02`, etc.).
-  - **`pst-utils`**: Required for extracting `.pst` files.
+  - **`pst-utils`**: Required for extracting Outlook `.pst` and `.ost` files (both use `readpst`).
   - **`zstd`**: Required for handling `.zst` files.
 
   Run `pystou doctor` after installation to verify all external tools are present.
@@ -203,7 +203,7 @@ pystou dedup [directory] [options]
 **Supported Formats:**
 - Standard: `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz`, `.gz`, `.bz2`
 - Zstandard: `.zst`, `.tar.zst`, `.tzst`
-- Outlook: `.pst`
+- Outlook: `.pst`, `.ost`
 - Split ZIP: `.z01`, `.z02`, ... (automatically detected with main `.zip` file)
 
 **Command:**
