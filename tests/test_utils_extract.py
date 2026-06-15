@@ -427,5 +427,29 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
         self.assertTrue(result)
 
 
+class TestGetArchiveFilesOst(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_ost_is_discovered(self):
+        ost = Path(self.test_dir) / "mailbox.ost"
+        ost.write_bytes(b"!BDN")
+        found = utils.get_archive_files(self.test_dir, recursive=False)
+        self.assertIn(ost, found)
+
+    def test_type_filter_ost_includes_only_ost(self):
+        ost = Path(self.test_dir) / "mailbox.ost"
+        ost.write_bytes(b"!BDN")
+        zip_path = Path(self.test_dir) / "data.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("a.txt", "x")
+        found = utils.get_archive_files(self.test_dir, recursive=False, filter_types=["ost"])
+        self.assertIn(ost, found)
+        self.assertNotIn(zip_path, found)
+
+
 if __name__ == "__main__":
     unittest.main()

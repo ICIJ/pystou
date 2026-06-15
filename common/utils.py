@@ -112,6 +112,7 @@ def get_archive_files(
         ".tzst",
         ".zst",
         ".pst",
+        ".ost",
     ]
 
     if filter_types:
