@@ -24,7 +24,7 @@ from common.cli import (
     RecursiveOpt,
     TrashDirOpt,
 )
-from common.fs_walker import collect_directories
+from common.fs_walker import ScanContext, collect_directories, scan_tree
 from common.indexer import (
     close_database,
     index_has_data,
@@ -327,6 +327,7 @@ def merge_contents(
                 else:
                     try:
                         console.status(f"Moving {src} to {dst}")
+                        src_is_dir = src.is_dir()
                         shutil.move(str(src), str(dst))
                         logging.info(
                             {
@@ -336,8 +337,13 @@ def merge_contents(
                                 "destination": str(dst),
                             }
                         )
-                        update_index_after_change(conn, "delete_file", src)
-                        update_index_after_change(conn, "add_file", dst)
+                        if src_is_dir:
+                            update_index_after_change(conn, "delete_directory", src)
+                            update_index_after_change(conn, "add_directory", dst)
+                            scan_tree(dst, conn, recursive=True, level=None, ctx=ScanContext())
+                        else:
+                            update_index_after_change(conn, "delete_file", src)
+                            update_index_after_change(conn, "add_file", dst)
                     except OSError as e:
                         had_conflict = True  # keep the dir; the file did not move
                         console.error(f"Error moving {src} to {dst}: {e}")
