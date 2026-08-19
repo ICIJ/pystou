@@ -89,9 +89,8 @@ def quarantine(
     operation: str,
     command: str,
     trash_dir: Optional[str] = None,
-    dry_run: bool = False,
 ) -> str:
-    """Moves ``items`` into the trash, returning the run id ('' on dry run).
+    """Moves ``items`` into the trash, returning the run id ('' when nothing moved).
 
     Args:
         items: Iterable of file/dir paths to quarantine.
@@ -99,10 +98,9 @@ def quarantine(
         operation: Originating command name (e.g. 'cleanup').
         command: Reconstructed command line, recorded in the ledger header.
         trash_dir: Optional override for the trash root location.
-        dry_run: If True, print intentions and move nothing.
 
     Returns:
-        str: The run id, or '' when ``dry_run`` is True or ``items`` is empty.
+        str: The run id, or '' when ``items`` is empty.
 
     Raises:
         TrashUnavailableError: The trash root cannot be created.
@@ -111,11 +109,6 @@ def quarantine(
     items = [Path(p) for p in items]
     if not items:
         return ""
-    if dry_run:
-        for it in items:
-            print(f"Dry run: would quarantine {it}", file=sys.stderr)
-        return ""
-
     root = _ensure_trash_root(op_root, trash_dir)
     kept = []
     for it in items:

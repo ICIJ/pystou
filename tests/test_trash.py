@@ -91,15 +91,6 @@ class TestQuarantineHappyPath(unittest.TestCase):
         stored = Path(self.root) / ".pystou-trash" / items[0]["stored"]
         self.assertTrue((stored / "inner" / "f.txt").is_file())
 
-    def test_dry_run_moves_nothing(self):
-        victim = self._make_file("a/report.pdf")
-        run_id = trash.quarantine(
-            [victim], self.root, operation="cleanup", command="pystou cleanup", dry_run=True
-        )
-        self.assertEqual(run_id, "")
-        self.assertTrue(victim.exists())
-        self.assertFalse((Path(self.root) / ".pystou-trash").exists())
-
 
 class TestQuarantineEdgeCases(unittest.TestCase):
     def setUp(self):
