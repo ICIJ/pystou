@@ -1,6 +1,6 @@
 .PHONY: help test coverage lint format typecheck clean install build publish release-dry _check-uv
 
-SRC := cleanup common dedup_folders empty extract identify pystou stats
+SRC := $(filter-out tests,$(patsubst %/__init__.py,%,$(wildcard */__init__.py)))
 
 help:
 	@echo "pystou - Python scripts for deduplicating folders and unarchiving files"
