@@ -1,11 +1,10 @@
 # tests/test_indexer.py
 import os
 import shutil
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-
-import sqlite3
 
 from common.errors import PystouError
 from common.indexer import (
@@ -154,8 +153,10 @@ class TestLegacyIndexRetrofit(unittest.TestCase):
             " size INTEGER, mtime REAL)"
         )
         for _ in range(3):
-            legacy.execute("INSERT INTO files (directory_path, name, size, mtime)"
-                           " VALUES ('/a', 'f.txt', 10, 0)")
+            legacy.execute(
+                "INSERT INTO files (directory_path, name, size, mtime)"
+                " VALUES ('/a', 'f.txt', 10, 0)"
+            )
         legacy.commit()
         legacy.close()
 
@@ -167,8 +168,10 @@ class TestLegacyIndexRetrofit(unittest.TestCase):
         try:
             self.assertEqual(get_directory_size(conn, Path("/a")), (10, 1))
             with self.assertRaises(sqlite3.IntegrityError):
-                conn.execute("INSERT INTO files (directory_path, name, size, mtime)"
-                             " VALUES ('/a', 'f.txt', 10, 0)")
+                conn.execute(
+                    "INSERT INTO files (directory_path, name, size, mtime)"
+                    " VALUES ('/a', 'f.txt', 10, 0)"
+                )
         finally:
             close_database(conn)
 
