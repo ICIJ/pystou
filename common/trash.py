@@ -228,6 +228,12 @@ def list_runs(op_root, trash_dir: Optional[str] = None) -> list[TrashRun]:
     return runs
 
 
+def _inside(root, path: Path) -> bool:
+    """True when ``path`` sits under ``root`` (symlinks in the prefix resolved)."""
+    resolved = Path(os.path.realpath(path.parent)) / path.name
+    return Path(os.path.realpath(root)) in resolved.parents
+
+
 def _select_runs(runs, run_id, all_runs):
     if run_id is not None:
         return [r for r in runs if r.run_id == run_id]
@@ -273,6 +279,18 @@ def restore(
             if target is not None and str(orig) != target:
                 continue
             stored = root / item["stored"]
+            if not _inside(root, stored) or not _inside(run.op_root or op_root, orig):
+                print(f"Refusing unsafe ledger entry for {orig}", file=sys.stderr)
+                logging.warning(
+                    {
+                        "action": "restore",
+                        "status": "unsafe",
+                        "stored": str(stored),
+                        "original": str(orig),
+                    }
+                )
+                conflicted += 1
+                continue
             if os.path.lexists(orig):
                 print(
                     f"Conflict: {orig} already exists; leaving quarantined copy",
