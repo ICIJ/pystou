@@ -288,23 +288,27 @@ def _resolve_current_path(path: str, moves: list[tuple[str, str]]) -> str:
 
     A descendant's recorded path is expressed using its ancestor's *old*
     name, since the ancestor had not been renamed yet when the descendant
-    was. A real undo self-corrects: renaming the ancestor back physically
-    moves the descendant along with it. A dry run changes nothing on disk,
-    so this substitutes the ancestor's actual current (``new``) name in its
-    place instead.
+    was. With two or more renamed levels above it, a descendant's path needs
+    every one of those ancestors' substitutions applied, not just the first
+    that matches. A real undo self-corrects: renaming each ancestor back
+    physically moves the descendant along with it. A dry run changes nothing
+    on disk, so this substitutes every ancestor's actual current (``new``)
+    name in turn instead.
 
     Args:
         path: A recorded ``new`` path, decoded.
         moves: ``(old, new)`` pairs for every entry in the manifest, deepest
-            first, the order in which substitutions must be tried.
+            first: the order their substitutions must be applied in, since a
+            child's own prefix has to give way before its parent's does.
 
     Returns:
         str: The path as it actually exists on disk right now.
     """
     for old_prefix, new_prefix in moves:
         if path == old_prefix:
-            return new_prefix
-        prefixed = old_prefix + os.sep
-        if path.startswith(prefixed):
-            return new_prefix + os.sep + path[len(prefixed) :]
+            path = new_prefix
+        else:
+            prefixed = old_prefix + os.sep
+            if path.startswith(prefixed):
+                path = new_prefix + os.sep + path[len(prefixed) :]
     return path
