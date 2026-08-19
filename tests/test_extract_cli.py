@@ -48,7 +48,7 @@ class TestExtractCommand(unittest.TestCase):
     def test_extract_only_keeps_archive_by_default(self):
         r = self.runner.invoke(_app(), self._common("--action", "extract"))
         self.assertEqual(r.exit_code, 0)
-        self.assertTrue((Path(self.dir) / "inner.txt").is_file())
+        self.assertTrue((Path(self.dir) / "a" / "inner.txt").is_file())
         self.assertTrue(self.zip_path.exists())  # default keep
         self.assertEqual(trash.list_runs(self.dir), [])
 
@@ -65,7 +65,7 @@ class TestExtractCommand(unittest.TestCase):
     def test_remove_archives_quarantines(self):
         r = self.runner.invoke(_app(), self._common("--action", "extract", "--remove-archives"))
         self.assertEqual(r.exit_code, 0)
-        self.assertTrue((Path(self.dir) / "inner.txt").is_file())
+        self.assertTrue((Path(self.dir) / "a" / "inner.txt").is_file())
         self.assertFalse(self.zip_path.exists())
         self.assertEqual(len(trash.list_runs(self.dir)), 1)
 
@@ -82,7 +82,7 @@ class TestExtractCommand(unittest.TestCase):
         r = self.runner.invoke(_app(), self._common("--action", "skip"))
         self.assertEqual(r.exit_code, 0)
         self.assertTrue(self.zip_path.exists())
-        self.assertFalse((Path(self.dir) / "inner.txt").exists())
+        self.assertFalse((Path(self.dir) / "a" / "inner.txt").exists())
         self.assertEqual(trash.list_runs(self.dir), [])
 
     def test_dry_run(self):

@@ -200,6 +200,10 @@ pystou dedup [directory] [options]
 
 **Purpose:** Extract various archive formats efficiently and manage them post-extraction.
 
+**Output layout:** each archive is extracted into its own directory next to it, named after the
+archive (`photos.zip` -> `photos/`, `backup.tar.gz` -> `backup/`). If that name is taken, a numbered
+one is used instead (`photos (1)/`), so extracting never overwrites existing files.
+
 **Supported Formats:**
 - Standard: `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz`, `.gz`, `.bz2`
 - Zstandard: `.zst`, `.tar.zst`, `.tzst`
