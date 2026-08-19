@@ -305,13 +305,12 @@ pystou cleanup [directory] [options]
 **Options:**
 
 - `-r`, `--recursive`: Recursively process subdirectories.
-- `--include NAME`: Additional file/directory names to remove (repeatable).
+- `--include NAME`: Additional exact file/directory names to remove (repeatable).
 - `--list-only`: Only list junk files without removing them.
 - `-n`, `--dry-run`: Perform a dry run without making any changes.
 - `--hard-delete`: Permanently delete junk files instead of quarantining them.
 - `--trash-dir PATH`: Use a custom trash directory instead of the default `.pystou-trash/` co-located with the target.
 - `--log-dir PATH`: Directory to store log files (default: current directory).
-- `--db-dir PATH`: Directory to store index database (default: current directory).
 
 > **Note:** Junk files are quarantined to `.pystou-trash/` by default rather than permanently deleted.
 > Use `pystou restore` to recover them, or `pystou trash purge` to reclaim space.
@@ -331,10 +330,10 @@ pystou cleanup [directory] [options]
   pystou cleanup /path/to/folder -r
   ```
 
-- **Remove additional patterns:**
+- **Remove additional names:**
 
   ```bash
-  pystou cleanup /path/to/folder -r --include ".gitkeep" --include "*.bak"
+  pystou cleanup /path/to/folder -r --include ".gitkeep" --include ".keep"
   ```
 
 ### Identify File Types
@@ -353,7 +352,6 @@ pystou identify [directory] [options]
 - `--check mismatch|encrypted|all`: Which check(s) to run (repeatable). Omit to run all checks.
 - `--extensions EXT`: Comma-separated list of extensions to filter on (e.g., `.zip,.pdf`).
 - `--log-dir PATH`: Directory to store log files (default: current directory).
-- `--db-dir PATH`: Directory to store index database (default: current directory).
 
 **Examples:**
 
@@ -494,7 +492,7 @@ pystou restore [directory] [options]
 - **Restore a specific run:**
 
   ```bash
-  pystou restore /path/to/folder --run 20260613_142501
+  pystou restore /path/to/folder --run 20260613T142501Z-9f3a
   ```
 
 - **Restore everything:**
@@ -574,7 +572,7 @@ pystou trash purge [directory] [options]
 - **Purge a specific run:**
 
   ```bash
-  pystou trash purge /path/to/folder --run 20260613_142501
+  pystou trash purge /path/to/folder --run 20260613T142501Z-9f3a
   ```
 
 - **Purge all runs:**
