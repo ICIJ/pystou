@@ -27,7 +27,7 @@ class TestEmptyIsDirectoryEmpty(unittest.TestCase):
         empty_dir = self.test_path / "empty"
         empty_dir.mkdir()
 
-        self.assertTrue(is_directory_empty(empty_dir, include_hidden=True))
+        self.assertTrue(is_directory_empty(empty_dir))
 
     def test_non_empty_directory_with_file(self):
         """Test that a directory with files is not empty."""
@@ -35,7 +35,7 @@ class TestEmptyIsDirectoryEmpty(unittest.TestCase):
         non_empty.mkdir()
         (non_empty / "file.txt").touch()
 
-        self.assertFalse(is_directory_empty(non_empty, include_hidden=True))
+        self.assertFalse(is_directory_empty(non_empty))
 
     def test_non_empty_directory_with_subdir(self):
         """Test that a directory with subdirectories is not empty."""
@@ -43,24 +43,15 @@ class TestEmptyIsDirectoryEmpty(unittest.TestCase):
         non_empty.mkdir()
         (non_empty / "subdir").mkdir()
 
-        self.assertFalse(is_directory_empty(non_empty, include_hidden=True))
+        self.assertFalse(is_directory_empty(non_empty))
 
-    def test_directory_with_hidden_files_include(self):
-        """Test directory with hidden files when including hidden."""
+    def test_directory_with_hidden_files(self):
+        """Test that a directory holding only a hidden file is not empty."""
         dir_with_hidden = self.test_path / "hidden"
         dir_with_hidden.mkdir()
         (dir_with_hidden / ".hidden").touch()
 
-        self.assertFalse(is_directory_empty(dir_with_hidden, include_hidden=True))
-
-    def test_directory_with_hidden_files_exclude(self):
-        """Test directory with hidden files when excluding hidden."""
-        dir_with_hidden = self.test_path / "hidden"
-        dir_with_hidden.mkdir()
-        (dir_with_hidden / ".hidden").touch()
-
-        # Should be considered empty when excluding hidden files
-        self.assertTrue(is_directory_empty(dir_with_hidden, include_hidden=False))
+        self.assertFalse(is_directory_empty(dir_with_hidden))
 
 
 class TestEmptyFindEmptyDirectories(unittest.TestCase):
@@ -118,6 +109,16 @@ class TestEmptyFindEmptyDirectories(unittest.TestCase):
 
         dir_names = {d.name for d in empty_dirs}
         self.assertIn(".hidden_empty", dir_names)
+
+    def test_dir_holding_only_a_hidden_file_is_not_empty(self):
+        """A directory whose only entry is hidden still holds data."""
+        only_hidden = self.test_path / "only_hidden"
+        only_hidden.mkdir()
+        (only_hidden / ".DS_Store").touch()
+
+        empty_dirs = find_empty_directories(self.test_dir, recursive=True, include_hidden=False)
+
+        self.assertNotIn("only_hidden", {d.name for d in empty_dirs})
 
     def test_find_empty_sorted_deepest_first(self):
         """Test that empty directories are sorted deepest first."""

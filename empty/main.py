@@ -134,7 +134,7 @@ def find_empty_directories(
                 continue
 
             # Check if directory is empty (no files and no non-empty subdirs)
-            if is_directory_empty(root_path, include_hidden):
+            if is_directory_empty(root_path):
                 empty_dirs.append(root_path)
     else:
         try:
@@ -154,7 +154,7 @@ def find_empty_directories(
                     if not include_hidden and dir_path.name.startswith("."):
                         continue
 
-                    if is_directory_empty(dir_path, include_hidden):
+                    if is_directory_empty(dir_path):
                         empty_dirs.append(dir_path)
         except PermissionError as e:
             console.error(f"Permission denied: {directory_path}")
@@ -166,12 +166,11 @@ def find_empty_directories(
     return empty_dirs
 
 
-def is_directory_empty(dir_path: Path, include_hidden: bool) -> bool:
+def is_directory_empty(dir_path: Path) -> bool:
     """Checks if a directory is empty.
 
     Args:
         dir_path: Path to the directory.
-        include_hidden: Whether to consider hidden files/dirs.
 
     Returns:
         True if the directory is empty, False otherwise.
@@ -181,9 +180,6 @@ def is_directory_empty(dir_path: Path, include_hidden: bool) -> bool:
             for entry in entries:
                 # Skip symlinks when checking contents
                 if entry.is_symlink():
-                    continue
-                # If not including hidden, skip hidden entries
-                if not include_hidden and entry.name.startswith("."):
                     continue
                 return False
         return True
