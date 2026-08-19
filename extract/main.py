@@ -150,12 +150,17 @@ def extract_command(
         close_database(conn)
         return
 
+    # Seeded with every archive already offered to the user (skipped ones included)
+    # so the nested pass never reprocesses an archive it can still see on disk.
+    processed = {archive.resolve() for archive in archives}
+
     if parallel > 1 and not dry_run:
         _extract_parallel(
             to_extract,
             conn,
             parallel,
             directory,
+            processed=processed,
             remove_archives=remove_archives,
             nested=nested,
             max_depth=max_depth,
@@ -173,6 +178,7 @@ def extract_command(
                     archive,
                     conn,
                     directory,
+                    processed=processed,
                     dry_run=dry_run,
                     remove_archives=remove_archives,
                     nested=nested,
@@ -193,6 +199,7 @@ def _extract_one(
     conn,
     op_root: str,
     *,
+    processed: set[Path],
     dry_run: bool,
     remove_archives: bool,
     nested: bool,
@@ -223,6 +230,7 @@ def _extract_one(
             archive.parent,
             conn,
             op_root,
+            processed=processed,
             remove_archives=remove_archives,
             max_depth=max_depth,
             types=types,
@@ -251,6 +259,7 @@ def _extract_nested(
     conn,
     op_root: str,
     *,
+    processed: set[Path],
     remove_archives: bool,
     max_depth: int,
     types: Optional[list[str]],
@@ -259,10 +268,15 @@ def _extract_nested(
     trash_dir: Optional[str],
     depth: int,
 ) -> None:
-    """Scans a freshly-extracted directory for nested archives and extracts them."""
-    nested_archives = get_archive_files(directory, recursive=True, filter_types=types)
+    """Scans a freshly-extracted directory for archives not yet processed."""
+    nested_archives = [
+        archive
+        for archive in get_archive_files(directory, recursive=True, filter_types=types)
+        if archive.resolve() not in processed
+    ]
     if not nested_archives:
         return
+    processed.update(archive.resolve() for archive in nested_archives)
     console.status(f"[Depth {depth}] Found {len(nested_archives)} nested archive(s)")
     logging.info(
         {
@@ -277,6 +291,7 @@ def _extract_nested(
             archive,
             conn,
             op_root,
+            processed=processed,
             dry_run=False,
             remove_archives=remove_archives,
             nested=True,
@@ -295,6 +310,7 @@ def _extract_parallel(
     workers: int,
     op_root: str,
     *,
+    processed: set[Path],
     remove_archives: bool,
     nested: bool,
     max_depth: int,
@@ -350,6 +366,7 @@ def _extract_parallel(
                 archive.parent,
                 conn,
                 op_root,
+                processed=processed,
                 remove_archives=remove_archives,
                 max_depth=max_depth,
                 types=types,

@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 import typer
 from typer.testing import CliRunner
@@ -150,3 +151,53 @@ class TestExtractSurvivesBadArchive(unittest.TestCase):
         self.assertEqual(r.exit_code, 0)
         self.assertTrue((Path(self.dir) / "z_good" / "inner.txt").is_file())
         self.assertFalse((Path(self.dir) / "a.txt").exists())
+
+
+class TestNestedExtraction(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.runner = _split_runner()
+        for name in ("a.zip", "b.zip"):
+            with zipfile.ZipFile(Path(self.dir) / name, "w") as z:
+                z.writestr("inner.txt", "hi")
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def _invoke(self, *extra):
+        return self.runner.invoke(
+            _app(),
+            [self.dir, "--nested", "--log-dir", self.dir, "--db-dir", self.dir, *extra],
+        )
+
+    def test_each_archive_is_extracted_once(self):
+        calls = []
+
+        def fake_extract(archive, tolerant=False):
+            calls.append(archive)
+            return True
+
+        with patch("extract.main.extract_archive", side_effect=fake_extract):
+            r = self._invoke("--action", "extract", "--max-depth", "4")
+
+        self.assertEqual(r.exit_code, 0)
+        self.assertEqual(sorted(p.name for p in calls), ["a.zip", "b.zip"])
+
+    def test_nested_pass_honours_a_skipped_archive(self):
+        calls = []
+
+        def fake_extract(archive, tolerant=False):
+            calls.append(archive)
+            return True
+
+        def fake_choice(prompt, choices, default=None):
+            return "extract" if "a.zip" in prompt else "skip"
+
+        with (
+            patch("extract.main.extract_archive", side_effect=fake_extract),
+            patch("common.console.prompt_choice", side_effect=fake_choice),
+        ):
+            r = self._invoke("--max-depth", "4")
+
+        self.assertEqual(r.exit_code, 0)
+        self.assertEqual([p.name for p in calls], ["a.zip"])
