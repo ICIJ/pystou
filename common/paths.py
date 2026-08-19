@@ -30,6 +30,19 @@ def index_dir() -> Path:
     return _created(_base("XDG_CACHE_HOME", ".cache") / APP_NAME / "index")
 
 
+def rename_dir() -> Path:
+    """Returns the directory for rename manifests, creating it if needed.
+
+    A manifest is the only record of what a normalize run renamed, and a later
+    Elasticsearch update replays it, so it lives beside the logs in the state
+    directory rather than in the cache: nothing is allowed to wipe it.
+
+    Returns:
+        Path: ``$XDG_STATE_HOME/pystou/renames``.
+    """
+    return _created(_base("XDG_STATE_HOME", ".local/state") / APP_NAME / "renames")
+
+
 def _base(variable: str, fallback: str) -> Path:
     """Reads an XDG base directory from the environment.
 

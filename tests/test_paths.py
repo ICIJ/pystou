@@ -23,6 +23,10 @@ class TestXdgDefaults(unittest.TestCase):
         with self._without_xdg():
             self.assertEqual(paths.log_dir(), Path(self.home, ".local/state/pystou/logs"))
 
+    def test_rename_dir_falls_back_to_local_state(self):
+        with self._without_xdg():
+            self.assertEqual(paths.rename_dir(), Path(self.home, ".local/state/pystou/renames"))
+
     def test_index_dir_falls_back_to_cache(self):
         with self._without_xdg():
             self.assertEqual(paths.index_dir(), Path(self.home, ".cache/pystou/index"))
@@ -48,6 +52,11 @@ class TestXdgOverrides(unittest.TestCase):
     def test_log_dir_honors_xdg_state_home(self):
         with mock.patch.dict(os.environ, {"XDG_STATE_HOME": self.root}):
             self.assertEqual(paths.log_dir(), Path(self.root, "pystou/logs"))
+
+    def test_rename_dir_honors_xdg_state_home(self):
+        with mock.patch.dict(os.environ, {"XDG_STATE_HOME": self.root}):
+            self.assertEqual(paths.rename_dir(), Path(self.root, "pystou/renames"))
+            self.assertTrue(paths.rename_dir().is_dir())
 
     def test_index_dir_honors_xdg_cache_home(self):
         with mock.patch.dict(os.environ, {"XDG_CACHE_HOME": self.root}):

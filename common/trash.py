@@ -37,7 +37,8 @@ def trash_root(op_root, trash_dir: Optional[str] = None) -> Path:
     return Path(op_root) / TRASH_DIR_NAME
 
 
-def _new_run_id() -> str:
+def new_run_id() -> str:
+    """Returns a sortable, collision-resistant run id (``20260819T101500Z-3f2a``)."""
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return f"{stamp}-{secrets.token_hex(2)}"
 
@@ -130,7 +131,7 @@ def quarantine(
                 f"Use --trash-dir <path> on the same volume, or --hard-delete."
             )
 
-    run_id = _new_run_id()
+    run_id = new_run_id()
     run_dir = root / run_id
     run_dir.mkdir(parents=True)
     ledger = root / "runs" / f"{run_id}.jsonl"
