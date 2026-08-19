@@ -3,9 +3,12 @@ import logging
 import os
 from datetime import datetime
 from logging import handlers
+from typing import Optional
+
+from common import paths
 
 
-def setup_logging(script_name: str = "script", log_dir: str = ".") -> None:
+def setup_logging(script_name: str = "script", log_dir: Optional[str] = None) -> None:
     """Sets up JSON logging to a timestamped file.
 
     Idempotent: clears handlers added by previous calls so dispatching a
@@ -13,10 +16,12 @@ def setup_logging(script_name: str = "script", log_dir: str = ".") -> None:
 
     Args:
         script_name (str): Name of the script (used in log filename).
-        log_dir (str): Directory to store log files.
+        log_dir (Optional[str]): Directory to store log files. Defaults to the
+            XDG log directory.
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = os.path.join(log_dir, f"{script_name}.{timestamp}.log")
+    directory = log_dir if log_dir else str(paths.log_dir())
+    log_filename = os.path.join(directory, f"{script_name}.{timestamp}.log")
     handler = handlers.RotatingFileHandler(log_filename, maxBytes=10485760, backupCount=5)
     handler.setFormatter(JsonFormatter())
 

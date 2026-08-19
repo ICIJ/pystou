@@ -19,7 +19,7 @@ class TestExtractQuarantine(unittest.TestCase):
     def test_delete_archive_quarantines_by_default(self):
         arc = Path(self.test_dir) / "a.zip"
         arc.write_text("PK")
-        conn = initialize_database(self.test_dir)
+        conn = initialize_database(str(Path(self.test_dir) / "index.db"))
         delete_archive_file(arc, conn, dry_run=False, op_root=self.test_dir, hard_delete=False)
         conn.close()
         self.assertFalse(arc.exists())
@@ -28,7 +28,7 @@ class TestExtractQuarantine(unittest.TestCase):
     def test_delete_archive_hard_delete(self):
         arc = Path(self.test_dir) / "a.zip"
         arc.write_text("PK")
-        conn = initialize_database(self.test_dir)
+        conn = initialize_database(str(Path(self.test_dir) / "index.db"))
         delete_archive_file(arc, conn, dry_run=False, op_root=self.test_dir, hard_delete=True)
         conn.close()
         self.assertFalse(arc.exists())
@@ -39,7 +39,7 @@ class TestUpdateIndexAfterExtraction(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.root = Path(self.test_dir)
-        self.conn = initialize_database(self.test_dir)
+        self.conn = initialize_database(str(Path(self.test_dir) / "index.db"))
 
     def tearDown(self):
         self.conn.close()

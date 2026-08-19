@@ -64,6 +64,24 @@ next to the target. Use `pystou restore` to undo and `pystou trash purge` to rec
 
 Pass `--hard-delete` to delete immediately instead.
 
+## Where PyStou writes
+
+Logs and index databases follow the XDG Base Directory specification, so no command litters the
+directory you run it from:
+
+| What | Location | Override |
+|------|----------|----------|
+| JSON logs | `$XDG_STATE_HOME/pystou/logs` (`~/.local/state/pystou/logs`) | `--log-dir` |
+| Index databases | `$XDG_CACHE_HOME/pystou/index` (`~/.cache/pystou/index`) | `--db-dir` |
+
+Each scanned tree gets its own index file, named after the target and a hash of its absolute path,
+so a run on `/data` is never offered the index built for `/photos`. Indexes are a cache: deleting
+them only costs a rescan.
+
+Quarantined files are the exception and stay in `.pystou-trash/` next to the target, because
+quarantining has to be a same-filesystem move to be atomic. Use `--trash-dir` to place it elsewhere
+on that filesystem.
+
 ## Global options
 
 These go **before** the subcommand name.
@@ -89,8 +107,8 @@ pystou --quiet extract /data -r --action extract
 | `-n`, `--dry-run` | Do not make any changes. | `dedup` `extract` `cleanup` `empty` |
 | `--hard-delete` | Permanently delete instead of quarantining. | `dedup` `extract` `cleanup` |
 | `--trash-dir PATH` | Override the trash location (must be the same filesystem). | `dedup` `extract` `cleanup` `restore` `trash` |
-| `--log-dir PATH` | Directory for JSON log files (default: current). | all but `doctor` |
-| `--db-dir PATH` | Directory for the index database (default: current). | `dedup` `extract` `restore` |
+| `--log-dir PATH` | Directory for JSON log files (default: XDG state dir). | all but `doctor` |
+| `--db-dir PATH` | Directory for index databases (default: XDG cache dir). | `dedup` `extract` `restore` |
 
 ## Command reference
 

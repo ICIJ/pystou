@@ -303,7 +303,7 @@ class TestRestoreReindex(unittest.TestCase):
         victim = Path(self.root) / "f.txt"
         victim.write_text("data")
         run_id = trash.quarantine([victim], self.root, operation="cleanup", command="c")
-        conn = initialize_database(self.root)
+        conn = initialize_database(os.path.join(self.root, "index.db"))
         # index starts empty for this path; restore with conn should add it
         trash.restore(self.root, run_id=run_id, conn=conn)
         cur = conn.execute(

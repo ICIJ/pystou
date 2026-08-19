@@ -23,8 +23,8 @@ class TestDedupFolders(unittest.TestCase):
         # Set up test directories
         self.setup_test_directories()
         # Initialize database
-        self.db_path = os.path.join(self.test_dir, "filesystem_index.db")
-        self.conn = initialize_database(self.test_dir)
+        self.db_path = os.path.join(self.test_dir, "index.db")
+        self.conn = initialize_database(self.db_path)
         # Collect directories
         collect_directories(self.conn, self.test_dir, recursive=True)
 
@@ -102,7 +102,7 @@ from common.indexer import initialize_database as _init_db
 class TestMergeConflictPreservesData(unittest.TestCase):
     def setUp(self):
         self.test_dir = _tempfile.mkdtemp()
-        self.conn = _init_db(self.test_dir)
+        self.conn = _init_db(os.path.join(self.test_dir, "index.db"))
         self.base = _Path(self.test_dir) / "base"
         self.dup = _Path(self.test_dir) / "base (1)"
         self.base.mkdir()
@@ -132,7 +132,7 @@ class TestGroupDirectoriesRequiresPlainBase(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
         for name in ("Trip (2019)", "Trip (2020)", "Album", "Album (1)"):
             (Path(self.test_dir) / name).mkdir()
-        self.conn = initialize_database(self.test_dir)
+        self.conn = initialize_database(os.path.join(self.test_dir, "index.db"))
         collect_directories(self.conn, self.test_dir, recursive=True)
 
     def tearDown(self):
@@ -155,7 +155,7 @@ class TestMergeIndexesMovedDirectories(unittest.TestCase):
         self.dup = Path(self.test_dir) / "data (1)"
         (self.dup / "sub").mkdir(parents=True)
         (self.dup / "sub" / "f.txt").write_text("hello")
-        self.conn = initialize_database(self.test_dir)
+        self.conn = initialize_database(os.path.join(self.test_dir, "index.db"))
         collect_directories(self.conn, self.test_dir, recursive=True)
 
     def tearDown(self):
@@ -189,7 +189,7 @@ class TestDedupQuarantine(unittest.TestCase):
         dup = Path(self.test_dir) / "dup (1)"
         dup.mkdir()
         (dup / "f.txt").write_text("x")
-        conn = initialize_database(self.test_dir)
+        conn = initialize_database(os.path.join(self.test_dir, "index.db"))
         delete_duplicates([dup], dry_run=False, conn=conn, op_root=self.test_dir, hard_delete=False)
         conn.close()
         self.assertFalse(dup.exists())
@@ -198,7 +198,7 @@ class TestDedupQuarantine(unittest.TestCase):
     def test_delete_duplicates_hard_delete(self):
         dup = Path(self.test_dir) / "dup (1)"
         dup.mkdir()
-        conn = initialize_database(self.test_dir)
+        conn = initialize_database(os.path.join(self.test_dir, "index.db"))
         delete_duplicates([dup], dry_run=False, conn=conn, op_root=self.test_dir, hard_delete=True)
         conn.close()
         self.assertFalse(dup.exists())
@@ -211,7 +211,7 @@ class TestDedupQuarantine(unittest.TestCase):
         dup = Path(self.test_dir) / "base (1)"
         dup.mkdir()
         (dup / "only_in_dup.txt").write_text("dup")  # no conflict -> moves cleanly
-        conn = initialize_database(self.test_dir)
+        conn = initialize_database(os.path.join(self.test_dir, "index.db"))
         merge_contents(
             base, [dup], dry_run=False, conn=conn, op_root=self.test_dir, hard_delete=False
         )

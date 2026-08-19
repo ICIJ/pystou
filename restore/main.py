@@ -9,7 +9,7 @@ import typer
 
 from common import console, trash
 from common.cli import DbDirOpt, DirectoryArg, LogDirOpt, TrashDirOpt
-from common.indexer import DB_NAME, close_database, initialize_database
+from common.indexer import close_database, index_db_path, initialize_database
 from common.logger import setup_logging
 from common.validation import validate_directory_or_exit
 
@@ -22,8 +22,8 @@ def restore_command(
         Optional[str], typer.Option("--path", help="Restore only the item with this original path.")
     ] = None,
     trash_dir: TrashDirOpt = None,
-    log_dir: LogDirOpt = ".",
-    db_dir: DbDirOpt = ".",
+    log_dir: LogDirOpt = None,
+    db_dir: DbDirOpt = None,
 ) -> None:
     """Bring quarantined items back to their original paths."""
     setup_logging("restore", log_dir)
@@ -44,9 +44,8 @@ def restore_command(
         console.status("Specify --run <id>, --all, or --path <original>.")
         return
 
-    conn = None
-    if os.path.exists(os.path.join(db_dir, DB_NAME)):
-        conn = initialize_database(db_dir)
+    db_path = index_db_path(db_dir, directory)
+    conn = initialize_database(db_path) if os.path.exists(db_path) else None
 
     restored, conflicted = trash.restore(
         directory,

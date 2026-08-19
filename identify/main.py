@@ -37,7 +37,7 @@ def identify_command(
         Optional[str],
         typer.Option("--extensions", help="Comma-separated extensions to check (e.g. .zip,.pdf)."),
     ] = None,
-    log_dir: LogDirOpt = ".",
+    log_dir: LogDirOpt = None,
 ) -> None:
     """Identify file-type mismatches and encrypted archives."""
     setup_logging("identify", log_dir)

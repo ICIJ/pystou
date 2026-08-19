@@ -49,8 +49,8 @@ def dedup_command(
     dry_run: DryRunOpt = False,
     hard_delete: HardDeleteOpt = False,
     trash_dir: TrashDirOpt = None,
-    log_dir: LogDirOpt = ".",
-    db_dir: DbDirOpt = ".",
+    log_dir: LogDirOpt = None,
+    db_dir: DbDirOpt = None,
 ) -> None:
     """Find duplicate folders (e.g. "data" / "data (1)") and delete, merge, or skip."""
     setup_logging("dedup_folders", log_dir)

@@ -16,7 +16,7 @@ from common.indexer import close_database, initialize_database
 class TestDeepTree(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.conn = initialize_database(self.test_dir)
+        self.conn = initialize_database(os.path.join(self.test_dir, "index.db"))
         self._recursion_limit = sys.getrecursionlimit()
 
     def tearDown(self):
@@ -74,7 +74,7 @@ class FakeEntry:
 class TestBadEntryIsolation(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.conn = initialize_database(self.test_dir)
+        self.conn = initialize_database(os.path.join(self.test_dir, "index.db"))
 
     def tearDown(self):
         close_database(self.conn)
@@ -111,7 +111,7 @@ class TestExcludeTrash(unittest.TestCase):
         root = Path(self.test_dir)
         (root / "keep").mkdir()
         (root / ".pystou-trash" / "20260613T000000Z-aaaa" / "0" / "victim").mkdir(parents=True)
-        conn = initialize_database(self.test_dir)
+        conn = initialize_database(os.path.join(self.test_dir, "index.db"))
         collect_directories(conn, str(root), recursive=True)
         paths = [row[0] for row in conn.execute("SELECT path FROM directories")]
         conn.close()
@@ -133,7 +133,7 @@ class TestProgressCallback(unittest.TestCase):
         (Path(self.test_dir) / "a").mkdir()
         (Path(self.test_dir) / "a" / "f.txt").write_text("x")
         calls = []
-        conn = initialize_database(self.test_dir)
+        conn = initialize_database(os.path.join(self.test_dir, "index.db"))
         collect_directories(
             conn, self.test_dir, recursive=True, progress_cb=lambda d, f: calls.append((d, f))
         )

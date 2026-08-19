@@ -63,7 +63,7 @@ def cleanup_command(
     dry_run: DryRunOpt = False,
     hard_delete: HardDeleteOpt = False,
     trash_dir: TrashDirOpt = None,
-    log_dir: LogDirOpt = ".",
+    log_dir: LogDirOpt = None,
 ) -> None:
     """Remove junk files (.DS_Store, Thumbs.db, etc.); quarantines by default."""
     setup_logging("cleanup", log_dir)

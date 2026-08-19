@@ -10,6 +10,7 @@ from pathlib import Path
 from common.errors import PystouError
 from common.indexer import (
     close_database,
+    index_db_path,
     index_has_data,
     initialize_database,
     open_or_rescan,
@@ -31,7 +32,7 @@ def _size_and_count(conn, directory) -> tuple:
 class TestIndexerDeleteDirectory(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.conn = initialize_database(self.test_dir)
+        self.conn = initialize_database(os.path.join(self.test_dir, "index.db"))
         cur = self.conn.cursor()
         for path, parent in [
             ("/a/foo", "/a"),
@@ -90,7 +91,7 @@ class TestIndexerDeleteDirectory(unittest.TestCase):
 class TestIndexerStatGuard(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.conn = initialize_database(self.test_dir)
+        self.conn = initialize_database(os.path.join(self.test_dir, "index.db"))
 
     def tearDown(self):
         close_database(self.conn)
@@ -112,9 +113,10 @@ class TestInitializeDatabaseDefensive(unittest.TestCase):
         test_dir = tempfile.mkdtemp()
         try:
             # Make the db path a directory so sqlite cannot open it as a file.
-            os.mkdir(os.path.join(test_dir, "filesystem_index.db"))
+            db_path = os.path.join(test_dir, "index.db")
+            os.mkdir(db_path)
             with self.assertRaises(PystouError):
-                initialize_database(test_dir)
+                initialize_database(db_path)
         finally:
             shutil.rmtree(test_dir, ignore_errors=True)
 
@@ -122,7 +124,7 @@ class TestInitializeDatabaseDefensive(unittest.TestCase):
 class TestIndexHasData(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.conn = initialize_database(self.test_dir)
+        self.conn = initialize_database(os.path.join(self.test_dir, "index.db"))
 
     def tearDown(self):
         close_database(self.conn)
@@ -142,7 +144,7 @@ class TestIndexHasData(unittest.TestCase):
 class TestFilesAreIndexedOnce(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.conn = initialize_database(self.test_dir)
+        self.conn = initialize_database(os.path.join(self.test_dir, "index.db"))
 
     def tearDown(self):
         close_database(self.conn)
@@ -159,7 +161,8 @@ class TestFilesAreIndexedOnce(unittest.TestCase):
 class TestLegacyIndexRetrofit(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        legacy = sqlite3.connect(os.path.join(self.test_dir, "filesystem_index.db"))
+        self.db_path = os.path.join(self.test_dir, "index.db")
+        legacy = sqlite3.connect(self.db_path)
         legacy.execute(
             "CREATE TABLE files (id INTEGER PRIMARY KEY, directory_path TEXT, name TEXT,"
             " size INTEGER, mtime REAL)"
@@ -176,7 +179,7 @@ class TestLegacyIndexRetrofit(unittest.TestCase):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_existing_duplicate_rows_are_collapsed(self):
-        conn = initialize_database(self.test_dir)
+        conn = initialize_database(self.db_path)
         try:
             self.assertEqual(_size_and_count(conn, "/a"), (10, 1))
             with self.assertRaises(sqlite3.IntegrityError):
@@ -230,3 +233,42 @@ class TestOpenOrRescan(unittest.TestCase):
             self.assertEqual(_indexed_names(conn), {"a", "b"})
         finally:
             close_database(conn)
+
+
+class TestIndexDbPath(unittest.TestCase):
+    def setUp(self):
+        self.db_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.db_dir, ignore_errors=True)
+
+    def test_same_target_always_resolves_to_the_same_file(self):
+        first = index_db_path(self.db_dir, "/data/photos")
+        second = index_db_path(self.db_dir, "/data/photos/")
+        self.assertEqual(first, second)
+
+    def test_different_targets_resolve_to_different_files(self):
+        self.assertNotEqual(
+            index_db_path(self.db_dir, "/data/photos"),
+            index_db_path(self.db_dir, "/data/music"),
+        )
+
+    def test_targets_sharing_a_basename_resolve_to_different_files(self):
+        self.assertNotEqual(
+            index_db_path(self.db_dir, "/alpha/data"),
+            index_db_path(self.db_dir, "/beta/data"),
+        )
+
+    def test_relative_and_absolute_targets_agree(self):
+        target = Path(self.db_dir).name
+        with unittest.mock.patch("os.getcwd", return_value=str(Path(self.db_dir).parent)):
+            self.assertEqual(
+                index_db_path(self.db_dir, target),
+                index_db_path(self.db_dir, self.db_dir),
+            )
+
+    def test_the_name_is_recognisable_and_lands_in_the_db_dir(self):
+        path = Path(index_db_path(self.db_dir, "/data/photos"))
+        self.assertEqual(path.parent, Path(self.db_dir))
+        self.assertTrue(path.name.startswith("photos-"))
+        self.assertTrue(path.name.endswith(".db"))

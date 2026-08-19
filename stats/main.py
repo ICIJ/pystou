@@ -31,7 +31,7 @@ def stats_command(
     ] = False,
     by_size: Annotated[bool, typer.Option("--by-size", help="Show largest files.")] = False,
     json_out: Annotated[bool, typer.Option("--json", help="Output stats as JSON.")] = False,
-    log_dir: LogDirOpt = ".",
+    log_dir: LogDirOpt = None,
 ) -> None:
     """Display directory statistics: file counts, sizes, extensions, largest files."""
     setup_logging("stats", log_dir)
