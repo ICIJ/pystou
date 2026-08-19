@@ -74,6 +74,7 @@ directory you run it from:
 |------|----------|----------|
 | JSON logs | `$XDG_STATE_HOME/pystou/logs` (`~/.local/state/pystou/logs`) | `--log-dir` |
 | Index databases | `$XDG_CACHE_HOME/pystou/index` (`~/.cache/pystou/index`) | `--db-dir` |
+| Rename manifests | `$XDG_STATE_HOME/pystou/renames` (`~/.local/state/pystou/renames`) | `--manifest-dir` |
 
 Each scanned tree gets its own index file, named after the target and a hash of its absolute path,
 so a run on `/data` is never offered the index built for `/photos`. Indexes are a cache: deleting
@@ -104,12 +105,13 @@ pystou --quiet extract /data -r --action extract
 
 | Flag | Description | Available on |
 |------|-------------|--------------|
-| `-r`, `--recursive` | Recurse into subdirectories. | `dedup` `extract` `cleanup` `identify` `stats` `empty` |
-| `-n`, `--dry-run` | Do not make any changes. | `dedup` `extract` `cleanup` `empty` |
+| `-r`, `--recursive` | Recurse into subdirectories. | `dedup` `extract` `cleanup` `identify` `stats` `empty` `normalize` |
+| `-n`, `--dry-run` | Do not make any changes. | `dedup` `extract` `cleanup` `empty` `normalize` |
 | `--hard-delete` | Permanently delete instead of quarantining. | `dedup` `extract` `cleanup` |
 | `--trash-dir PATH` | Override the trash location (must be the same filesystem). | `dedup` `extract` `cleanup` `restore` `trash` |
 | `--log-dir PATH` | Directory for JSON log files (default: XDG state dir). | all but `doctor` |
 | `--db-dir PATH` | Directory for index databases (default: XDG cache dir). | `dedup` `extract` `restore` |
+| `--manifest-dir PATH` | Directory for rename manifests (default: XDG state dir). | `normalize` |
 
 ## Command reference
 
@@ -223,6 +225,14 @@ pystou normalize ~/data -r               # rename, writing a manifest
 pystou normalize ~/data -r --rule utf8   # only the S3 blocker
 pystou normalize --undo 20260819T101500Z-3f2a
 ```
+
+| Option | Description |
+|--------|-------------|
+| `--rule utf8\|nfc\|control\|punct\|all` | Which rule to apply (repeatable). Omit to apply all. |
+| `-r`, `--recursive` | Recurse into subdirectories. |
+| `-n`, `--dry-run` | Preview the renames without touching anything, and without writing a manifest. |
+| `--undo RUN_ID` | Replay a manifest in reverse, restoring the original names. |
+| `--manifest-dir PATH` | Directory for rename manifests (default: XDG state dir). |
 
 | Rule | Fixes |
 |------|-------|
