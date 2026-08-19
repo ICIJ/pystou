@@ -116,6 +116,16 @@ class TestIdentifyCommand(unittest.TestCase):
         r = self._invoke("--extensions", ".zip")
         self.assertEqual(r.exit_code, 0, r.output)
 
+    def test_extensions_filter_tolerates_spaces(self):
+        """A space after the comma must not corrupt the extension."""
+        fake_pdf = Path(self.dir) / "fake.pdf"
+        with zipfile.ZipFile(fake_pdf, "w") as zf:
+            zf.writestr("a.txt", "data")
+
+        r = self._invoke("--extensions", ".zip, .pdf")
+        self.assertEqual(r.exit_code, 0, r.output)
+        self.assertIn("fake.pdf", self.out.getvalue())
+
     # ------------------------------------------------------------------
     # test_check_encrypted_finds_issue
     # Trigger: a ZIP file whose local-file-header and central-directory
