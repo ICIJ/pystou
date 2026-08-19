@@ -12,6 +12,10 @@ LogDirOpt = Annotated[
     Optional[str],
     typer.Option("--log-dir", help="Directory for log files [default: XDG state dir]."),
 ]
+ManifestDirOpt = Annotated[
+    Optional[str],
+    typer.Option("--manifest-dir", help="Directory for rename manifests [default: XDG state dir]."),
+]
 DbDirOpt = Annotated[
     Optional[str],
     typer.Option("--db-dir", help="Directory for index databases [default: XDG cache dir]."),
