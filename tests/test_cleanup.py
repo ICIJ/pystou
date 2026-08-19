@@ -1,3 +1,4 @@
+import os
 import shutil
 import tempfile
 import unittest
@@ -226,6 +227,22 @@ class TestCleanupQuarantine(unittest.TestCase):
         self.assertEqual(removed, 0)
         self.assertEqual(skipped, 1)
         self.assertTrue(junk.exists())  # not removed when quarantine fails
+
+    def test_remove_junk_os_error_reports_partial_run(self):
+        if os.geteuid() == 0:
+            self.skipTest("requires non-root user")
+        root = Path(self.test_dir)
+        (root / ".DS_Store").write_text("x")
+        locked = root / "locked"
+        locked.mkdir()
+        (locked / ".DS_Store").write_text("x")
+        items = find_junk(self.test_dir, True, {".DS_Store"}, set())
+        os.chmod(locked, 0o500)
+        try:
+            removed, skipped = remove_junk(items, op_root=self.test_dir, hard_delete=False)
+        finally:
+            os.chmod(locked, 0o700)
+        self.assertEqual((removed, skipped), (1, 1))
 
 
 if __name__ == "__main__":
