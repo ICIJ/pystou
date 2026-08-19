@@ -127,6 +127,26 @@ class TestMergeConflictPreservesData(unittest.TestCase):
         self.assertEqual((self.base / "shared.txt").read_text(), "base-version")
 
 
+class TestGroupDirectoriesRequiresPlainBase(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        for name in ("Trip (2019)", "Trip (2020)", "Album", "Album (1)"):
+            (Path(self.test_dir) / name).mkdir()
+        self.conn = initialize_database(self.test_dir)
+        collect_directories(self.conn, self.test_dir, recursive=True)
+
+    def tearDown(self):
+        close_database(self.conn)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_year_suffixed_siblings_are_not_duplicates(self):
+        names = {
+            tuple(sorted(d.name for d in dirs))
+            for dirs in group_directories(self.conn, self.test_dir).values()
+        }
+        self.assertEqual(names, {("Album", "Album (1)")})
+
+
 class TestDedupQuarantine(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
