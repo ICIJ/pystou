@@ -1,3 +1,4 @@
+import io
 import shutil
 import tempfile
 import unittest
@@ -6,7 +7,7 @@ from pathlib import Path
 import typer
 from typer.testing import CliRunner
 
-from common import trash
+from common import console, trash
 from restore.main import restore_command
 
 
@@ -62,6 +63,18 @@ class TestRestoreCommand(unittest.TestCase):
         )
         self.assertEqual(r.exit_code, 0)
         self.assertTrue(victim.is_file())
+
+    def test_nothing_to_restore_names_the_trash_root(self):
+        out = io.StringIO()
+        err = io.StringIO()
+        console.configure(no_color=True, out_file=out, err_file=err)
+        self.addCleanup(console.configure)
+        r = self.runner.invoke(
+            _app(), [self.dir, "--all", "--log-dir", self.dir, "--db-dir", self.dir]
+        )
+        self.assertEqual(r.exit_code, 0)
+        self.assertIn(str(Path(self.dir) / ".pystou-trash"), err.getvalue())
+        self.assertIn("--trash-dir", err.getvalue())
 
 
 if __name__ == "__main__":

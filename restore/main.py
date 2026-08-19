@@ -60,7 +60,13 @@ def restore_command(
     if conn is not None:
         close_database(conn)
 
-    console.success(f"Restored {restored} item(s).")
+    if restored or conflicted:
+        console.success(f"Restored {restored} item(s).")
+    else:
+        console.status(
+            f"Nothing to restore under {trash.trash_root(directory, trash_dir)}."
+            " If the run used --trash-dir, pass the same path."
+        )
     if conflicted:
         console.warn(f"{conflicted} item(s) left in trash (path occupied or missing).")
     logging.info({"action": "restore_complete", "restored": restored, "conflicted": conflicted})
