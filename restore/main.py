@@ -9,7 +9,7 @@ import typer
 
 from common import console, trash
 from common.cli import DbDirOpt, DirectoryArg, LogDirOpt, TrashDirOpt
-from common.indexer import close_database, initialize_database
+from common.indexer import DB_NAME, close_database, initialize_database
 from common.logger import setup_logging
 from common.validation import validate_directory_or_exit
 
@@ -45,8 +45,7 @@ def restore_command(
         return
 
     conn = None
-    db_path = os.path.join(db_dir, "filesystem_index.db")
-    if os.path.exists(db_path):
+    if os.path.exists(os.path.join(db_dir, DB_NAME)):
         conn = initialize_database(db_dir)
 
     restored, conflicted = trash.restore(

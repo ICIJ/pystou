@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import logging
-import os
 import shlex
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,13 +20,7 @@ from common.cli import (
     RecursiveOpt,
     TrashDirOpt,
 )
-from common.fs_walker import collect_directories
-from common.indexer import (
-    close_database,
-    index_has_data,
-    initialize_database,
-    update_index_after_change,
-)
+from common.indexer import close_database, open_or_rescan, update_index_after_change
 from common.logger import setup_logging
 from common.utils import extract_archive, get_archive_files, get_split_archive_parts
 from common.validation import validate_directory_or_exit
@@ -98,27 +91,7 @@ def extract_command(
     )
     validate_directory_or_exit(directory)
 
-    db_path = os.path.join(db_dir, "filesystem_index.db")
-    index_existed = os.path.exists(db_path)
-    conn = initialize_database(db_dir)
-
-    def rescan() -> None:
-        with console.progress() as p:
-            task = p.add_task("Scanning", total=None)
-            collect_directories(
-                conn,
-                directory,
-                recursive,
-                progress_cb=lambda d, f: p.update(
-                    task, description=f"Scanning  dirs {d:,}  files {f:,}"
-                ),
-            )
-
-    if index_existed and index_has_data(conn):
-        if not console.confirm("Use the existing index?", default=True):
-            rescan()
-    else:
-        rescan()
+    conn = open_or_rescan(db_dir, directory, recursive)
 
     archives = get_archive_files(directory, recursive, types)
     logging.info({"action": "archives_found", "total_archives": len(archives)})
