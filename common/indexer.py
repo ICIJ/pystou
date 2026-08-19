@@ -26,7 +26,7 @@ def index_db_path(db_dir: Optional[str], directory: str) -> str:
     """
     root = db_dir if db_dir else str(paths.index_dir())
     target = os.path.abspath(directory)
-    digest = hashlib.sha256(target.encode()).hexdigest()[:12]
+    digest = hashlib.sha256(os.fsencode(target)).hexdigest()[:12]
     return os.path.join(root, f"{os.path.basename(target) or 'root'}-{digest}.db")
 
 

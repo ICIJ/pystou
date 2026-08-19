@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from typing import Callable, Optional
 
+from common.errors import UndecodablePathError
+
 EXCLUDED_DIR_NAMES = {".pystou-trash"}
 
 
@@ -144,6 +146,25 @@ def scan_tree(
             )
 
 
+def _reject_undecodable(
+    dir_entries: list[tuple[str, str, float]],
+    file_entries: list[tuple[str, str, int, float]],
+) -> None:
+    """Raises :class:`UndecodablePathError` for the first name SQLite cannot store."""
+    for path, _parent, _mtime in dir_entries:
+        _reject_undecodable_name(path)
+    for directory, name, _size, _mtime in file_entries:
+        _reject_undecodable_name(directory)
+        _reject_undecodable_name(name)
+
+
+def _reject_undecodable_name(name: str) -> None:
+    try:
+        name.encode("utf-8")
+    except UnicodeEncodeError as e:
+        raise UndecodablePathError(name) from e
+
+
 def clear_database(conn: sqlite3.Connection) -> None:
     """Clears existing data from the database.
 
@@ -169,6 +190,10 @@ def insert_entries(
         file_entries (List[Tuple[str, str, int, float]]): List of file entries.
     """
     cursor = conn.cursor()
+    # SQLite TEXT is UTF-8, so a name the filesystem accepted but Python
+    # surfaces as surrogates cannot be stored. Fail here, where the offending
+    # name is still known, rather than letting sqlite3 raise anonymously.
+    _reject_undecodable(dir_entries, file_entries)
     if dir_entries:
         cursor.executemany(
             "INSERT OR IGNORE INTO directories (path, parent_path, mtime) VALUES (?, ?, ?)",

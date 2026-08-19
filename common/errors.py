@@ -15,3 +15,15 @@ class CrossDeviceTrashError(PystouError):
 
 class TrashUnavailableError(PystouError):
     """Raised when the trash directory cannot be created (e.g. read-only root)."""
+
+
+class UndecodablePathError(PystouError):
+    """Raised when a path cannot be stored in the index because it is not valid UTF-8."""
+
+    def __init__(self, path: str):
+        self.path = path
+        printable = path.encode("utf-8", "surrogateescape").decode("utf-8", "backslashreplace")
+        super().__init__(
+            f"Cannot index {printable}: the name is not valid UTF-8. "
+            f"Run 'pystou normalize' on this tree first."
+        )

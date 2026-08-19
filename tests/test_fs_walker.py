@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import common.fs_walker as fs_walker
+from common.errors import UndecodablePathError
 from common.fs_walker import collect_directories, is_excluded_dir
 from common.indexer import close_database, initialize_database
 
@@ -143,3 +144,25 @@ class TestProgressCallback(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestUndecodableNames(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.conn = initialize_database(str(self.root / "index.db"))
+
+    def tearDown(self):
+        self.conn.close()
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_scan_explains_which_name_the_index_cannot_store(self):
+        # SQLite TEXT is UTF-8, so a name the filesystem accepts but Python
+        # surfaces as surrogates cannot be indexed. The error must name the
+        # offender and point at the command that fixes it.
+        tree = self.root / "tree"
+        tree.mkdir()
+        (Path(os.fsdecode(os.fsencode(str(tree)) + b"/note_\x9f.txt"))).write_text("x")
+        with self.assertRaises(UndecodablePathError) as caught:
+            collect_directories(self.conn, str(tree), recursive=True)
+        self.assertIn("note_", str(caught.exception))
+        self.assertIn("normalize", str(caught.exception))
