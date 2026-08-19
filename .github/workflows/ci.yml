@@ -17,14 +17,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install ruff
-        run: pip install ruff
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
       - name: Lint
-        run: ruff check cleanup common dedup_folders empty extract identify pystou stats tests
+        run: make lint
 
-      - name: Format check
-        run: ruff format --check cleanup common dedup_folders empty extract identify pystou stats tests
+      - name: Typecheck
+        run: make typecheck
 
   test:
     runs-on: ubuntu-latest
