@@ -1,6 +1,59 @@
 # CHANGELOG
 
 
+## v0.5.0 (2026-08-19)
+
+### Chores
+
+- Remove dead helpers from common
+  ([`3065bf1`](https://github.com/ICIJ/pystou/commit/3065bf1d62c13f8a283793175fa7ec9e25094dbb))
+
+log_configuration, prompt_use_existing_index, load_directories_from_index, summarize_group,
+  get_directory_size, unique_path, verify_then_delete and the extract_pst_archive alias had no
+  production callers. Tests that only exercised them are gone; tests that used them as query helpers
+  now query directly.
+
+### Continuous Integration
+
+- Run make typecheck now that the repo type-checks clean
+  ([`8abdde3`](https://github.com/ICIJ/pystou/commit/8abdde32f558cc20e14de5daebf2980af8284911))
+
+### Documentation
+
+- Reorganize the README into a shorter command reference
+  ([`6424bd5`](https://github.com/ICIJ/pystou/commit/6424bd5bcefa6d300a8aaed395e4a0748486cb0c))
+
+- Restore the original README intro
+  ([`7abe595`](https://github.com/ICIJ/pystou/commit/7abe5957e2c8c50165e826f6f49ce38104c97515))
+
+### Features
+
+- **cli**: Store logs and indexes in XDG base directories
+  ([`e944d65`](https://github.com/ICIJ/pystou/commit/e944d65f2eeb76996564c8809891176097ee7fd2))
+
+### Refactoring
+
+- **common**: Share the index bootstrap via open_or_rescan
+  ([`2c67e48`](https://github.com/ICIJ/pystou/commit/2c67e4885988a5ee8270ac374a4fedf1cb22eb94))
+
+extract and dedup carried the same db_path/initialize_database/rescan-closure block; the only
+  difference was dedup passing a depth level, now a parameter. restore and initialize_database spell
+  the db filename via indexer.DB_NAME.
+
+- **common**: Unify byte-size formatting on console.human_size
+  ([`06ff1b1`](https://github.com/ICIJ/pystou/commit/06ff1b179dc4cd9a6c54ad0166ae70e6965cdf96))
+
+stats rendered '1.0 KB' up to PB while trash rendered '1.0KB' and capped at TB, so a >1 PB trash run
+  showed as '2048.0TB'. Both now share the spaced, PB-aware formatter; its tests move to
+  tests/test_console.py and cover the PB case.
+
+- **trash**: Drop the unused dry_run branch from quarantine
+  ([`16f46d9`](https://github.com/ICIJ/pystou/commit/16f46d9fcd442667102c9207e83a0e0832d33d0a))
+
+All three callers (cleanup, dedup, extract) short-circuit on dry run before reaching quarantine, so
+  the parameter was never passed outside its own test.
+
+
 ## v0.4.1 (2026-08-19)
 
 ### Bug Fixes
