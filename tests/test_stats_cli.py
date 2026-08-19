@@ -47,7 +47,7 @@ class TestStatsCommand(unittest.TestCase):
         console.configure()
 
     def _args(self, *extra):
-        return [self.dir, "--log-dir", self.dir, "--db-dir", self.dir, *extra]
+        return [self.dir, "--log-dir", self.dir, *extra]
 
     def _invoke(self, *extra):
         return self.runner.invoke(_app(), self._args(*extra))
@@ -119,7 +119,7 @@ class TestStatsCommand(unittest.TestCase):
         runner = _split_runner()  # keep stdout/stderr separate on all Click versions
         r = runner.invoke(
             _app(),
-            [str(big), "-r", "--json", "--log-dir", self.dir, "--db-dir", self.dir],
+            [str(big), "-r", "--json", "--log-dir", self.dir],
         )
         self.assertEqual(r.exit_code, 0, r.output)
         json.loads(r.stdout)  # must parse — no progress line leaked
@@ -140,7 +140,7 @@ class TestStatsCommand(unittest.TestCase):
         runner = _split_runner()  # keep stdout/stderr separate on all Click versions
         r = runner.invoke(
             _app(),
-            [str(big), "-r", "--log-dir", self.dir, "--db-dir", self.dir],
+            [str(big), "-r", "--log-dir", self.dir],
         )
         self.assertEqual(r.exit_code, 0, r.output)
         self.assertNotIn("\r", r.stdout)

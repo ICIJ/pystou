@@ -11,7 +11,6 @@ import typer
 
 from common import console
 from common.cli import (
-    DbDirOpt,
     DirectoryArg,
     LogDirOpt,
     RecursiveOpt,
@@ -39,7 +38,6 @@ def identify_command(
         typer.Option("--extensions", help="Comma-separated extensions to check (e.g. .zip,.pdf)."),
     ] = None,
     log_dir: LogDirOpt = ".",
-    db_dir: DbDirOpt = ".",
 ) -> None:
     """Identify file-type mismatches and encrypted archives."""
     setup_logging("identify", log_dir)

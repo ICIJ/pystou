@@ -13,7 +13,6 @@ import typer
 
 from common import console, trash
 from common.cli import (
-    DbDirOpt,
     DirectoryArg,
     DryRunOpt,
     HardDeleteOpt,
@@ -65,7 +64,6 @@ def cleanup_command(
     hard_delete: HardDeleteOpt = False,
     trash_dir: TrashDirOpt = None,
     log_dir: LogDirOpt = ".",
-    db_dir: DbDirOpt = ".",
 ) -> None:
     """Remove junk files (.DS_Store, Thumbs.db, etc.); quarantines by default."""
     setup_logging("cleanup", log_dir)

@@ -60,7 +60,7 @@ class TestIdentifyCommand(unittest.TestCase):
         console.configure()
 
     def _args(self, *extra):
-        return [self.dir, "--log-dir", self.dir, "--db-dir", self.dir, *extra]
+        return [self.dir, "--log-dir", self.dir, *extra]
 
     def _invoke(self, *extra):
         return self.runner.invoke(_app(), self._args(*extra))
