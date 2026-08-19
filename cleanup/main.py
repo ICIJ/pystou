@@ -234,6 +234,11 @@ def remove_junk(
             console.error(str(e))
             logging.error({"action": "cleanup", "status": "trash_error", "error": str(e)})
             return 0, len(junk_items)
+        except OSError as e:
+            console.error(f"Error quarantining: {e}")
+            logging.error({"action": "cleanup", "status": "error", "error": str(e)})
+            moved = [item for item in existing if not (item.exists() or item.is_symlink())]
+            return len(moved), len(junk_items) - len(moved)
         return len(existing), skipped
 
     removed = 0
