@@ -53,6 +53,10 @@ def normalize_command(
         typer.Option("--rule", help="utf8|nfc|control|punct|all (repeatable)."),
     ] = None,
     dry_run: DryRunOpt = False,
+    no_manifest: Annotated[
+        bool,
+        typer.Option("--no-manifest", help="Skip the rename manifest; the run cannot be undone."),
+    ] = False,
     manifest_dir: ManifestDirOpt = None,
     log_dir: LogDirOpt = None,
 ) -> None:
@@ -67,9 +71,12 @@ def normalize_command(
             "recursive": recursive,
             "rules": list(selected),
             "dry_run": dry_run,
+            "no_manifest": no_manifest,
             "undo": undo,
         }
     )
+    if no_manifest and manifest_dir:
+        raise PystouError("--no-manifest and --manifest-dir contradict each other.")
     if undo:
         restored, skipped = undo_run(undo, manifest_dir, dry_run)
         verb = "Would restore" if dry_run else "Restored"
@@ -93,7 +100,10 @@ def normalize_command(
         "rules": list(selected),
     }
 
-    renamed, failed, table = _run(root, recursive, selected, dry_run, path, meta)
+    records = not dry_run and not no_manifest
+    writing = manifest.ManifestWriter(path, meta) if records else contextlib.nullcontext()
+
+    renamed, failed, table = _run(root, recursive, selected, dry_run, writing)
 
     if not renamed and not failed:
         console.status("No filenames need normalizing.")
@@ -106,9 +116,12 @@ def normalize_command(
         )
         return
     console.success(f"Renamed {renamed} item(s)" + (f", {failed} failed" if failed else ""))
-    # The manifest is written lazily, so a run where every rename failed has none.
-    if renamed:
+    if not renamed:
+        return
+    if records:
         console.status(f"Manifest: {path}")
+        return
+    console.warn("No manifest was written: this run cannot be undone.")
 
 
 def _selected_rules(rule: Optional[list[Rule]]) -> tuple[str, ...]:
@@ -123,15 +136,16 @@ def _run(
     recursive: bool,
     rules: tuple[str, ...],
     dry_run: bool,
-    path: Path,
-    meta: dict,
+    writing,
 ) -> tuple[int, int, Table]:
-    """Walks, renames, and records. Returns (renamed, failed, table)."""
+    """Walks, renames, and records into ``writing``. Returns (renamed, failed, table).
+
+    ``writing`` is the caller's manifest context: a ``ManifestWriter`` when the
+    run records, or a null context when it does not.
+    """
     table = console.table("Renames", ["Old", "New", "Mode"])
     renamed = 0
     failed = 0
-    # A dry run must not create a manifest file, not even an empty one.
-    writing = manifest.ManifestWriter(path, meta) if not dry_run else contextlib.nullcontext()
     with writing as writer:
         for old, kind in walk_bottom_up(root, recursive):
             new_name, mode, applied = normalize_name(old.name, rules)
@@ -159,8 +173,8 @@ def _run(
                     }
                 )
                 continue
-            assert writer is not None
-            writer.record(kind, str(old), str(new), mode, applied)
+            if writer is not None:
+                writer.record(kind, str(old), str(new), mode, applied)
             table.add_row(manifest.printable(str(old)), manifest.printable(str(new)), mode)
             renamed += 1
             logging.info(

@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 
 import normalize.main
 from common import console
+from common.errors import PystouError
 from normalize import manifest
 from normalize.main import normalize_command
 
@@ -244,3 +245,46 @@ class TestNoOpRun(unittest.TestCase):
         )
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(list(Path(self.state).glob("*.jsonl")), [])
+
+
+class TestNoManifest(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.state = tempfile.mkdtemp()
+        self.runner = CliRunner()
+        self.out = io.StringIO()
+        self.err = io.StringIO()
+        console.configure(no_color=True, quiet=False, out_file=self.out, err_file=self.err)
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+        shutil.rmtree(self.state, ignore_errors=True)
+        console.configure()
+
+    def test_renames_without_writing_a_manifest(self):
+        make(self.dir, b"note_\x9f.txt")
+        result = self.runner.invoke(_app(), [self.dir, "--log-dir", self.state, "--no-manifest"])
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue((Path(self.dir) / "note__.txt").exists())
+        self.assertEqual(list(Path(self.state).glob("*.jsonl")), [])
+
+    def test_warns_that_the_run_cannot_be_undone(self):
+        # --undo replays a manifest, so skipping it forfeits the safety net.
+        # That has to be said out loud, not left to --help.
+        make(self.dir, b"note_\x9f.txt")
+        self.runner.invoke(_app(), [self.dir, "--log-dir", self.state, "--no-manifest"])
+        self.assertIn("cannot be undone", self.err.getvalue())
+
+    def test_says_nothing_about_undo_when_no_rename_happened(self):
+        (Path(self.dir) / "fine.txt").write_text("x")
+        self.runner.invoke(_app(), [self.dir, "--log-dir", self.state, "--no-manifest"])
+        self.assertNotIn("cannot be undone", self.err.getvalue())
+
+    def test_rejects_no_manifest_combined_with_manifest_dir(self):
+        result = self.runner.invoke(
+            _app(),
+            [self.dir, "--log-dir", self.state, "--manifest-dir", self.state, "--no-manifest"],
+        )
+        self.assertEqual(result.exit_code, 1)
+        self.assertIsInstance(result.exception, PystouError)
+        self.assertIn("--no-manifest", str(result.exception))

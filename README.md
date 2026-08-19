@@ -111,7 +111,8 @@ pystou --quiet extract /data -r --action extract
 | `--trash-dir PATH` | Override the trash location (must be the same filesystem). | `dedup` `extract` `cleanup` `restore` `trash` |
 | `--log-dir PATH` | Directory for JSON log files (default: XDG state dir). | all but `doctor` |
 | `--db-dir PATH` | Directory for index databases (default: XDG cache dir). | `dedup` `extract` `restore` |
-| `--manifest-dir PATH` | Directory for rename manifests (default: XDG state dir). | `normalize` |
+| `--manifest-dir PATH` | Directory for rename manifests (default: XDG state dir). |
+| `--no-manifest` | Rename without recording anything. The run cannot be undone. | `normalize` |
 
 ## Command reference
 
@@ -223,6 +224,7 @@ downstream job can replay against a search index.
 pystou normalize ~/data -r --dry-run     # preview
 pystou normalize ~/data -r               # rename, writing a manifest
 pystou normalize ~/data -r --rule utf8   # only the S3 blocker
+pystou normalize ~/data -r --no-manifest # rename without recording anything
 pystou normalize --undo 20260819T101500Z-3f2a
 ```
 
@@ -233,6 +235,7 @@ pystou normalize --undo 20260819T101500Z-3f2a
 | `-n`, `--dry-run` | Preview the renames without touching anything, and without writing a manifest. |
 | `--undo RUN_ID` | Replay a manifest in reverse, restoring the original names. |
 | `--manifest-dir PATH` | Directory for rename manifests (default: XDG state dir). |
+| `--no-manifest` | Rename without recording anything. The run cannot be undone. |
 
 | Rule | Fixes |
 |------|-------|
@@ -246,6 +249,11 @@ All rules run by default. `--rule` is repeatable.
 Manifests are written to `$XDG_STATE_HOME/pystou/renames` (override with
 `--manifest-dir`). Replay entries in file order: each `file` entry is an exact
 path swap, and each `dir` entry is a prefix rewrite over everything below it.
+
+`--no-manifest` skips the record entirely, for trees nothing has indexed. Note
+that `--undo` replays a manifest, so a run without one cannot be reversed;
+pystou says so after the run rather than leaving you to find out later. It is
+rejected together with `--manifest-dir`, which would contradict it.
 
 ### stats
 
