@@ -34,3 +34,13 @@ class TestLogger(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMissingLogDir(unittest.TestCase):
+    def test_setup_logging_creates_a_missing_log_dir(self):
+        # --log-dir otherwise dies with a raw FileNotFoundError through the
+        # top-level "Unexpected error" boundary.
+        with tempfile.TemporaryDirectory() as base:
+            missing = os.path.join(base, "logs", "nested")
+            setup_logging("probe", missing)
+            self.assertTrue(os.path.isdir(missing))
