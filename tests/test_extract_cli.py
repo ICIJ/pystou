@@ -251,3 +251,37 @@ class TestParallelNestedDepth(unittest.TestCase):
 
         self.assertEqual(r.exit_code, 0)
         self.assertTrue((Path(self.dir) / "outer" / "inner" / "deep.txt").is_file())
+
+
+class TestParallelRemoveArchives(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.runner = _split_runner()
+        self.zip_path = Path(self.dir) / "a.zip"
+        with zipfile.ZipFile(self.zip_path, "w") as z:
+            z.writestr("inner.txt", "hi")
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_remove_archives_quarantines_on_the_parallel_path(self):
+        r = self.runner.invoke(
+            _app(),
+            [
+                self.dir,
+                "--action",
+                "extract",
+                "--remove-archives",
+                "-p",
+                "4",
+                "--log-dir",
+                self.dir,
+                "--db-dir",
+                self.dir,
+            ],
+        )
+
+        self.assertEqual(r.exit_code, 0)
+        self.assertTrue((Path(self.dir) / "a" / "inner.txt").is_file())
+        self.assertFalse(self.zip_path.exists())
+        self.assertEqual(len(trash.list_runs(self.dir)), 1)
