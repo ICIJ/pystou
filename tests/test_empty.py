@@ -201,6 +201,21 @@ class TestEmptyRemoveEmptyDirectories(unittest.TestCase):
         self.assertEqual(skipped, 1)
         self.assertTrue(non_empty.exists())
 
+    def test_remove_skips_symlink_to_directory(self):
+        """A symlink pointing at a directory is skipped, never rmdir'd."""
+        real = self.test_path / "real"
+        real.mkdir()
+        link = self.test_path / "link"
+        link.symlink_to(real, target_is_directory=True)
+
+        with self.assertLogs(level="WARNING") as logs:
+            removed, skipped = remove_empty_directories([link])
+
+        self.assertEqual((removed, skipped), (0, 1))
+        self.assertIn("symlink_skipped", logs.output[0])
+        self.assertTrue(link.is_symlink())
+        self.assertTrue(real.is_dir())
+
     def test_unrelated_oserror_is_reported(self):
         """An OSError that merely mentions 'not empty' is still a real error."""
         target = self.test_path / "target"
