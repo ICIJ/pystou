@@ -601,6 +601,7 @@ class TestGetArchiveFilesCaseInsensitive(unittest.TestCase):
 
         self.assertEqual(found, [upper])
 
+
 class TestGetArchiveFilesUnknownType(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
@@ -619,6 +620,7 @@ class TestGetArchiveFilesUnknownType(unittest.TestCase):
         self.assertIn(".rar", message)
         self.assertIn(".zip", message)
 
+
 class TestGetArchiveFilesPrunesTrash(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
@@ -636,6 +638,7 @@ class TestGetArchiveFilesPrunesTrash(unittest.TestCase):
         found = utils.get_archive_files(self.test_dir, recursive=True)
 
         self.assertEqual(found, [live])
+
 
 class TestExtractIntoUniqueDirectory(unittest.TestCase):
     def setUp(self):
@@ -705,6 +708,7 @@ class TestExtractIntoUniqueDirectory(unittest.TestCase):
 
         self.assertEqual((Path(self.test_dir) / "a" / "notes.txt").read_text(), "hi")
 
+
 class TestTruncatedArchiveFailsPerArchive(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
@@ -734,6 +738,7 @@ class TestTruncatedArchiveFailsPerArchive(unittest.TestCase):
         utils.extract_archive(src)
 
         self.assertFalse((Path(self.test_dir) / "a.txt").exists())
+
 
 class TestSplitZipWrapper(unittest.TestCase):
     def setUp(self):
@@ -851,6 +856,7 @@ class TestExternalToolInvocation(unittest.TestCase):
             utils.extract_outlook_archive(archive)
 
         self._assert_hardened(record, archive)
+
 
 if __name__ == "__main__":
     unittest.main()
