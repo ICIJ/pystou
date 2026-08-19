@@ -361,7 +361,7 @@ def _extract_parallel(
         logging.info({"action": "extract", "status": "success", "archive": str(archive)})
         update_index_after_extraction(conn, archive.parent)
 
-        if nested:
+        if nested and max_depth > 0:
             _extract_nested(
                 archive.parent,
                 conn,
