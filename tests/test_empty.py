@@ -122,6 +122,16 @@ class TestEmptyFindEmptyDirectories(unittest.TestCase):
 
         self.assertNotIn("only_hidden", {d.name for d in empty_dirs})
 
+    def test_dir_holding_only_a_symlink_is_not_empty(self):
+        """A directory whose only entry is a symlink still holds an entry."""
+        only_link = self.test_path / "only_link"
+        only_link.mkdir()
+        (only_link / "link").symlink_to(self.test_path / "non_empty", target_is_directory=True)
+
+        empty_dirs = find_empty_directories(self.test_dir, recursive=True, include_hidden=False)
+
+        self.assertNotIn("only_link", {d.name for d in empty_dirs})
+
     def test_find_empty_sorted_deepest_first(self):
         """Test that empty directories are sorted deepest first."""
         # Create deeper nested structure

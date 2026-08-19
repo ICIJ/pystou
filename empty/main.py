@@ -176,12 +176,7 @@ def is_directory_empty(dir_path: Path) -> bool:
     """
     try:
         with os.scandir(dir_path) as entries:
-            for entry in entries:
-                # Skip symlinks when checking contents
-                if entry.is_symlink():
-                    continue
-                return False
-        return True
+            return next(entries, None) is None
     except PermissionError:
         return False
     except FileNotFoundError:
