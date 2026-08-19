@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import sqlite3
+
 from common.errors import PystouError
 from common.indexer import (
     close_database,
@@ -12,6 +14,7 @@ from common.indexer import (
     initialize_database,
     update_index_after_change,
 )
+from common.utils import get_directory_size
 
 
 class TestIndexerDeleteDirectory(unittest.TestCase):
@@ -123,6 +126,51 @@ class TestIndexHasData(unittest.TestCase):
         )
         self.conn.commit()
         self.assertTrue(index_has_data(self.conn))
+
+
+class TestFilesAreIndexedOnce(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.conn = initialize_database(self.test_dir)
+
+    def tearDown(self):
+        close_database(self.conn)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_repeated_add_file_does_not_inflate_size(self):
+        path = Path(self.test_dir) / "f.txt"
+        path.write_text("0123456789")
+        for _ in range(3):
+            update_index_after_change(self.conn, "add_file", path)
+        self.assertEqual(get_directory_size(self.conn, Path(self.test_dir)), (10, 1))
+
+
+class TestLegacyIndexRetrofit(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        legacy = sqlite3.connect(os.path.join(self.test_dir, "filesystem_index.db"))
+        legacy.execute(
+            "CREATE TABLE files (id INTEGER PRIMARY KEY, directory_path TEXT, name TEXT,"
+            " size INTEGER, mtime REAL)"
+        )
+        for _ in range(3):
+            legacy.execute("INSERT INTO files (directory_path, name, size, mtime)"
+                           " VALUES ('/a', 'f.txt', 10, 0)")
+        legacy.commit()
+        legacy.close()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_existing_duplicate_rows_are_collapsed(self):
+        conn = initialize_database(self.test_dir)
+        try:
+            self.assertEqual(get_directory_size(conn, Path("/a")), (10, 1))
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute("INSERT INTO files (directory_path, name, size, mtime)"
+                             " VALUES ('/a', 'f.txt', 10, 0)")
+        finally:
+            close_database(conn)
 
 
 if __name__ == "__main__":

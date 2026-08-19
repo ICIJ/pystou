@@ -59,13 +59,25 @@ def create_tables(conn: sqlite3.Connection) -> None:
             directory_path TEXT,
             name TEXT,
             size INTEGER,
-            mtime REAL
+            mtime REAL,
+            UNIQUE (directory_path, name)
         )
     """
     )
+    unique_files = (
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_files_directory_name"
+        " ON files(directory_path, name)"
+    )
+    try:
+        cursor.execute(unique_files)
+    except sqlite3.IntegrityError:
+        cursor.execute(
+            "DELETE FROM files WHERE id NOT IN"
+            " (SELECT MIN(id) FROM files GROUP BY directory_path, name)"
+        )
+        cursor.execute(unique_files)
     # Create indexes for faster queries
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_directories_parent ON directories(parent_path)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_directory ON files(directory_path)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_name ON files(name)")
     conn.commit()
 
