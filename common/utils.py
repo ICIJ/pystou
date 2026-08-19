@@ -334,6 +334,20 @@ def extract_split_zip_archive(archive_path: Path) -> bool:
     return True
 
 
+def _tar_output_dir(archive_path: Path) -> Path:
+    """Creates and returns the unique directory a tar-based archive extracts into.
+
+    Args:
+        archive_path (Path): The archive being extracted.
+
+    Returns:
+        Path: The freshly created output directory, named after the archive with any
+        intermediate ``.tar`` dropped (``backup.tar.gz`` -> ``backup``).
+    """
+    base_name = re.sub(r"\.tar$", "", archive_path.stem, flags=re.IGNORECASE)
+    return make_unique_dir(archive_path.parent / base_name)
+
+
 def extract_tar_archive(archive_path: Path) -> bool:
     """Extracts a TAR archive into a unique directory named after the archive.
 
@@ -343,8 +357,7 @@ def extract_tar_archive(archive_path: Path) -> bool:
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
-    base_name = re.sub(r"\.tar$", "", archive_path.stem, flags=re.IGNORECASE)
-    output_dir = make_unique_dir(archive_path.parent / base_name)
+    output_dir = _tar_output_dir(archive_path)
     try:
         with tarfile.open(archive_path, "r:*") as tar_ref:
             if not safe_extract_tar(tar_ref, output_dir):
@@ -470,16 +483,19 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
     is_tar = ".tar.zst" in suffixes or ".tzst" in suffixes
     if is_tar:
         temp_tar_path = reserve_unique_file(archive_path.with_suffix(".tar"))
+        output_dir = _tar_output_dir(archive_path)
         try:
             with open(archive_path, "rb") as f_in, open(temp_tar_path, "wb") as f_out:
                 zstd.ZstdDecompressor().copy_stream(f_in, f_out)
             with tarfile.open(temp_tar_path, "r") as tar_ref:
-                if not safe_extract_tar(tar_ref, archive_path.parent):
+                if not safe_extract_tar(tar_ref, output_dir):
                     print(f"Refused unsafe TAR.ZST archive: {archive_path}", file=sys.stderr)
+                    shutil.rmtree(output_dir, ignore_errors=True)
                     return False
-            print(f"Extracted TAR.ZST archive: {archive_path}", file=sys.stderr)
+            print(f"Extracted TAR.ZST archive to {output_dir}", file=sys.stderr)
             return True
-        except (OSError, tarfile.TarError) as e:
+        except Exception as e:
+            shutil.rmtree(output_dir, ignore_errors=True)
             print(f"Error extracting ZST archive {archive_path}: {e}", file=sys.stderr)
             logging.error(
                 {
@@ -527,6 +543,9 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
     """
     suffixes = "".join(archive_path.suffixes).lower()
     is_tar = ".tar.zst" in suffixes or ".tzst" in suffixes
+    # Claim the output directory before reserving the temp file, so the durable
+    # artifact gets the clean name and only the throwaway is suffixed.
+    output_dir = _tar_output_dir(archive_path) if is_tar else None
     output_path = reserve_unique_file(archive_path.with_suffix(""))
     keep_output = False
     try:
@@ -538,12 +557,13 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
             stdin=subprocess.DEVNULL,
             timeout=EXTERNAL_TOOL_TIMEOUT_SECONDS,
         )
-        if is_tar:
+        if output_dir is not None:
             with tarfile.open(output_path, "r") as tar_ref:
-                if not safe_extract_tar(tar_ref, archive_path.parent):
+                if not safe_extract_tar(tar_ref, output_dir):
                     print(f"Refused unsafe TAR.ZST archive: {archive_path}", file=sys.stderr)
+                    shutil.rmtree(output_dir, ignore_errors=True)
                     return False
-            print(f"Extracted TAR.ZST archive using zstd command: {archive_path}", file=sys.stderr)
+            print(f"Extracted TAR.ZST archive to {output_dir}", file=sys.stderr)
             return True
         keep_output = True  # the decompressed plain file IS the result
         print(f"Decompressed ZST file using zstd command: {archive_path}", file=sys.stderr)
@@ -554,6 +574,8 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
         tarfile.TarError,
         OSError,
     ) as e:
+        if output_dir is not None:
+            shutil.rmtree(output_dir, ignore_errors=True)
         print(
             f"Error extracting ZST archive with zstd command {archive_path}: {e}", file=sys.stderr
         )

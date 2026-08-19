@@ -109,8 +109,8 @@ class TestZstdCommandPath(unittest.TestCase):
             result = utils._extract_zst_with_command(archive)
 
         self.assertTrue(result)
-        # The tar's contents were extracted next to the archive.
-        self.assertTrue((Path(self.test_dir) / "payload_unique.txt").exists())
+        # The tar's contents were extracted into the archive's own directory.
+        self.assertTrue((Path(self.test_dir) / "bundle" / "payload_unique.txt").exists())
         # The temporary decompressed tar was cleaned up.
         self.assertFalse(expected_output.exists())
 
@@ -932,6 +932,79 @@ class TestExtractUppercaseArchives(unittest.TestCase):
         self.assertTrue(utils.extract_archive(archive))
 
         self.assertEqual((Path(self.test_dir) / "PLAIN.TXT").read_text(), "hi")
+
+
+class TestTarZstIntoUniqueDirectory(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.existing = Path(self.test_dir) / "notes.txt"
+        self.existing.write_text("original")
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def _tar_bytes(self) -> bytes:
+        member = Path(self.test_dir) / "src" / "notes.txt"
+        member.parent.mkdir()
+        member.write_text("pwned")
+        tar_path = Path(self.test_dir) / "src" / "payload.tar"
+        with tarfile.open(tar_path, "w") as tf:
+            tf.add(member, arcname="notes.txt")
+        payload = tar_path.read_bytes()
+        shutil.rmtree(member.parent)
+        return payload
+
+    def _assert_did_not_clobber(self):
+        self.assertEqual(self.existing.read_text(), "original")
+        self.assertEqual((Path(self.test_dir) / "bundle" / "notes.txt").read_text(), "pwned")
+
+    def test_command_path_does_not_clobber_existing_sibling(self):
+        from unittest.mock import patch
+
+        payload = self._tar_bytes()
+        archive = Path(self.test_dir) / "bundle.tar.zst"
+        archive.write_bytes(b"placeholder-compressed-bytes")
+
+        def fake_run(cmd, *args, **kwargs):
+            Path(cmd[cmd.index("-o") + 1]).write_bytes(payload)
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        with patch.object(utils.subprocess, "run", side_effect=fake_run):
+            self.assertTrue(utils._extract_zst_with_command(archive))
+
+        self._assert_did_not_clobber()
+
+    def test_tzst_output_directory_keeps_the_clean_name(self):
+        from unittest.mock import patch
+
+        payload = self._tar_bytes()
+        archive = Path(self.test_dir) / "bundle.tzst"
+        archive.write_bytes(b"placeholder-compressed-bytes")
+
+        def fake_run(cmd, *args, **kwargs):
+            Path(cmd[cmd.index("-o") + 1]).write_bytes(payload)
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        with patch.object(utils.subprocess, "run", side_effect=fake_run):
+            self.assertTrue(utils._extract_zst_with_command(archive))
+
+        self._assert_did_not_clobber()
+
+    def test_module_path_does_not_clobber_existing_sibling(self):
+        payload = self._tar_bytes()
+        archive = Path(self.test_dir) / "bundle.tar.zst"
+        archive.write_bytes(b"placeholder-compressed-bytes")
+
+        class FakeDecompressor:
+            def copy_stream(self, f_in, f_out):
+                f_out.write(payload)
+
+        class FakeZstd:
+            ZstdDecompressor = FakeDecompressor
+
+        self.assertTrue(utils._extract_zst_with_module(archive, FakeZstd()))
+
+        self._assert_did_not_clobber()
 
 
 if __name__ == "__main__":
