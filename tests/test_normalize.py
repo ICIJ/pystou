@@ -100,3 +100,64 @@ class TestApplyRename(unittest.TestCase):
         new = apply_rename(link, "link_")
         self.assertTrue(new.is_symlink())
         self.assertEqual(target.read_text(), "target body")
+
+
+from normalize.main import undo_run
+
+
+class TestUndo(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.state = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def _normalize(self):
+        from normalize.main import normalize_command
+
+        normalize_command(
+            directory=str(self.root),
+            recursive=True,
+            rule=None,
+            dry_run=False,
+            manifest_dir=self.state,
+            log_dir=self.state,
+        )
+        return Path(sorted(Path(self.state).glob("*.jsonl"))[0]).stem
+
+    def test_restores_the_exact_original_bytes(self):
+        bad_dir = Path(os.fsdecode(os.fsencode(str(self.root)) + b"/dir_\x9f"))
+        bad_dir.mkdir()
+        make(bad_dir, b"a\x9f.txt", b"body")
+        before = _listing(self.root)
+
+        run_id = self._normalize()
+        self.assertNotEqual(_listing(self.root), before)
+
+        restored, skipped = undo_run(run_id, self.state)
+        self.assertEqual(skipped, 0)
+        self.assertEqual(restored, 2)
+        self.assertEqual(_listing(self.root), before)
+
+    def test_skips_an_entry_whose_original_name_is_taken(self):
+        make(self.root, b"note_\x9f.txt", b"body")
+        run_id = self._normalize()
+        # Recreate the original name so the undo target is occupied.
+        make(self.root, b"note_\x9f.txt", b"squatter")
+        restored, skipped = undo_run(run_id, self.state)
+        self.assertEqual((restored, skipped), (0, 1))
+        self.assertEqual(
+            Path(os.fsdecode(os.fsencode(str(self.root)) + b"/note_\x9f.txt")).read_bytes(),
+            b"squatter",
+        )
+
+
+def _listing(root: Path) -> list[bytes]:
+    """Returns every path under root as raw bytes, so bad names compare exactly."""
+    found = []
+    for current, dirs, files in os.walk(os.fsencode(str(root))):
+        for name in sorted(dirs) + sorted(files):
+            found.append(os.path.join(current, name))
+    return sorted(found)
