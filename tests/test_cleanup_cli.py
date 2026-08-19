@@ -45,34 +45,26 @@ class TestCleanupCommand(unittest.TestCase):
 
     def test_hard_delete(self):
         (Path(self.dir) / ".DS_Store").write_text("junk")
-        r = self.runner.invoke(
-            _app(), [self.dir, "--hard-delete", "--log-dir", self.dir]
-        )
+        r = self.runner.invoke(_app(), [self.dir, "--hard-delete", "--log-dir", self.dir])
         self.assertEqual(r.exit_code, 0)
         self.assertFalse((Path(self.dir) / ".DS_Store").exists())
         self.assertEqual(trash.list_runs(self.dir), [])
 
     def test_list_only_does_not_remove(self):
         (Path(self.dir) / ".DS_Store").write_text("junk")
-        r = self.runner.invoke(
-            _app(), [self.dir, "--list-only", "--log-dir", self.dir]
-        )
+        r = self.runner.invoke(_app(), [self.dir, "--list-only", "--log-dir", self.dir])
         self.assertEqual(r.exit_code, 0)
         self.assertTrue((Path(self.dir) / ".DS_Store").exists())
 
     def test_dry_run_no_op(self):
         (Path(self.dir) / ".DS_Store").write_text("junk")
-        r = self.runner.invoke(
-            _app(), [self.dir, "-n", "--log-dir", self.dir]
-        )
+        r = self.runner.invoke(_app(), [self.dir, "-n", "--log-dir", self.dir])
         self.assertEqual(r.exit_code, 0)
         self.assertTrue((Path(self.dir) / ".DS_Store").exists())
 
     def test_dry_run_stdout_clean(self):
         (Path(self.dir) / ".DS_Store").write_text("x")
-        r = _split_runner().invoke(
-            _app(), [self.dir, "-n", "--log-dir", self.dir]
-        )
+        r = _split_runner().invoke(_app(), [self.dir, "-n", "--log-dir", self.dir])
         self.assertEqual(r.exit_code, 0)
         self.assertNotIn("\r", r.stdout)
 

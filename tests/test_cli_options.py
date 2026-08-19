@@ -44,7 +44,5 @@ class TestDbDirNotOfferedWithoutAnIndex(unittest.TestCase):
             with self.subTest(command=command.__name__):
                 app = typer.Typer()
                 app.command()(command)
-                r = CliRunner().invoke(
-                    app, [self.dir, "--log-dir", self.dir, "--db-dir", self.dir]
-                )
+                r = CliRunner().invoke(app, [self.dir, "--log-dir", self.dir, "--db-dir", self.dir])
                 self.assertNotEqual(r.exit_code, 0)

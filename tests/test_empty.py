@@ -221,9 +221,11 @@ class TestEmptyRemoveEmptyDirectories(unittest.TestCase):
         target = self.test_path / "target"
         target.mkdir()
 
-        with mock.patch.object(Path, "rmdir", side_effect=OSError(errno.EIO, "buffer not empty")):
-            with self.assertLogs(level="ERROR"):
-                removed, skipped = remove_empty_directories([target])
+        failing_rmdir = mock.patch.object(
+            Path, "rmdir", side_effect=OSError(errno.EIO, "buffer not empty")
+        )
+        with failing_rmdir, self.assertLogs(level="ERROR"):
+            removed, skipped = remove_empty_directories([target])
 
         self.assertEqual((removed, skipped), (0, 1))
 
