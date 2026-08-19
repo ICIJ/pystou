@@ -148,6 +148,33 @@ class TestQuarantineEdgeCases(unittest.TestCase):
             trash.quarantine([victim], self.root, operation="cleanup", command="pystou cleanup")
 
 
+class TestQuarantineCost(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_holding_dir_probes_stay_linear(self):
+        items = []
+        for i in range(20):
+            p = Path(self.root) / f"f{i}.txt"
+            p.write_text("x")
+            items.append(p)
+        real_mkdir = Path.mkdir
+        calls = []
+
+        def counting_mkdir(self, *args, **kwargs):
+            calls.append(self)
+            return real_mkdir(self, *args, **kwargs)
+
+        with mock.patch.object(Path, "mkdir", counting_mkdir):
+            run_id = trash.quarantine(items, self.root, operation="cleanup", command="c")
+        run_dir = Path(self.root) / ".pystou-trash" / run_id
+        probes = [c for c in calls if c.parent == run_dir]
+        self.assertEqual(len(probes), len(items))
+
+
 class TestListRuns(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp()

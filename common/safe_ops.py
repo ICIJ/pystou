@@ -104,7 +104,7 @@ def verify_then_delete(archive: Path, success: bool, delete_fn: Callable[[], Non
     delete_fn()
 
 
-def reserve_unique_name(dest_dir, basename) -> Path:
+def reserve_unique_name(dest_dir, basename, start: int = 0) -> Path:
     """Atomically reserves a collision-free path under ``dest_dir``.
 
     Creates a numbered holding subdir (``dest_dir/0``, ``dest_dir/1``, ...) with
@@ -116,12 +116,15 @@ def reserve_unique_name(dest_dir, basename) -> Path:
     Args:
         dest_dir: Directory under which to reserve a name.
         basename: Final name the reserved path should carry.
+        start: First holding number to try. Callers reserving many names under
+            the same directory pass an increasing value, so the probe only runs
+            on a real collision instead of rescanning every taken number.
 
     Returns:
         Path: ``<dest_dir>/<n>/<basename>`` with the ``<n>`` holding dir created.
     """
     dest_dir = Path(dest_dir)
-    counter = 0
+    counter = start
     while True:
         holding = dest_dir / str(counter)
         try:
