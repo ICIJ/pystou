@@ -228,5 +228,23 @@ class TestStatsSkipsTrash(unittest.TestCase):
         self.assertFalse(any(".pystou-trash" in p for p in stats["empty_directories"]))
 
 
+class TestStatsArchiveExtensions(unittest.TestCase):
+    """stats must count exactly the formats extract supports."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_counts_the_formats_extract_supports(self):
+        for name in ("mail.ost", "bundle.tbz", "bundle.tzst", "notes.rar", "notes.7z"):
+            (Path(self.test_dir) / name).write_bytes(b"x")
+
+        stats = collect_stats(self.test_dir, recursive=False)
+
+        self.assertEqual(stats["summary"]["archive_files"], 3)
+
+
 if __name__ == "__main__":
     unittest.main()
