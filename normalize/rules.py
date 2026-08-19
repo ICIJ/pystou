@@ -21,7 +21,7 @@ _PUNCT = re.compile(r"[\\{}^%`\[\]~<>#|]+")
 # ASCII only: NBSP and the ideographic space are valid, S3-safe UTF-8 and the
 # control rule never claimed them. A Unicode-aware ``\s`` would rewrite them.
 _ASCII_SPACE = " \t\n\r\f\v"
-_WHITESPACE = re.compile(r"[ \t\n\r\f\v]+")
+_WHITESPACE = re.compile(f"[{re.escape(_ASCII_SPACE)}]+")
 
 
 def _decode_cesu8_pair(match: "re.Match[bytes]") -> bytes:
@@ -94,7 +94,9 @@ def normalize_name(name: str, rules: Sequence[str] = RULES) -> tuple[str, str, l
     if "punct" in rules:
         result = _record(_PUNCT.sub("", result), result, "punct", applied)
     if "control" in rules:
-        result = trim(result)
+        # Punctuation removal can expose a trailing space, so the trim runs
+        # last; the rule that owns it must still be credited.
+        result = _record(trim(result), result, "control", applied)
 
     if result in ("", ".", ".."):
         result = FALLBACK
@@ -103,6 +105,6 @@ def normalize_name(name: str, rules: Sequence[str] = RULES) -> tuple[str, str, l
 
 def _record(new: str, old: str, rule: str, applied: list[str]) -> str:
     """Returns ``new``, noting ``rule`` in ``applied`` when it changed ``old``."""
-    if new != old:
+    if new != old and rule not in applied:
         applied.append(rule)
     return new

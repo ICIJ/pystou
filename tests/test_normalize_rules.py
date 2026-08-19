@@ -107,3 +107,12 @@ class TestUnicodeWhitespace(unittest.TestCase):
 
     def test_a_leading_nbsp_is_not_stripped(self):
         self.assertEqual(normalize_name("\xa0note.txt")[0], "\xa0note.txt")
+
+
+class TestAppliedRules(unittest.TestCase):
+    def test_trailing_space_exposed_by_punct_removal_is_credited_to_control(self):
+        # Punctuation removal can expose a trailing space that only the final
+        # trim clears; the rule that changed the name must still be reported.
+        new, _mode, applied = normalize_name("a #")
+        self.assertEqual(new, "a")
+        self.assertIn("control", applied)
