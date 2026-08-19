@@ -11,7 +11,6 @@ import typer
 
 from common import console
 from common.cli import (
-    DbDirOpt,
     DirectoryArg,
     DryRunOpt,
     LogDirOpt,
@@ -33,7 +32,6 @@ def empty_command(
     ] = False,
     dry_run: DryRunOpt = False,
     log_dir: LogDirOpt = ".",
-    db_dir: DbDirOpt = ".",
 ) -> None:
     """Find and remove empty directories; no quarantine (empty dirs hold no data)."""
     setup_logging("empty", log_dir)

@@ -12,7 +12,6 @@ import typer
 
 from common import console
 from common.cli import (
-    DbDirOpt,
     DirectoryArg,
     LogDirOpt,
     RecursiveOpt,
@@ -33,7 +32,6 @@ def stats_command(
     by_size: Annotated[bool, typer.Option("--by-size", help="Show largest files.")] = False,
     json_out: Annotated[bool, typer.Option("--json", help="Output stats as JSON.")] = False,
     log_dir: LogDirOpt = ".",
-    db_dir: DbDirOpt = ".",
 ) -> None:
     """Display directory statistics: file counts, sizes, extensions, largest files."""
     setup_logging("stats", log_dir)
