@@ -142,11 +142,11 @@ def quarantine(
         },
     )
 
-    for it in items:
+    for counter, it in enumerate(items):
         is_link = it.is_symlink()
         kind = "dir" if (it.is_dir() and not is_link) else "file"
         size = _entry_size(it, is_link, kind)
-        reserved = reserve_unique_name(run_dir, it.name)
+        reserved = reserve_unique_name(run_dir, it.name, counter)
         # WAL invariant: the ledger line is written right after the rename, so the
         # ledger always reflects exactly what was moved. An interrupt leaves at most
         # one moved-but-unrecorded item; restore treats unledgered trash as orphans.
