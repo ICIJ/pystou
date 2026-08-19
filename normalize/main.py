@@ -31,6 +31,8 @@ from normalize import manifest
 from normalize.rules import RULES, normalize_name
 from pystou import __version__
 
+STAGING_SUFFIX = ".pystou-staging"
+
 
 class Rule(str, Enum):
     utf8 = "utf8"
@@ -224,18 +226,73 @@ def apply_rename(old: Path, new_name: str) -> Path:
         suffix if the desired name was taken.
     """
     target = old.parent / new_name
-    # The claim is unconditional on purpose. Short-circuiting when target and
-    # old are the same file (a case- or normalization-insensitive volume, a
-    # sibling hardlink) looks like it avoids a spurious ' (1)', but os.rename
-    # is a no-op when both paths resolve to one file, so it would record a
-    # rename that never happened. A manifest that lies is worse than an ugly
-    # name.
-    if old.is_dir() and not old.is_symlink():
-        claimed = make_unique_dir(target)
-    else:
-        claimed = reserve_unique_file(target, keep_suffix=True)
-    os.rename(old, claimed)
+    is_directory = old.is_dir() and not old.is_symlink()
+    # os.rename is a no-op when both paths resolve to one file, so a target that
+    # already IS the source (a case- or normalization-insensitive volume) or
+    # merely shares its inode (a hardlink) must be moved aside before renaming.
+    # Skipping that would report and record a rename that never happened.
+    if _is_same_entry(old, target):
+        return _rename_through_staging(old, target, is_directory)
+    claimed = _claim(target, is_directory)
+    _rename_onto_claim(old, claimed)
     return claimed
+
+
+def _is_same_entry(old: Path, target: Path) -> bool:
+    """Returns True when ``target`` exists and resolves to the same file as ``old``."""
+    if not os.path.lexists(target):
+        return False
+    return os.path.samestat(os.lstat(old), os.lstat(target))
+
+
+def _claim(target: Path, is_directory: bool) -> Path:
+    """Exclusively creates a placeholder at ``target``, or at ``target (n)`` if taken."""
+    if is_directory:
+        return make_unique_dir(target)
+    return reserve_unique_file(target, keep_suffix=True)
+
+
+def _rename_onto_claim(old: Path, claimed: Path) -> None:
+    """Renames ``old`` onto its placeholder, releasing the placeholder on failure.
+
+    The placeholder carries the name the caller asked for, so leaving it behind
+    would push the real entry to ``name (1)`` on the next run.
+    """
+    try:
+        os.rename(old, claimed)
+    except OSError:
+        _release(claimed)
+        raise
+
+
+def _release(claimed: Path) -> None:
+    """Removes a placeholder we created but could not rename onto."""
+    with contextlib.suppress(OSError):
+        if claimed.is_dir():
+            claimed.rmdir()
+        else:
+            claimed.unlink()
+
+
+def _rename_through_staging(old: Path, target: Path, is_directory: bool) -> Path:
+    """Renames an entry that shares its directory entry or inode with ``target``.
+
+    Moving ``old`` aside first makes the two paths distinguishable: if ``target``
+    is gone afterwards it was the same directory entry, so the name is free; if
+    it survives it was a separate link and the usual collision suffix applies.
+    """
+    staged = _claim(old.with_name(f"{old.name}{STAGING_SUFFIX}"), is_directory)
+    _rename_onto_claim(old, staged)
+    try:
+        if not os.path.lexists(target):
+            os.rename(staged, target)
+            return target
+        claimed = _claim(target, is_directory)
+        _rename_onto_claim(staged, claimed)
+        return claimed
+    except OSError:
+        os.rename(staged, old)
+        raise
 
 
 def undo_run(

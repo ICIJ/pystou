@@ -27,7 +27,9 @@ def normalize_tree(root: Path, state: str) -> str:
         manifest_dir=state,
         log_dir=state,
     )
-    return sorted(Path(state).glob("*.jsonl"))[-1].stem
+    manifests = sorted(Path(state).glob("*.jsonl"))
+    assert len(manifests) == 1, f"expected one manifest, found {len(manifests)}"
+    return manifests[0].stem
 
 
 class TestWalkBottomUp(unittest.TestCase):
@@ -277,3 +279,32 @@ def _listing(root: Path) -> list[bytes]:
         for name in sorted(dirs) + sorted(files):
             found.append(os.path.join(current, name))
     return sorted(found)
+
+
+class TestApplyRenameFailure(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_failed_rename_leaves_no_reserved_placeholder(self):
+        # The placeholder carries the name the caller wanted, so leaving it
+        # behind would push the real entry to 'name (1).ext' on the next run.
+        old = make(self.root, b"note_\x9f.txt", b"body")
+        with (
+            mock.patch("normalize.main.os.rename", side_effect=PermissionError("denied")),
+            self.assertRaises(PermissionError),
+        ):
+            apply_rename(old, "note_.txt")
+        self.assertEqual([p.name for p in self.root.iterdir()], [old.name])
+
+    def test_same_inode_sibling_still_gets_a_collision_suffix(self):
+        # os.rename is a no-op when both paths resolve to one file, so a
+        # hardlinked sibling must not be reported as renamed in place.
+        old = make(self.root, b"note_\x9f.txt", b"body")
+        os.link(old, self.root / "note_.txt")
+        result = apply_rename(old, "note_.txt")
+        self.assertEqual(result.name, "note_ (1).txt")
+        self.assertFalse(os.path.lexists(old))
+        self.assertEqual(result.read_bytes(), b"body")
