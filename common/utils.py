@@ -64,9 +64,13 @@ def group_directories(conn, root) -> dict:
             base_name = match.group(1)
             group_key = (str(parent_dir), base_name)
             groups[group_key].append(dir_path)
-    # Only keep groups with more than one directory
-    duplicate_groups = {k: v for k, v in groups.items() if len(v) > 1}
-    return duplicate_groups
+    # A suffixed name is only a copy of something when the plain name exists next to it:
+    # 'Trip (2019)' and 'Trip (2020)' are distinct folders, not 'Trip' duplicated.
+    return {
+        (parent, base): dirs
+        for (parent, base), dirs in groups.items()
+        if len(dirs) > 1 and any(d.name == base for d in dirs)
+    }
 
 
 def get_directory_size(conn, dir_path: Path) -> tuple:
