@@ -10,6 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Optional, Union
 
+from common.errors import PystouError
 from common.safe_extract import safe_extract_tar, safe_extract_zip
 from common.safe_ops import make_unique_dir, reserve_unique_file
 
@@ -116,11 +117,20 @@ def get_archive_files(
 
     Returns:
         List[Path]: A list of Paths to archive files.
+
+    Raises:
+        PystouError: If ``filter_types`` names an unsupported archive type.
     """
     if filter_types:
         # Normalize filter types to have leading dot
-        normalized = [t.lower() if t.startswith(".") else f".{t.lower()}" for t in filter_types]
-        archive_extensions = [ext for ext in ARCHIVE_EXTENSIONS if ext in normalized]
+        normalized = {t.lower() if t.startswith(".") else f".{t.lower()}" for t in filter_types}
+        unknown = normalized - ARCHIVE_EXTENSIONS
+        if unknown:
+            raise PystouError(
+                f"Unknown archive type: {', '.join(sorted(unknown))}. "
+                f"Accepted types: {', '.join(sorted(ARCHIVE_EXTENSIONS))}."
+            )
+        archive_extensions = normalized
     else:
         archive_extensions = ARCHIVE_EXTENSIONS
     # Pattern to match split archive parts (.z01, .z02, etc.)
