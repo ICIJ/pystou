@@ -68,7 +68,7 @@ def stats_command(
     t = console.table("Directory Statistics", ["Metric", "Value"])
     t.add_row("Total files", f"{summary['total_files']:,}")
     t.add_row("Total directories", f"{summary['total_dirs']:,}")
-    t.add_row("Total size", format_size(summary["total_size"]))
+    t.add_row("Total size", console.human_size(summary["total_size"]))
     t.add_row("Archive files", f"{summary['archive_files']:,}")
     t.add_row("Empty directories", f"{summary['empty_dirs']:,}")
     if summary["symlinks_skipped"] > 0:
@@ -84,14 +84,14 @@ def stats_command(
         )[:top]
         te = console.table(f"Top {top} Extensions by Count", ["Extension", "Files", "Size"])
         for ext, data in sorted_by_count:
-            te.add_row(ext, f"{data['count']:,}", format_size(data["size"]))
+            te.add_row(ext, f"{data['count']:,}", console.human_size(data["size"]))
         console.print_table(te)
 
     # Largest files
     if by_size:
         ts = console.table(f"Top {top} Largest Files", ["Size", "Path"])
         for path, size in stats["largest_files"][:top]:
-            ts.add_row(format_size(size), path)
+            ts.add_row(console.human_size(size), path)
         console.print_table(ts)
 
 
@@ -234,19 +234,3 @@ def process_file(file_path: Path, stats: dict, archive_extensions: set, top_n: i
         heapq.heappush(stats["largest_files"], (size, str(file_path)))
     elif stats["largest_files"] and size > stats["largest_files"][0][0]:
         heapq.heapreplace(stats["largest_files"], (size, str(file_path)))
-
-
-def format_size(size: float) -> str:
-    """Formats a size in bytes to human-readable format.
-
-    Args:
-        size: Size in bytes.
-
-    Returns:
-        Human-readable size string.
-    """
-    for unit in ["B", "KB", "MB", "GB", "TB"]:
-        if size < 1024:
-            return f"{size:.1f} {unit}"
-        size /= 1024
-    return f"{size:.1f} PB"

@@ -35,6 +35,15 @@ def print_json(obj, file=None) -> None:
     (file or sys.stdout).write(_json.dumps(obj, indent=2) + "\n")
 
 
+def human_size(size: float) -> str:
+    """Formats a byte count with a binary unit suffix, e.g. '1.0 KB'."""
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} PB"
+
+
 def table(title: str, columns: list) -> Table:
     t = Table(title=title)
     for col in columns:

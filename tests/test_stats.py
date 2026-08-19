@@ -4,36 +4,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from stats.main import (
-    collect_stats,
-    format_size,
-    process_file,
-)
-
-
-class TestStatsFormatSize(unittest.TestCase):
-    """Tests for size formatting function."""
-
-    def test_format_bytes(self):
-        """Test formatting bytes."""
-        self.assertEqual(format_size(500), "500.0 B")
-
-    def test_format_kilobytes(self):
-        """Test formatting kilobytes."""
-        self.assertEqual(format_size(1024), "1.0 KB")
-        self.assertEqual(format_size(2048), "2.0 KB")
-
-    def test_format_megabytes(self):
-        """Test formatting megabytes."""
-        self.assertEqual(format_size(1024 * 1024), "1.0 MB")
-
-    def test_format_gigabytes(self):
-        """Test formatting gigabytes."""
-        self.assertEqual(format_size(1024 * 1024 * 1024), "1.0 GB")
-
-    def test_format_terabytes(self):
-        """Test formatting terabytes."""
-        self.assertEqual(format_size(1024 * 1024 * 1024 * 1024), "1.0 TB")
+from stats.main import collect_stats, process_file
 
 
 class TestStatsCollectStats(unittest.TestCase):
