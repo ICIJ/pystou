@@ -224,3 +224,23 @@ def _listing(root) -> list[bytes]:
         for name in sorted(dirs) + sorted(files):
             found.append(os.path.join(current, name))
     return sorted(found)
+
+
+class TestNoOpRun(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.state = tempfile.mkdtemp()
+        self.runner = CliRunner()
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def test_run_with_nothing_to_rename_writes_no_manifest(self):
+        # Otherwise every clean run drops an orphan run id that --undo accepts.
+        (Path(self.dir) / "fine.txt").write_text("x")
+        result = self.runner.invoke(
+            _app(), [self.dir, "--log-dir", self.state, "--manifest-dir", self.state]
+        )
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(list(Path(self.state).glob("*.jsonl")), [])
