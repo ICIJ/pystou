@@ -1,8 +1,10 @@
 import shutil
+import tarfile
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 from identify.main import (
     check_encrypted_archives,
@@ -71,6 +73,16 @@ class TestIdentifyDetectFileType(unittest.TestCase):
         file_type = detect_file_type(pdf_path)
         self.assertEqual(file_type, "pdf")
 
+    def test_detect_tar_file(self):
+        """A real tar is recognised by the 'ustar' magic at offset 257."""
+        member = self.test_path / "member.txt"
+        member.write_text("content")
+        tar_path = self.test_path / "test.tar"
+        with tarfile.open(tar_path, "w") as tf:
+            tf.add(member, arcname="member.txt")
+
+        self.assertEqual(detect_file_type(tar_path), "tar")
+
     def test_detect_pdf_carrying_ustar_at_tar_offset(self):
         """A PDF that happens to hold 'ustar' at offset 257 is still a PDF."""
         pdf_path = self.test_path / "carrier.pdf"
@@ -84,6 +96,22 @@ class TestIdentifyDetectFileType(unittest.TestCase):
         text_path.write_bytes(b"ustar is a word")
 
         self.assertIsNone(detect_file_type(text_path))
+
+    def test_detect_opens_the_file_once(self):
+        """The tar probe must reuse the header read, not re-open the file."""
+        unknown_path = self.test_path / "notes.txt"
+        unknown_path.write_bytes(b"plain text" + b"\x00" * 300)
+        real_open = open
+        opened = []
+
+        def counting_open(*args, **kwargs):
+            opened.append(args[0])
+            return real_open(*args, **kwargs)
+
+        with mock.patch("builtins.open", counting_open):
+            self.assertIsNone(detect_file_type(unknown_path))
+
+        self.assertEqual(len(opened), 1)
 
     def test_detect_unknown_file(self):
         """Test detecting an unknown file type."""

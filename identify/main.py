@@ -207,7 +207,7 @@ def detect_file_type(file_path: Path) -> Optional[str]:
     """
     try:
         with open(file_path, "rb") as f:
-            header = f.read(16)
+            header = f.read(262)
 
         if len(header) == 0:
             return None
@@ -218,13 +218,8 @@ def detect_file_type(file_path: Path) -> Optional[str]:
                 return file_type
 
         # tar has no header magic: "ustar" sits at offset 257
-        try:
-            with open(file_path, "rb") as f:
-                f.seek(257)
-                if f.read(5) == b"ustar":
-                    return "tar"
-        except OSError:
-            pass
+        if header[257:262] == b"ustar":
+            return "tar"
 
         return None
 
