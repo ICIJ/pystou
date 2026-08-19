@@ -49,11 +49,13 @@ def trash_list(
         return
     t = console.table("Trash", ["Run", "Op", "Items", "Reclaimable", "Started"])
     for r in runs:
-        t.add_row(r.run_id, r.operation, str(r.item_count), _human_size(r.total_size), r.started_at)
+        t.add_row(
+            r.run_id, r.operation, str(r.item_count), console.human_size(r.total_size), r.started_at
+        )
     console.print_table(t)
     total = sum(r.total_size for r in runs)
     console.status(
-        f"{len(runs)} run(s), {_human_size(total)} reclaimable."
+        f"{len(runs)} run(s), {console.human_size(total)} reclaimable."
         " Use 'pystou trash purge' to free space."
     )
 
@@ -81,12 +83,3 @@ def trash_purge(
     )
     console.success(f"Purged {removed} run(s).")
     logging.info({"action": "purge_complete", "purged": removed})
-
-
-def _human_size(n: int) -> str:
-    size = float(n)
-    for unit in ("B", "KB", "MB", "GB", "TB"):
-        if size < 1024 or unit == "TB":
-            return f"{size:.1f}{unit}"
-        size /= 1024
-    return f"{size:.1f}TB"
