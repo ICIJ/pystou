@@ -6,7 +6,7 @@ import logging
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -106,7 +106,7 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> dict:
     Returns:
         Dictionary with collected statistics.
     """
-    stats = {
+    stats: dict[str, Any] = {
         "summary": {
             "total_files": 0,
             "total_dirs": 0,
@@ -236,7 +236,7 @@ def process_file(file_path: Path, stats: dict, archive_extensions: set, top_n: i
         heapq.heapreplace(stats["largest_files"], (size, str(file_path)))
 
 
-def format_size(size: int) -> str:
+def format_size(size: float) -> str:
     """Formats a size in bytes to human-readable format.
 
     Args:
