@@ -123,7 +123,7 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> dict:
         "empty_directories": [],
     }
 
-    archive_extensions = ARCHIVE_EXTENSIONS
+    archive_extensions = set(ARCHIVE_EXTENSIONS)
 
     directory_path = Path(directory)
 

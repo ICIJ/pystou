@@ -126,7 +126,9 @@ def get_archive_files(
     """
     if filter_types:
         # Normalize filter types to have leading dot
-        normalized = {t.lower() if t.startswith(".") else f".{t.lower()}" for t in filter_types}
+        normalized = frozenset(
+            t.lower() if t.startswith(".") else f".{t.lower()}" for t in filter_types
+        )
         unknown = normalized - ARCHIVE_EXTENSIONS
         if unknown:
             raise PystouError(

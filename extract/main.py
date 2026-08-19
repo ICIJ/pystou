@@ -29,7 +29,6 @@ from common.indexer import (
     update_index_after_change,
 )
 from common.logger import setup_logging
-from common.safe_ops import verify_then_delete
 from common.utils import extract_archive, get_archive_files, get_split_archive_parts
 from common.validation import validate_directory_or_exit
 
@@ -377,17 +376,13 @@ def _extract_parallel(
             )
 
         if remove_archives:
-            verify_then_delete(
+            delete_archive_file(
                 archive,
-                success,
-                lambda a=archive: delete_archive_file(
-                    a,
-                    conn,
-                    False,
-                    op_root,
-                    hard_delete=hard_delete,
-                    trash_dir=trash_dir,
-                ),
+                conn,
+                False,
+                op_root,
+                hard_delete=hard_delete,
+                trash_dir=trash_dir,
             )
         else:
             console.status(f"Keeping archive: {archive}")
