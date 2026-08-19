@@ -735,5 +735,122 @@ class TestTruncatedArchiveFailsPerArchive(unittest.TestCase):
 
         self.assertFalse((Path(self.test_dir) / "a.txt").exists())
 
+class TestSplitZipWrapper(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.archive = Path(self.test_dir) / "a.zip"
+        self.archive.write_bytes(b"PK")
+        (Path(self.test_dir) / "a.z01").write_bytes(b"part")
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def _fake_7z(self, returncode, stderr="", record=None):
+        def fake_run(cmd, *args, **kwargs):
+            if record is not None:
+                record["cmd"] = cmd
+                record["kwargs"] = kwargs
+            out_dir = Path(next(c for c in cmd if c.startswith("-o"))[2:])
+            (out_dir / "notes.txt").write_text("hi")
+            if kwargs.get("check") and returncode:
+                raise subprocess.CalledProcessError(returncode, cmd, output="", stderr=stderr)
+            return subprocess.CompletedProcess(cmd, returncode, stdout="", stderr=stderr)
+
+        return fake_run
+
+    def _run(self, fake_run):
+        from unittest.mock import patch
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/7z"),
+            patch.object(utils.subprocess, "run", side_effect=fake_run),
+        ):
+            return utils.extract_split_zip_archive(self.archive)
+
+    def test_warning_exit_keeps_the_extracted_output(self):
+        self.assertTrue(self._run(self._fake_7z(1, stderr="WARNING: cannot open file")))
+        self.assertTrue((Path(self.test_dir) / "a" / "notes.txt").exists())
+
+    def test_fatal_exit_reports_diagnostics_and_removes_partial_output(self):
+        with self.assertLogs(level="ERROR") as captured:
+            self.assertFalse(self._run(self._fake_7z(2, stderr="ERROR: CRC failed")))
+
+        self.assertIn("CRC failed", "\n".join(captured.output))
+        self.assertFalse((Path(self.test_dir) / "a").exists())
+
+    def test_archive_path_follows_a_switch_terminator(self):
+        record = {}
+        self._run(self._fake_7z(0, record=record))
+
+        cmd = record["cmd"]
+        self.assertEqual(cmd[cmd.index("--") + 1], str(self.archive))
+        self.assertEqual(cmd[-1], str(self.archive))
+
+    def test_stdin_is_closed_and_a_timeout_is_set(self):
+        record = {}
+        self._run(self._fake_7z(0, record=record))
+
+        self.assertEqual(record["kwargs"]["stdin"], subprocess.DEVNULL)
+        self.assertGreater(record["kwargs"]["timeout"], 0)
+
+
+class TestExternalToolInvocation(unittest.TestCase):
+    """zstd and readpst get the same switch-terminator/stdin/timeout treatment."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def _record(self, record, make_output=None):
+        def fake_run(cmd, *args, **kwargs):
+            record["cmd"] = cmd
+            record["kwargs"] = kwargs
+            if make_output is not None:
+                make_output(cmd)
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        return fake_run
+
+    def _assert_hardened(self, record, archive):
+        cmd = record["cmd"]
+        self.assertEqual(cmd[cmd.index("--") + 1], str(archive))
+        self.assertEqual(cmd[-1], str(archive))
+        self.assertEqual(record["kwargs"]["stdin"], subprocess.DEVNULL)
+        self.assertGreater(record["kwargs"]["timeout"], 0)
+
+    def test_zstd_command(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "blob.zst"
+        archive.write_bytes(b"placeholder")
+        record = {}
+
+        with patch.object(utils.subprocess, "run", side_effect=self._record(record)):
+            utils._extract_zst_with_command(archive)
+
+        self._assert_hardened(record, archive)
+
+    def test_readpst_command(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "mailbox.pst"
+        archive.write_bytes(b"!BDN")
+        record = {}
+
+        def make_output(cmd):
+            mail = Path(cmd[cmd.index("-o") + 1]) / "mailbox"
+            mail.mkdir(parents=True)
+            (mail / "0001.eml").write_text("from: a@b")
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
+            patch.object(utils.subprocess, "run", side_effect=self._record(record, make_output)),
+        ):
+            utils.extract_outlook_archive(archive)
+
+        self._assert_hardened(record, archive)
+
 if __name__ == "__main__":
     unittest.main()

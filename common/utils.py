@@ -15,6 +15,8 @@ from common.fs_walker import is_excluded_dir
 from common.safe_extract import safe_extract_tar, safe_extract_zip
 from common.safe_ops import make_unique_dir, reserve_unique_file
 
+EXTERNAL_TOOL_TIMEOUT_SECONDS = 3600
+
 ARCHIVE_EXTENSIONS = frozenset(
     {
         ".zip",
@@ -281,12 +283,17 @@ def extract_split_zip_archive(archive_path: Path) -> bool:
         return False
 
     output_dir = make_unique_dir(archive_path.parent / archive_path.stem)
+    cmd = ["7z", "x", f"-o{output_dir}", "-y", "--", str(archive_path)]
     try:
-        cmd = ["7z", "x", str(archive_path), f"-o{output_dir}", "-y"]
-        subprocess.run(cmd, check=True, capture_output=True)
-        print(f"Extracted split ZIP archive to {output_dir}", file=sys.stderr)
-        return True
-    except subprocess.CalledProcessError as e:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            stdin=subprocess.DEVNULL,
+            timeout=EXTERNAL_TOOL_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
         shutil.rmtree(output_dir, ignore_errors=True)
         print(f"Error extracting split ZIP archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
@@ -298,6 +305,31 @@ def extract_split_zip_archive(archive_path: Path) -> bool:
             }
         )
         return False
+
+    # 7-Zip exits 1 for non-fatal warnings (e.g. a skipped file); 2 and above are fatal.
+    if proc.returncode > 1:
+        diagnostics = ((proc.stderr or "").strip() or (proc.stdout or "").strip())[-2000:]
+        shutil.rmtree(output_dir, ignore_errors=True)
+        print(
+            f"Error extracting split ZIP archive {archive_path}: "
+            f"7z exited with status {proc.returncode}",
+            file=sys.stderr,
+        )
+        if diagnostics:
+            print(diagnostics, file=sys.stderr)
+        logging.error(
+            {
+                "action": "extract_split_zip",
+                "status": "error",
+                "returncode": proc.returncode,
+                "archive": str(archive_path),
+                "sevenzip_output": diagnostics,
+            }
+        )
+        return False
+
+    print(f"Extracted split ZIP archive to {output_dir}", file=sys.stderr)
+    return True
 
 
 def extract_tar_archive(archive_path: Path) -> bool:
@@ -495,8 +527,14 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
     output_path = reserve_unique_file(archive_path.with_suffix(""))
     keep_output = False
     try:
-        cmd = ["zstd", "-d", "-f", str(archive_path), "-o", str(output_path)]
-        subprocess.run(cmd, check=True, capture_output=True)
+        cmd = ["zstd", "-d", "-f", "-o", str(output_path), "--", str(archive_path)]
+        subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            timeout=EXTERNAL_TOOL_TIMEOUT_SECONDS,
+        )
         if is_tar:
             with tarfile.open(output_path, "r") as tar_ref:
                 if not safe_extract_tar(tar_ref, archive_path.parent):
@@ -507,7 +545,12 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
         keep_output = True  # the decompressed plain file IS the result
         print(f"Decompressed ZST file using zstd command: {archive_path}", file=sys.stderr)
         return True
-    except (subprocess.CalledProcessError, tarfile.TarError, OSError) as e:
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        tarfile.TarError,
+        OSError,
+    ) as e:
         print(
             f"Error extracting ZST archive with zstd command {archive_path}: {e}", file=sys.stderr
         )
@@ -622,12 +665,19 @@ def extract_outlook_archive(archive_path: Path, tolerant: bool = False) -> bool:
 
     base_output_dir = archive_path.parent / archive_path.stem
     unique_output_dir = make_unique_dir(base_output_dir)
-    cmd = ["readpst", "-reD", "-o", str(unique_output_dir), str(archive_path)]
+    cmd = ["readpst", "-reD", "-o", str(unique_output_dir), "--", str(archive_path)]
     try:
         # errors="replace": readpst echoes mail folder names (often non-ASCII) to its
         # output; never let a stray byte raise UnicodeDecodeError mid-extraction.
-        proc = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
-    except OSError as e:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            stdin=subprocess.DEVNULL,
+            timeout=EXTERNAL_TOOL_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
         print(f"Error extracting {label} file {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
