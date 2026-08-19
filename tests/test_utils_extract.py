@@ -637,5 +637,73 @@ class TestGetArchiveFilesPrunesTrash(unittest.TestCase):
 
         self.assertEqual(found, [live])
 
+class TestExtractIntoUniqueDirectory(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_zip_does_not_clobber_existing_sibling(self):
+        existing = Path(self.test_dir) / "notes.txt"
+        existing.write_text("original")
+        archive = Path(self.test_dir) / "a.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("notes.txt", "pwned")
+
+        self.assertTrue(utils.extract_archive(archive))
+
+        self.assertEqual(existing.read_text(), "original")
+        self.assertEqual((Path(self.test_dir) / "a" / "notes.txt").read_text(), "pwned")
+
+    def test_second_zip_extraction_gets_its_own_directory(self):
+        archive = Path(self.test_dir) / "a.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("notes.txt", "hi")
+
+        self.assertTrue(utils.extract_archive(archive))
+        self.assertTrue(utils.extract_archive(archive))
+
+        self.assertTrue((Path(self.test_dir) / "a" / "notes.txt").exists())
+        self.assertTrue((Path(self.test_dir) / "a (1)" / "notes.txt").exists())
+
+    def test_tar_gz_does_not_clobber_existing_sibling(self):
+        existing = Path(self.test_dir) / "notes.txt"
+        existing.write_text("original")
+        member = Path(self.test_dir) / "src" / "notes.txt"
+        member.parent.mkdir()
+        member.write_text("pwned")
+        archive = Path(self.test_dir) / "a.tar.gz"
+        with tarfile.open(archive, "w:gz") as tf:
+            tf.add(member, arcname="notes.txt")
+
+        self.assertTrue(utils.extract_archive(archive))
+
+        self.assertEqual(existing.read_text(), "original")
+        self.assertEqual((Path(self.test_dir) / "a" / "notes.txt").read_text(), "pwned")
+
+    def test_split_zip_extracts_into_its_own_directory(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "a.zip"
+        archive.write_bytes(b"PK-placeholder")
+        (Path(self.test_dir) / "a.z01").write_bytes(b"part")
+
+        seen = {}
+
+        def fake_run(cmd, *args, **kwargs):
+            seen["cmd"] = cmd
+            out_dir = Path(next(c for c in cmd if c.startswith("-o"))[2:])
+            (out_dir / "notes.txt").write_text("hi")
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        with (
+            patch.object(utils.shutil, "which", return_value="/usr/bin/7z"),
+            patch.object(utils.subprocess, "run", side_effect=fake_run),
+        ):
+            self.assertTrue(utils.extract_archive(archive))
+
+        self.assertEqual((Path(self.test_dir) / "a" / "notes.txt").read_text(), "hi")
+
 if __name__ == "__main__":
     unittest.main()

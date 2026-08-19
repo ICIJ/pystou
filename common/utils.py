@@ -225,7 +225,7 @@ def extract_archive(archive_path: Path, tolerant: bool = False) -> bool:
 
 
 def extract_zip_archive(archive_path: Path) -> bool:
-    """Extracts a ZIP archive with path-traversal protection.
+    """Extracts a ZIP archive into a unique directory named after the archive.
 
     Args:
         archive_path (Path): The path to the ZIP archive.
@@ -233,17 +233,20 @@ def extract_zip_archive(archive_path: Path) -> bool:
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
+    output_dir = make_unique_dir(archive_path.parent / archive_path.stem)
     try:
         with zipfile.ZipFile(archive_path, "r") as zip_ref:
-            if not safe_extract_zip(zip_ref, archive_path.parent):
+            if not safe_extract_zip(zip_ref, output_dir):
                 print(
                     f"Refused unsafe ZIP archive (path traversal): {archive_path}",
                     file=sys.stderr,
                 )
+                shutil.rmtree(output_dir, ignore_errors=True)
                 return False
-        print(f"Extracted ZIP archive: {archive_path}", file=sys.stderr)
+        print(f"Extracted ZIP archive to {output_dir}", file=sys.stderr)
         return True
     except (zipfile.BadZipFile, OSError) as e:
+        shutil.rmtree(output_dir, ignore_errors=True)
         print(f"Error extracting ZIP archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
@@ -257,7 +260,7 @@ def extract_zip_archive(archive_path: Path) -> bool:
 
 
 def extract_split_zip_archive(archive_path: Path) -> bool:
-    """Extracts a split ZIP archive using 7z command.
+    """Extracts a split ZIP archive into a unique directory using the 7z command.
 
     Args:
         archive_path (Path): The path to the main .zip file of the split archive.
@@ -279,13 +282,14 @@ def extract_split_zip_archive(archive_path: Path) -> bool:
         )
         return False
 
+    output_dir = make_unique_dir(archive_path.parent / archive_path.stem)
     try:
-        output_dir = archive_path.parent
         cmd = ["7z", "x", str(archive_path), f"-o{output_dir}", "-y"]
         subprocess.run(cmd, check=True, capture_output=True)
-        print(f"Extracted split ZIP archive: {archive_path}", file=sys.stderr)
+        print(f"Extracted split ZIP archive to {output_dir}", file=sys.stderr)
         return True
     except subprocess.CalledProcessError as e:
+        shutil.rmtree(output_dir, ignore_errors=True)
         print(f"Error extracting split ZIP archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
@@ -299,7 +303,7 @@ def extract_split_zip_archive(archive_path: Path) -> bool:
 
 
 def extract_tar_archive(archive_path: Path) -> bool:
-    """Extracts a TAR archive with member validation.
+    """Extracts a TAR archive into a unique directory named after the archive.
 
     Args:
         archive_path (Path): The path to the TAR archive.
@@ -307,17 +311,20 @@ def extract_tar_archive(archive_path: Path) -> bool:
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
+    output_dir = make_unique_dir(archive_path.parent / archive_path.stem.removesuffix(".tar"))
     try:
         with tarfile.open(archive_path, "r:*") as tar_ref:
-            if not safe_extract_tar(tar_ref, archive_path.parent):
+            if not safe_extract_tar(tar_ref, output_dir):
                 print(
                     f"Refused unsafe TAR archive (unsafe member): {archive_path}",
                     file=sys.stderr,
                 )
+                shutil.rmtree(output_dir, ignore_errors=True)
                 return False
-        print(f"Extracted TAR archive: {archive_path}", file=sys.stderr)
+        print(f"Extracted TAR archive to {output_dir}", file=sys.stderr)
         return True
     except (tarfile.TarError, OSError) as e:
+        shutil.rmtree(output_dir, ignore_errors=True)
         print(f"Error extracting TAR archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
