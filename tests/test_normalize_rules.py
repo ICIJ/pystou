@@ -95,3 +95,15 @@ class TestFixUtf8(unittest.TestCase):
         new, mode = fix_utf8(name)
         self.assertEqual(new, "\U0001f600__.txt")
         self.assertEqual(mode, "stripped")
+
+
+class TestUnicodeWhitespace(unittest.TestCase):
+    def test_non_ascii_spaces_are_left_alone(self):
+        # NBSP and the ideographic space are valid, S3-safe UTF-8: the control
+        # rule is scoped to C0/C1 controls and trailing spaces and dots.
+        for name in ("a\xa0b.txt", "a\u3000b.txt"):
+            with self.subTest(name=repr(name)):
+                self.assertEqual(normalize_name(name), (name, "clean", []))
+
+    def test_a_leading_nbsp_is_not_stripped(self):
+        self.assertEqual(normalize_name("\xa0note.txt")[0], "\xa0note.txt")

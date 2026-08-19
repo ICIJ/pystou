@@ -3,14 +3,31 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from normalize.main import apply_rename, walk_bottom_up
+from common.errors import PystouError
+from normalize import manifest
+from normalize.main import _run, apply_rename, normalize_command, undo_run, walk_bottom_up
+from normalize.rules import RULES
 
 
 def make(root: Path, raw: bytes, content: bytes = b"x") -> Path:
     path = Path(os.fsdecode(os.fsencode(str(root)) + b"/" + raw))
     path.write_bytes(content)
     return path
+
+
+def normalize_tree(root: Path, state: str) -> str:
+    """Runs a full normalize over ``root`` and returns the run id."""
+    normalize_command(
+        directory=str(root),
+        recursive=True,
+        rule=None,
+        dry_run=False,
+        manifest_dir=state,
+        log_dir=state,
+    )
+    return sorted(Path(state).glob("*.jsonl"))[-1].stem
 
 
 class TestWalkBottomUp(unittest.TestCase):
@@ -102,9 +119,6 @@ class TestApplyRename(unittest.TestCase):
         self.assertEqual(target.read_text(), "target body")
 
 
-from normalize.main import undo_run
-
-
 class TestUndo(unittest.TestCase):
     def setUp(self):
         self.root = Path(tempfile.mkdtemp())
@@ -115,17 +129,7 @@ class TestUndo(unittest.TestCase):
         shutil.rmtree(self.state, ignore_errors=True)
 
     def _normalize(self):
-        from normalize.main import normalize_command
-
-        normalize_command(
-            directory=str(self.root),
-            recursive=True,
-            rule=None,
-            dry_run=False,
-            manifest_dir=self.state,
-            log_dir=self.state,
-        )
-        return Path(sorted(Path(self.state).glob("*.jsonl"))[0]).stem
+        return normalize_tree(self.root, self.state)
 
     def test_restores_the_exact_original_bytes(self):
         bad_dir = Path(os.fsdecode(os.fsencode(str(self.root)) + b"/dir_\x9f"))
@@ -183,6 +187,87 @@ class TestUndo(unittest.TestCase):
         restored, skipped = undo_run(run_id, self.state)
         self.assertEqual(skipped, 0)
         self.assertEqual(dry_restored, restored)
+
+
+class TestDryRunTable(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_both_columns_hold_the_full_printable_path(self):
+        old = make(self.root, b"note_\x9f.txt")
+        _renamed, _failed, table = _run(
+            self.root, False, RULES, True, self.root / "unused.jsonl", {}
+        )
+        cells = [list(column.cells) for column in table.columns]
+        self.assertEqual(cells[0], [manifest.printable(str(old))])
+        self.assertEqual(cells[1], [str(self.root / "note__.txt")])
+
+
+class TestManifestShape(unittest.TestCase):
+    """The Elasticsearch contract: a dir entry is a prefix rewrite, recorded once."""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.state = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def test_a_renamed_directory_is_recorded_once_not_per_descendant(self):
+        bad_dir = Path(os.fsdecode(os.fsencode(str(self.root)) + b"/dir_\x9f"))
+        bad_dir.mkdir()
+        (bad_dir / "one.txt").write_text("x")
+        (bad_dir / "two.txt").write_text("x")
+        (bad_dir / "sub").mkdir()
+        (bad_dir / "sub" / "three.txt").write_text("x")
+        (bad_dir / "sub" / "nested").mkdir()
+
+        run_id = normalize_tree(self.root, self.state)
+
+        _meta, entries = manifest.read(manifest.manifest_path(run_id, self.state))
+        self.assertEqual([e["kind"] for e in entries], ["dir"])
+        self.assertEqual(entries[0]["new"], str(self.root / "dir__"))
+
+
+class TestUndoSkips(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.state = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def test_skips_an_entry_whose_renamed_file_is_gone(self):
+        make(self.root, b"note_\x9f.txt")
+        run_id = normalize_tree(self.root, self.state)
+        (self.root / "note__.txt").unlink()
+
+        self.assertEqual(undo_run(run_id, self.state), (0, 1))
+
+    def test_skips_an_entry_whose_rename_fails(self):
+        make(self.root, b"note_\x9f.txt")
+        run_id = normalize_tree(self.root, self.state)
+
+        with mock.patch("normalize.main.os.rename", side_effect=PermissionError(13, "denied")):
+            self.assertEqual(undo_run(run_id, self.state), (0, 1))
+
+        self.assertTrue((self.root / "note__.txt").exists())
+
+    def test_an_unknown_run_id_is_reported_not_raised_raw(self):
+        with self.assertRaises(PystouError) as caught:
+            undo_run("20260819T101500Z-3f2a", self.state)
+        self.assertIn("20260819T101500Z-3f2a", str(caught.exception))
+        self.assertIn(self.state, str(caught.exception))
+
+    def test_a_run_id_that_escapes_the_manifest_directory_is_rejected(self):
+        for run_id in ("../evil", "evil/../..", "not a run id"):
+            with self.subTest(run_id=run_id), self.assertRaises(PystouError):
+                undo_run(run_id, self.state)
 
 
 def _listing(root: Path) -> list[bytes]:

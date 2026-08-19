@@ -4,10 +4,12 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import typer
 from typer.testing import CliRunner
 
+import normalize.main
 from common import console
 from normalize import manifest
 from normalize.main import normalize_command
@@ -52,6 +54,19 @@ class TestNormalizeCLI(unittest.TestCase):
         self.assertTrue(os.path.lexists(os.fsencode(self.dir) + b"/note_\x9f.txt"))
         self.assertEqual(list(Path(self.state).glob("*.jsonl")), [])
 
+    def test_dry_run_renders_bad_bytes_when_the_utf8_rule_is_not_selected(self):
+        # A real terminal encodes what rich renders, so an unescaped
+        # surrogateescape code point aborts the safe preview mode.
+        make(self.dir, b"note_\x9f[x].txt")
+        stream = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+        console.configure(no_color=True, quiet=False, out_file=stream, err_file=self.err)
+
+        result = self._invoke("--rule", "punct", "--dry-run")
+
+        self.assertEqual(result.exit_code, 0, result.exception)
+        stream.flush()
+        self.assertIn("\\x9f", stream.buffer.getvalue().decode("utf-8"))
+
     def test_renames_and_writes_a_manifest(self):
         make(self.dir, b"note_\x9f.txt")
         result = self._invoke()
@@ -87,6 +102,81 @@ class TestNormalizeCLI(unittest.TestCase):
         result = self._invoke()
         self.assertEqual(result.exit_code, 0)
         self.assertTrue(os.path.lexists(os.fsencode(str(sub)) + b"/deep_\x9f.txt"))
+
+    def test_a_failing_entry_does_not_abort_the_rest(self):
+        make(self.dir, b"a_\x9f.txt")
+        make(self.dir, b"b_\x9f.txt")
+        make(self.dir, b"c_\x9f.txt")
+        real = normalize.main.apply_rename
+
+        def flaky(old, new_name):
+            if old.name.startswith("b_"):
+                raise PermissionError(13, "Permission denied")
+            return real(old, new_name)
+
+        with mock.patch("normalize.main.apply_rename", flaky):
+            result = self._invoke()
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue((Path(self.dir) / "a__.txt").exists())
+        self.assertTrue((Path(self.dir) / "c__.txt").exists())
+        self.assertTrue(os.path.lexists(os.fsencode(self.dir) + b"/b_\x9f.txt"))
+        self.assertIn("1 failed", self.err.getvalue())
+        _meta, entries = manifest.read(sorted(Path(self.state).glob("*.jsonl"))[0])
+        self.assertEqual(len(entries), 2)
+
+    def test_a_second_run_finds_nothing_left_to_do(self):
+        bad_dir = Path(os.fsdecode(os.fsencode(self.dir) + b"/dir_\xed\xa0\xbd\xed\xb8\x80"))
+        bad_dir.mkdir()
+        make(bad_dir, b"a\x9f.txt", b"one")
+        (Path(self.dir) / "Café. ").write_text("two")
+
+        self.assertEqual(self._invoke("-r").exit_code, 0)
+        after_first = _listing(self.dir)
+
+        self.err.truncate(0)
+        self.err.seek(0)
+        self.assertEqual(self._invoke("-r").exit_code, 0)
+
+        self.assertIn("No filenames need normalizing", self.err.getvalue())
+        self.assertEqual(_listing(self.dir), after_first)
+
+
+class TestRelativeDirectory(unittest.TestCase):
+    """The manifest is replayed against Elasticsearch, so it must hold full paths."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.state = tempfile.mkdtemp()
+        self.cwd = os.getcwd()
+        self.runner = CliRunner()
+
+    def tearDown(self):
+        os.chdir(self.cwd)
+        shutil.rmtree(self.dir, ignore_errors=True)
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def test_a_relative_directory_is_still_recorded_absolutely(self):
+        sub = Path(self.dir) / "sub"
+        sub.mkdir()
+        make(sub, b"f_\x9f.txt")
+        os.chdir(self.dir)
+
+        result = self.runner.invoke(
+            _app(), [".", "-r", "--log-dir", self.state, "--manifest-dir", self.state]
+        )
+        self.assertEqual(result.exit_code, 0)
+
+        meta, entries = manifest.read(sorted(Path(self.state).glob("*.jsonl"))[0])
+        self.assertTrue(os.path.isabs(meta["root"]), meta["root"])
+        self.assertTrue(os.path.isabs(manifest.decode(meta["root_b64"])))
+        self.assertTrue(entries)
+        for entry in entries:
+            with self.subTest(entry=entry["old"]):
+                self.assertTrue(os.path.isabs(entry["old"]), entry["old"])
+                self.assertTrue(os.path.isabs(entry["new"]), entry["new"])
+                self.assertTrue(os.path.isabs(manifest.decode(entry["old_b64"])))
+                self.assertTrue(os.path.isabs(manifest.decode(entry["new_b64"])))
 
 
 class TestRoundTripInvariant(unittest.TestCase):

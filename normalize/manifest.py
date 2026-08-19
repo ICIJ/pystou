@@ -54,8 +54,8 @@ class ManifestWriter:
     """Appends manifest lines, fsyncing each one.
 
     Each line is durable on its own so a crash mid-run still leaves a manifest
-    describing every rename that actually happened, which is what makes the run
-    undoable.
+    describing every rename but possibly the last: the rename lands on disk
+    before its line is written, so a kill in that window loses one record.
     """
 
     def __init__(self, path: Path, meta: dict):
@@ -110,7 +110,7 @@ def read(path: Path) -> tuple[dict, list[dict]]:
 
     Returns:
         tuple[dict, list[dict]]: The meta object and the rename entries, in
-        the order they were written (bottom-up).
+        file order, which is the order a consumer must replay them in.
     """
     meta: dict = {}
     entries: list[dict] = []
