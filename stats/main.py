@@ -234,7 +234,7 @@ def process_file(file_path: Path, stats: dict, archive_extensions: set, top_n: i
     # We store (size, path) and keep only the largest N
     if len(stats["largest_files"]) < top_n:
         heapq.heappush(stats["largest_files"], (size, str(file_path)))
-    elif size > stats["largest_files"][0][0]:
+    elif stats["largest_files"] and size > stats["largest_files"][0][0]:
         heapq.heapreplace(stats["largest_files"], (size, str(file_path)))
 
 

@@ -112,6 +112,13 @@ class TestStatsCollectStats(unittest.TestCase):
         sizes = [size for _, size in stats["largest_files"]]
         self.assertEqual(sizes, sorted(sizes, reverse=True))
 
+    def test_collect_stats_top_zero(self):
+        """--top 0 tracks no largest files instead of indexing an empty heap."""
+        stats = collect_stats(self.test_dir, recursive=True, top_n=0)
+
+        self.assertEqual(stats["largest_files"], [])
+        self.assertGreater(stats["summary"]["total_files"], 0)
+
     def test_collect_stats_empty_directories(self):
         """Test that empty directories are detected."""
         stats = collect_stats(self.test_dir, recursive=True)
