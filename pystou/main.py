@@ -13,6 +13,7 @@ from doctor.main import doctor_command
 from empty.main import empty_command
 from extract.main import extract_command
 from identify.main import identify_command
+from normalize.main import normalize_command
 from pystou import __version__
 from restore.main import restore_command
 from stats.main import stats_command
@@ -26,6 +27,7 @@ app.command("dedup")(dedup_command)
 app.command("extract")(extract_command)
 app.command("identify")(identify_command)
 app.command("stats")(stats_command)
+app.command("normalize")(normalize_command)
 app.command("empty")(empty_command)
 app.command("restore")(restore_command)
 app.command("doctor")(doctor_command)

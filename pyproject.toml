@@ -46,6 +46,7 @@ packages = [
     "empty",
     "extract",
     "identify",
+    "normalize",
     "pystou",
     "restore",
     "stats",
