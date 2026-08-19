@@ -858,5 +858,41 @@ class TestExternalToolInvocation(unittest.TestCase):
         self._assert_hardened(record, archive)
 
 
+class TestUnexpectedExtractorFailure(unittest.TestCase):
+    """An encrypted or otherwise unreadable member must not leave an empty dir."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_zip_failure_removes_the_output_directory(self):
+        from unittest.mock import patch
+
+        archive = Path(self.test_dir) / "a.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("inner.txt", "hi")
+
+        with patch.object(utils, "safe_extract_zip", side_effect=RuntimeError("encrypted")):
+            self.assertFalse(utils.extract_archive(archive))
+
+        self.assertFalse((Path(self.test_dir) / "a").exists())
+
+    def test_tar_failure_removes_the_output_directory(self):
+        from unittest.mock import patch
+
+        member = Path(self.test_dir) / "inner.txt"
+        member.write_text("hi")
+        archive = Path(self.test_dir) / "a.tar"
+        with tarfile.open(archive, "w") as tf:
+            tf.add(member, arcname="inner.txt")
+
+        with patch.object(utils, "safe_extract_tar", side_effect=RuntimeError("boom")):
+            self.assertFalse(utils.extract_archive(archive))
+
+        self.assertFalse((Path(self.test_dir) / "a").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
