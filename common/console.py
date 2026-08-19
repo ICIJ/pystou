@@ -3,7 +3,6 @@
 import json as _json
 import os
 import sys
-from typing import Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -76,7 +75,7 @@ def confirm(prompt: str, default: bool = False) -> bool:
     return Confirm.ask(prompt, default=default, console=_err)
 
 
-def prompt_choice(prompt: str, choices: list, default: Optional[str] = None) -> str:
+def prompt_choice(prompt: str, choices: list, default: str) -> str:
     from rich.prompt import Prompt
 
     return Prompt.ask(prompt, choices=choices, default=default, console=_err)

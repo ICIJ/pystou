@@ -50,7 +50,9 @@ def make_unique_dir(base) -> Path:
     Returns:
         Path: The freshly created directory.
     """
-    for candidate in _unique_candidates(base):
+    candidates = _unique_candidates(base)
+    while True:
+        candidate = next(candidates)
         try:
             candidate.mkdir(parents=True)
             return candidate
@@ -73,7 +75,9 @@ def reserve_unique_file(base) -> Path:
     Returns:
         Path: The freshly reserved (empty) file.
     """
-    for candidate in _unique_candidates(base):
+    candidates = _unique_candidates(base)
+    while True:
+        candidate = next(candidates)
         try:
             candidate.touch(exist_ok=False)
             return candidate
