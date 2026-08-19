@@ -705,5 +705,35 @@ class TestExtractIntoUniqueDirectory(unittest.TestCase):
 
         self.assertEqual((Path(self.test_dir) / "a" / "notes.txt").read_text(), "hi")
 
+class TestTruncatedArchiveFailsPerArchive(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def _truncated_gz(self) -> Path:
+        import gzip
+        import os
+
+        src = Path(self.test_dir) / "a.txt.gz"
+        with gzip.open(src, "wb") as f:
+            f.write(os.urandom(200_000))
+        payload = src.read_bytes()
+        src.write_bytes(payload[: len(payload) // 2])
+        return src
+
+    def test_truncated_gz_returns_false_instead_of_raising(self):
+        src = self._truncated_gz()
+
+        self.assertFalse(utils.extract_archive(src))
+
+    def test_truncated_gz_leaves_no_partial_output(self):
+        src = self._truncated_gz()
+
+        utils.extract_archive(src)
+
+        self.assertFalse((Path(self.test_dir) / "a.txt").exists())
+
 if __name__ == "__main__":
     unittest.main()

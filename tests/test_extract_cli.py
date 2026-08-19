@@ -1,3 +1,5 @@
+import gzip
+import os
 import shutil
 import tempfile
 import unittest
@@ -120,3 +122,31 @@ class TestExtractCommand(unittest.TestCase):
             r = self.runner.invoke(_app(), self._common("--action", "extract"))
         self.assertEqual(r.exit_code, 0)
         self.assertFalse(calls.get("tolerant"))
+
+
+class TestExtractSurvivesBadArchive(unittest.TestCase):
+    """A corrupt archive must not abort the run for the healthy ones."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.runner = _split_runner()
+        bad = Path(self.dir) / "a.txt.gz"
+        with gzip.open(bad, "wb") as f:
+            f.write(os.urandom(200_000))
+        payload = bad.read_bytes()
+        bad.write_bytes(payload[: len(payload) // 2])
+        with zipfile.ZipFile(Path(self.dir) / "z_good.zip", "w") as z:
+            z.writestr("inner.txt", "hi")
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_healthy_archive_is_still_extracted(self):
+        r = self.runner.invoke(
+            _app(),
+            [self.dir, "--action", "extract", "--log-dir", self.dir, "--db-dir", self.dir],
+        )
+
+        self.assertEqual(r.exit_code, 0)
+        self.assertTrue((Path(self.dir) / "z_good" / "inner.txt").is_file())
+        self.assertFalse((Path(self.dir) / "a.txt").exists())

@@ -163,6 +163,9 @@ def get_archive_files(
 def extract_archive(archive_path: Path, tolerant: bool = False) -> bool:
     """Extracts an archive file to its directory.
 
+    A failure in one archive never aborts the caller's run: any exception raised by
+    a format handler is reported and turned into a False return.
+
     Args:
         archive_path (Path): The path to the archive file.
         tolerant (bool): For Outlook (``.pst``/``.ost``) archives, keep partial
@@ -206,12 +209,7 @@ def extract_archive(archive_path: Path, tolerant: bool = False) -> bool:
                 }
             )
             return False
-    except (
-        OSError,
-        zipfile.BadZipFile,
-        tarfile.TarError,
-        subprocess.CalledProcessError,
-    ) as e:
+    except Exception as e:
         print(f"Error extracting archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
             {
@@ -375,7 +373,7 @@ def extract_compressed_file(archive_path: Path) -> bool:
             return False
         print(f"Extracted compressed file: {archive_path}", file=sys.stderr)
         return True
-    except OSError as e:
+    except Exception as e:
         if target_path is not None and target_path.exists():
             target_path.unlink()
         print(f"Error extracting compressed file {archive_path}: {e}", file=sys.stderr)
@@ -468,7 +466,7 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
                 zstd.ZstdDecompressor().copy_stream(f_in, f_out)
             print(f"Decompressed ZST file: {archive_path}", file=sys.stderr)
             return True
-        except OSError as e:
+        except Exception as e:
             if target_path is not None and target_path.exists():
                 target_path.unlink()
             print(f"Error extracting ZST archive {archive_path}: {e}", file=sys.stderr)
