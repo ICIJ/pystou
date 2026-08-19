@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 
 from common import trash
 from common.fs_walker import collect_directories
-from common.indexer import close_database, initialize_database
+from common.indexer import close_database, index_db_path, initialize_database
 from dedup_folders.main import dedup_command
 
 
@@ -90,7 +90,7 @@ class TestDedupScopedToTarget(unittest.TestCase):
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def test_stale_index_outside_target_is_left_alone(self):
-        conn = initialize_database(self.dir)
+        conn = initialize_database(index_db_path(self.dir, str(self.target)))
         collect_directories(conn, str(self.elsewhere), recursive=True)
         close_database(conn)
         r = self.runner.invoke(

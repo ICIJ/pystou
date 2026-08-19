@@ -21,14 +21,25 @@ class TestSharedOptions(unittest.TestCase):
             directory: DirectoryArg = ".",
             recursive: RecursiveOpt = False,
             dry_run: DryRunOpt = False,
-            log_dir: LogDirOpt = ".",
-            db_dir: DbDirOpt = ".",
+            log_dir: LogDirOpt = None,
+            db_dir: DbDirOpt = None,
         ):
             typer.echo(f"{directory}|{recursive}|{dry_run}|{log_dir}|{db_dir}")
 
         r = CliRunner().invoke(app, ["/tmp", "-r", "-n", "--log-dir", "L", "--db-dir", "D"])
         self.assertEqual(r.exit_code, 0)
         self.assertIn("/tmp|True|True|L|D", r.stdout)
+
+    def test_omitted_directories_stay_unset_for_the_callee_to_resolve(self):
+        app = typer.Typer()
+
+        @app.command()
+        def cmd(log_dir: LogDirOpt = None, db_dir: DbDirOpt = None):
+            typer.echo(f"{log_dir}|{db_dir}")
+
+        r = CliRunner().invoke(app, [])
+        self.assertEqual(r.exit_code, 0)
+        self.assertIn("None|None", r.stdout)
 
 
 class TestDbDirNotOfferedWithoutAnIndex(unittest.TestCase):

@@ -67,8 +67,8 @@ def extract_command(
     dry_run: DryRunOpt = False,
     hard_delete: HardDeleteOpt = False,
     trash_dir: TrashDirOpt = None,
-    log_dir: LogDirOpt = ".",
-    db_dir: DbDirOpt = ".",
+    log_dir: LogDirOpt = None,
+    db_dir: DbDirOpt = None,
 ) -> None:
     """Extract archives (zip/tar/gz/zst/pst); quarantines archives only on request."""
     setup_logging("extract", log_dir)

@@ -20,7 +20,7 @@ def trash_list(
     directory: DirectoryArg = ".",
     json_out: Annotated[bool, typer.Option("--json", help="Output as JSON.")] = False,
     trash_dir: TrashDirOpt = None,
-    log_dir: LogDirOpt = ".",
+    log_dir: LogDirOpt = None,
 ) -> None:
     """List quarantine runs."""
     setup_logging("trash", log_dir)
@@ -69,7 +69,7 @@ def trash_purge(
         Optional[int], typer.Option("--older-than", help="Only purge runs at least DAYS old.")
     ] = None,
     trash_dir: TrashDirOpt = None,
-    log_dir: LogDirOpt = ".",
+    log_dir: LogDirOpt = None,
 ) -> None:
     """Permanently delete quarantined runs."""
     setup_logging("trash", log_dir)

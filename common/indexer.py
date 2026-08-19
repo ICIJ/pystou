@@ -1,22 +1,40 @@
+import hashlib
 import logging
 import os
 import sqlite3
 from pathlib import Path
 from typing import Optional
 
-from common import console
+from common import console, paths
 from common.errors import PystouError
 from common.fs_walker import collect_directories
 
-DB_NAME = "filesystem_index.db"
+
+def index_db_path(db_dir: Optional[str], directory: str) -> str:
+    """Returns the index database file for a scan target.
+
+    Each indexed tree gets its own database, keyed by the target's absolute
+    path, so a run on one tree is never offered another tree's index.
+
+    Args:
+        db_dir (Optional[str]): Directory holding index databases. Defaults to
+            the XDG index directory.
+        directory (str): Directory being indexed.
+
+    Returns:
+        str: Path to the target's index database.
+    """
+    root = db_dir if db_dir else str(paths.index_dir())
+    target = os.path.abspath(directory)
+    digest = hashlib.sha256(target.encode()).hexdigest()[:12]
+    return os.path.join(root, f"{os.path.basename(target) or 'root'}-{digest}.db")
 
 
-def initialize_database(db_dir: str = ".", db_name: str = DB_NAME) -> sqlite3.Connection:
+def initialize_database(db_path: str) -> sqlite3.Connection:
     """Initializes the SQLite database and creates tables if they don't exist.
 
     Args:
-        db_dir (str): Directory to store the database file.
-        db_name (str): Name of the database file.
+        db_path (str): Path to the database file.
 
     Returns:
         sqlite3.Connection: SQLite database connection.
@@ -24,7 +42,6 @@ def initialize_database(db_dir: str = ".", db_name: str = DB_NAME) -> sqlite3.Co
     Raises:
         PystouError: If the database file cannot be opened.
     """
-    db_path = os.path.join(db_dir, db_name)
     try:
         conn = sqlite3.connect(db_path)
     except sqlite3.Error as e:
@@ -98,12 +115,13 @@ def index_has_data(conn: sqlite3.Connection) -> bool:
 
 
 def open_or_rescan(
-    db_dir: str, directory: str, recursive: bool, level: Optional[int] = None
+    db_dir: Optional[str], directory: str, recursive: bool, level: Optional[int] = None
 ) -> sqlite3.Connection:
     """Opens the index, scanning the filesystem unless the user keeps a populated one.
 
     Args:
-        db_dir (str): Directory holding the index database.
+        db_dir (Optional[str]): Directory holding index databases. Defaults to
+            the XDG index directory.
         directory (str): Directory to scan.
         recursive (bool): Whether to scan recursively.
         level (Optional[int]): Maximum depth level for recursion.
@@ -111,8 +129,9 @@ def open_or_rescan(
     Returns:
         sqlite3.Connection: A connection to a ready-to-query index.
     """
-    index_existed = os.path.exists(os.path.join(db_dir, DB_NAME))
-    conn = initialize_database(db_dir)
+    db_path = index_db_path(db_dir, directory)
+    index_existed = os.path.exists(db_path)
+    conn = initialize_database(db_path)
     if (
         index_existed
         and index_has_data(conn)

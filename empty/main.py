@@ -31,7 +31,7 @@ def empty_command(
         bool, typer.Option("--include-hidden", help="Include hidden directories.")
     ] = False,
     dry_run: DryRunOpt = False,
-    log_dir: LogDirOpt = ".",
+    log_dir: LogDirOpt = None,
 ) -> None:
     """Find and remove empty directories; no quarantine (empty dirs hold no data)."""
     setup_logging("empty", log_dir)
