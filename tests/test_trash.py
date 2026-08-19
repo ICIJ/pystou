@@ -50,6 +50,16 @@ class TestQuarantineHappyPath(unittest.TestCase):
         self.assertEqual(items[0]["size"], 10)
         self.assertEqual(items[0]["kind"], "file")
 
+    def test_header_records_the_trash_root(self):
+        victim = self._make_file("a.txt")
+        trash_dir = str(Path(self.root) / "mytrash")
+        run_id = trash.quarantine(
+            [victim], self.root, operation="cleanup", command="c", trash_dir=trash_dir
+        )
+        ledger = Path(trash_dir) / "runs" / f"{run_id}.jsonl"
+        header = json.loads(ledger.read_text().splitlines()[0])
+        self.assertEqual(header["trash_root"], str(Path(trash_dir).absolute()))
+
     def test_same_basename_from_two_dirs_do_not_collide(self):
         a = self._make_file("x/dup.txt", "a")
         b = self._make_file("y/dup.txt", "bb")

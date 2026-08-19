@@ -42,7 +42,10 @@ def trash_list(
         )
         return
     if not runs:
-        console.status("Trash is empty.")
+        console.status(
+            f"No quarantined runs under {trashlib.trash_root(directory, trash_dir)}."
+            " If the run used --trash-dir, pass the same path."
+        )
         return
     t = console.table("Trash", ["Run", "Op", "Items", "Reclaimable", "Started"])
     for r in runs:

@@ -150,6 +150,7 @@ def quarantine(
             "command": command,
             "operation": operation,
             "op_root": str(Path(op_root).absolute()),
+            "trash_root": str(root.absolute()),
         },
     )
 

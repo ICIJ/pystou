@@ -31,13 +31,16 @@ class TestTrashCli(unittest.TestCase):
 
     # ------------------------------------------------------------------
     # test_list_empty
-    # Fresh directory has no trash → "Trash is empty." on stderr; exit 0.
+    # Fresh directory has no trash → the searched trash root and the
+    # --trash-dir hint on stderr; exit 0.
     # ------------------------------------------------------------------
     def test_list_empty(self):
         r = self.runner.invoke(trash_app, self._args("list"))
         self.assertEqual(r.exit_code, 0, r.output)
         # console.status writes to the configured err file
-        self.assertIn("Trash is empty.", self.err.getvalue())
+        err = self.err.getvalue()
+        self.assertIn(str(Path(self.dir) / ".pystou-trash"), err)
+        self.assertIn("--trash-dir", err)
 
     # ------------------------------------------------------------------
     # test_list_shows_run
