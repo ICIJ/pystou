@@ -201,3 +201,53 @@ class TestNestedExtraction(unittest.TestCase):
 
         self.assertEqual(r.exit_code, 0)
         self.assertEqual([p.name for p in calls], ["a.zip"])
+
+
+class TestParallelNestedDepth(unittest.TestCase):
+    """The parallel path must honour --max-depth like the sequential one."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.runner = _split_runner()
+        inner = Path(self.dir) / "src" / "inner.zip"
+        inner.parent.mkdir()
+        with zipfile.ZipFile(inner, "w") as z:
+            z.writestr("deep.txt", "hi")
+        with zipfile.ZipFile(Path(self.dir) / "outer.zip", "w") as z:
+            z.write(inner, arcname="inner.zip")
+        shutil.rmtree(inner.parent)
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def _invoke(self, max_depth):
+        return self.runner.invoke(
+            _app(),
+            [
+                self.dir,
+                "--action",
+                "extract",
+                "--nested",
+                "-p",
+                "4",
+                "--max-depth",
+                str(max_depth),
+                "--log-dir",
+                self.dir,
+                "--db-dir",
+                self.dir,
+            ],
+        )
+
+    def test_max_depth_zero_does_not_recurse(self):
+        r = self._invoke(0)
+
+        self.assertEqual(r.exit_code, 0)
+        self.assertTrue((Path(self.dir) / "outer" / "inner.zip").is_file())
+        self.assertFalse((Path(self.dir) / "outer" / "inner").exists())
+
+    def test_max_depth_one_recurses_once(self):
+        r = self._invoke(1)
+
+        self.assertEqual(r.exit_code, 0)
+        self.assertTrue((Path(self.dir) / "outer" / "inner" / "deep.txt").is_file())
