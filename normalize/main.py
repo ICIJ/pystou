@@ -106,7 +106,9 @@ def normalize_command(
         )
         return
     console.success(f"Renamed {renamed} item(s)" + (f", {failed} failed" if failed else ""))
-    console.status(f"Manifest: {path}")
+    # The manifest is written lazily, so a run where every rename failed has none.
+    if renamed:
+        console.status(f"Manifest: {path}")
 
 
 def _selected_rules(rule: Optional[list[Rule]]) -> tuple[str, ...]:

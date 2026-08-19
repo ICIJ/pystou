@@ -72,3 +72,13 @@ class TestManifest(unittest.TestCase):
             writer.record("dir", "/a/deep", "/a/deep2", "clean", ["nfc"])
         _meta, entries = manifest.read(self.path)
         self.assertEqual([e["kind"] for e in entries], ["file", "dir"])
+
+
+class TestManifestPathIsPure(unittest.TestCase):
+    def test_manifest_path_does_not_create_the_directory(self):
+        # --undo resolves a path to read; querying an unknown run must not
+        # create state directories as a side effect.
+        with tempfile.TemporaryDirectory() as base:
+            missing = os.path.join(base, "not-there")
+            manifest.manifest_path("20260819T101500Z-3f2a", missing)
+            self.assertFalse(os.path.exists(missing))

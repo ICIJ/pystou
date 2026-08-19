@@ -27,7 +27,6 @@ def manifest_path(run_id: str, manifest_dir: Optional[str] = None) -> Path:
         Path: ``<manifest dir>/<run_id>.jsonl``.
     """
     directory = Path(manifest_dir) if manifest_dir else paths.rename_dir()
-    directory.mkdir(parents=True, exist_ok=True)
     return directory / f"{run_id}.jsonl"
 
 
@@ -64,8 +63,6 @@ class ManifestWriter:
         self._file: Optional[TextIO] = None
 
     def __enter__(self) -> "ManifestWriter":
-        self._file = open(self._path, "a", encoding="utf-8")
-        self._write({"meta": self._meta})
         return self
 
     def __exit__(self, *exc_info) -> None:
@@ -83,6 +80,7 @@ class ManifestWriter:
             mode: ``clean``, ``repaired``, or ``stripped``.
             rules: Rules that changed the name.
         """
+        self._ensure_open()
         self._write(
             {
                 "kind": kind,
@@ -94,6 +92,19 @@ class ManifestWriter:
                 "rules": rules,
             }
         )
+
+    def _ensure_open(self) -> None:
+        """Opens the manifest and writes its meta line, once, on the first record.
+
+        Deferred so a run that renames nothing leaves no orphan file behind: an
+        empty manifest is still a run id that ``--undo`` accepts.
+        """
+        if self._file is not None:
+            return
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        # ManifestWriter is itself the context manager; __exit__ closes this.
+        self._file = open(self._path, "a", encoding="utf-8")  # noqa: SIM115
+        self._write({"meta": self._meta})
 
     def _write(self, obj: dict) -> None:
         assert self._file is not None, "ManifestWriter used outside its context manager"
