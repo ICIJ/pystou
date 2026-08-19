@@ -166,6 +166,24 @@ class TestUndo(unittest.TestCase):
         self.assertEqual(restored, 2)
         self.assertEqual(_listing(self.root), after_normalize)
 
+    def test_dry_run_resolves_two_levels_of_renamed_ancestors(self):
+        dir_a = Path(os.fsdecode(os.fsencode(str(self.root)) + b"/dirA_\x9f"))
+        dir_a.mkdir()
+        dir_b = Path(os.fsdecode(os.fsencode(str(dir_a)) + b"/dirB_\x9f"))
+        dir_b.mkdir()
+        make(dir_b, b"file_\x9f.txt", b"body")
+
+        run_id = self._normalize()
+        after_normalize = _listing(self.root)
+
+        dry_restored, dry_skipped = undo_run(run_id, self.state, dry_run=True)
+        self.assertEqual(dry_skipped, 0)
+        self.assertEqual(_listing(self.root), after_normalize)
+
+        restored, skipped = undo_run(run_id, self.state)
+        self.assertEqual(skipped, 0)
+        self.assertEqual(dry_restored, restored)
+
 
 def _listing(root: Path) -> list[bytes]:
     """Returns every path under root as raw bytes, so bad names compare exactly."""
