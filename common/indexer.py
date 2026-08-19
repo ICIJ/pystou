@@ -65,8 +65,7 @@ def create_tables(conn: sqlite3.Connection) -> None:
     """
     )
     unique_files = (
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_files_directory_name"
-        " ON files(directory_path, name)"
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_files_directory_name ON files(directory_path, name)"
     )
     try:
         cursor.execute(unique_files)
