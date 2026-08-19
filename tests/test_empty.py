@@ -1,7 +1,9 @@
+import errno
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from empty.main import (
     find_empty_directories,
@@ -198,6 +200,17 @@ class TestEmptyRemoveEmptyDirectories(unittest.TestCase):
         self.assertEqual(removed, 0)
         self.assertEqual(skipped, 1)
         self.assertTrue(non_empty.exists())
+
+    def test_unrelated_oserror_is_reported(self):
+        """An OSError that merely mentions 'not empty' is still a real error."""
+        target = self.test_path / "target"
+        target.mkdir()
+
+        with mock.patch.object(Path, "rmdir", side_effect=OSError(errno.EIO, "buffer not empty")):
+            with self.assertLogs(level="ERROR"):
+                removed, skipped = remove_empty_directories([target])
+
+        self.assertEqual((removed, skipped), (0, 1))
 
     def test_remove_nonexistent_fails_gracefully(self):
         """Test that removing nonexistent directory fails gracefully."""

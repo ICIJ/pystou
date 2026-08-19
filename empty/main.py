@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Empty subcommand for finding and removing empty directories."""
 
+import errno
 import logging
 import os
 from pathlib import Path
@@ -265,7 +266,7 @@ def remove_empty_directories(empty_dirs: list[Path]) -> tuple:
 
         except OSError as e:
             # Directory might not be empty anymore or have other issues
-            if "not empty" in str(e).lower() or e.errno == 39:  # ENOTEMPTY
+            if e.errno == errno.ENOTEMPTY:
                 logging.warning(
                     {
                         "action": "remove_empty_dir",
