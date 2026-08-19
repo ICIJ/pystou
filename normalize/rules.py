@@ -18,7 +18,10 @@ _SURROGATES = re.compile(r"[\udc80-\udcff]+")
 _CESU8 = re.compile(rb"\xed[\xa0-\xaf][\x80-\xbf]\xed[\xb0-\xbf][\x80-\xbf]")
 _CONTROLS = re.compile(r"[\x00-\x1f\x7f-\x9f]+")
 _PUNCT = re.compile(r"[\\{}^%`\[\]~<>#|]+")
-_WHITESPACE = re.compile(r"\s+")
+# ASCII only: NBSP and the ideographic space are valid, S3-safe UTF-8 and the
+# control rule never claimed them. A Unicode-aware ``\s`` would rewrite them.
+_ASCII_SPACE = " \t\n\r\f\v"
+_WHITESPACE = re.compile(r"[ \t\n\r\f\v]+")
 
 
 def _decode_cesu8_pair(match: "re.Match[bytes]") -> bytes:
@@ -55,8 +58,8 @@ def fix_utf8(name: str) -> tuple[str, str]:
 
 
 def trim(name: str) -> str:
-    """Collapses whitespace runs and drops trailing spaces and dots."""
-    return _WHITESPACE.sub(" ", name).strip().rstrip(" .")
+    """Collapses ASCII whitespace runs and drops trailing spaces and dots."""
+    return _WHITESPACE.sub(" ", name).strip(_ASCII_SPACE).rstrip(" .")
 
 
 def normalize_name(name: str, rules: Sequence[str] = RULES) -> tuple[str, str, list[str]]:

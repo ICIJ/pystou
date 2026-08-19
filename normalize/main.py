@@ -21,10 +21,11 @@ from common.cli import (
     ManifestDirOpt,
     RecursiveOpt,
 )
+from common.errors import PystouError
 from common.fs_walker import is_excluded_dir
 from common.logger import setup_logging
 from common.safe_ops import make_unique_dir, reserve_unique_file
-from common.trash import new_run_id
+from common.trash import RUN_ID_RE, new_run_id
 from common.validation import validate_directory_or_exit
 from normalize import manifest
 from normalize.rules import RULES, normalize_name
@@ -55,11 +56,6 @@ def normalize_command(
 ) -> None:
     """Rename files whose names are not valid, portable UTF-8 (S3-safe)."""
     setup_logging("normalize", log_dir)
-    if undo:
-        restored, skipped = undo_run(undo, manifest_dir, dry_run)
-        verb = "Would restore" if dry_run else "Restored"
-        console.success(f"{verb} {restored} name(s)" + (f", skipped {skipped}" if skipped else ""))
-        return
     selected = _selected_rules(rule)
     logging.info(
         {
@@ -69,9 +65,18 @@ def normalize_command(
             "recursive": recursive,
             "rules": list(selected),
             "dry_run": dry_run,
+            "undo": undo,
         }
     )
-    root = validate_directory_or_exit(directory)
+    if undo:
+        restored, skipped = undo_run(undo, manifest_dir, dry_run)
+        verb = "Would restore" if dry_run else "Restored"
+        console.success(f"{verb} {restored} name(s)" + (f", skipped {skipped}" if skipped else ""))
+        return
+    # Absolute, because the manifest is replayed against Elasticsearch and an
+    # undo runs from an arbitrary cwd. abspath, not resolve(): resolving a
+    # symlinked ancestor would report paths the consumer never indexed.
+    root = Path(os.path.abspath(validate_directory_or_exit(directory)))
 
     run_id = new_run_id()
     path = manifest.manifest_path(run_id, manifest_dir)
@@ -129,7 +134,11 @@ def _run(
             if new_name == old.name:
                 continue
             if dry_run:
-                table.add_row(manifest.printable(str(old)), new_name, mode)
+                table.add_row(
+                    manifest.printable(str(old)),
+                    manifest.printable(str(old.parent / new_name)),
+                    mode,
+                )
                 renamed += 1
                 continue
             try:
@@ -215,6 +224,12 @@ def apply_rename(old: Path, new_name: str) -> Path:
         suffix if the desired name was taken.
     """
     target = old.parent / new_name
+    # On a normalization- or case-insensitive filesystem (HFS+, APFS) the NFC
+    # target already *is* the NFD source, so claiming it exclusively would fail
+    # against the very entry being renamed and invent a ' (1)' suffix.
+    if os.path.lexists(target) and os.path.samestat(os.lstat(target), os.lstat(old)):
+        os.rename(old, target)
+        return target
     if old.is_dir() and not old.is_symlink():
         claimed = make_unique_dir(target)
     else:
@@ -244,8 +259,13 @@ def undo_run(
         tuple[int, int]: ``(restored, skipped)`` counts. In a dry run,
         ``restored`` counts entries that would be restored.
     """
+    if not RUN_ID_RE.fullmatch(run_id):
+        raise PystouError(f"Not a run id: {run_id}. Expected a value like 20260819T101500Z-3f2a.")
     path = manifest.manifest_path(run_id, manifest_dir)
-    _meta, entries = manifest.read(path)
+    try:
+        _meta, entries = manifest.read(path)
+    except FileNotFoundError as e:
+        raise PystouError(f"No manifest for run {run_id} in {path.parent}.") from e
     restored = 0
     skipped = 0
     # entries are deepest-first (child-before-parent), which is also the order
@@ -268,6 +288,10 @@ def undo_run(
             restored += 1
             continue
         try:
+            # Deliberately not the forward path's claim-then-rename: an undo
+            # that invents a ' (n)' name is not an undo, so the check above is
+            # a plain lexists and the window between it and the rename is
+            # accepted.
             os.rename(source, target)
         except OSError as e:
             skipped += 1

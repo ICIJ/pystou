@@ -27,7 +27,7 @@ from common.indexer import update_index_after_change
 from common.safe_ops import reserve_unique_name
 
 TRASH_DIR_NAME = ".pystou-trash"
-_RUN_ID_RE = re.compile(r"\d{8}T\d{6}Z-[0-9a-f]+")
+RUN_ID_RE = re.compile(r"\d{8}T\d{6}Z-[0-9a-f]+")
 
 
 def trash_root(op_root, trash_dir: Optional[str] = None) -> Path:
@@ -214,7 +214,7 @@ def list_runs(op_root, trash_dir: Optional[str] = None) -> list[TrashRun]:
         header, items = _read_ledger(ledger)
         if header is None:
             continue
-        if not _RUN_ID_RE.fullmatch(str(header.get("run_id", ""))):
+        if not RUN_ID_RE.fullmatch(str(header.get("run_id", ""))):
             logging.warning(
                 {"action": "list_runs", "status": "invalid_run_id", "ledger": str(ledger)}
             )
