@@ -42,6 +42,9 @@ class Rule(str, Enum):
 def normalize_command(
     directory: DirectoryArg = ".",
     recursive: RecursiveOpt = False,
+    undo: Annotated[
+        Optional[str], typer.Option("--undo", help="Undo a previous run by its run id.")
+    ] = None,
     rule: Annotated[
         Optional[list[Rule]],
         typer.Option("--rule", help="utf8|nfc|control|punct|all (repeatable)."),
@@ -52,6 +55,12 @@ def normalize_command(
 ) -> None:
     """Rename files whose names are not valid, portable UTF-8 (S3-safe)."""
     setup_logging("normalize", log_dir)
+    if undo:
+        restored, skipped = undo_run(undo, manifest_dir)
+        console.success(
+            f"Restored {restored} name(s)" + (f", skipped {skipped}" if skipped else "")
+        )
+        return
     selected = _selected_rules(rule)
     logging.info(
         {
@@ -213,3 +222,50 @@ def apply_rename(old: Path, new_name: str) -> Path:
         claimed = reserve_unique_file(target, keep_suffix=True)
     os.rename(old, claimed)
     return claimed
+
+
+def undo_run(run_id: str, manifest_dir: Optional[str] = None) -> tuple[int, int]:
+    """Renames everything in a manifest back to its original name.
+
+    Entries are replayed in reverse (directories before the files they
+    contain), which is the order that keeps every recorded path valid.
+
+    An occupied target is skipped rather than suffixed: an undo that invents a
+    name is not an undo.
+
+    Args:
+        run_id: Run identifier of the manifest to replay.
+        manifest_dir: Optional override for the XDG state location.
+
+    Returns:
+        tuple[int, int]: ``(restored, skipped)`` counts.
+    """
+    path = manifest.manifest_path(run_id, manifest_dir)
+    _meta, entries = manifest.read(path)
+    restored = 0
+    skipped = 0
+    for entry in reversed(entries):
+        source = Path(manifest.decode(entry["new_b64"]))
+        target = Path(manifest.decode(entry["old_b64"]))
+        if not os.path.lexists(source):
+            skipped += 1
+            console.warn(f"Missing, cannot undo: {entry['new']}")
+            continue
+        if os.path.lexists(target):
+            skipped += 1
+            console.warn(f"Occupied, cannot undo: {entry['old']}")
+            continue
+        try:
+            os.rename(source, target)
+        except OSError as e:
+            skipped += 1
+            console.error(f"Cannot undo {entry['new']}: {e}")
+            logging.error(
+                {"action": "undo", "status": "error", "path": entry["new"], "error": str(e)}
+            )
+            continue
+        restored += 1
+        logging.info(
+            {"action": "undo", "status": "success", "old": entry["new"], "new": entry["old"]}
+        )
+    return restored, skipped
