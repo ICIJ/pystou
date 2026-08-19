@@ -146,6 +146,11 @@ class TestStatsCommand(unittest.TestCase):
         self.assertNotIn("\r", r.stdout)
         self.assertNotIn("Scanned", r.stdout)
 
+    def test_negative_top_is_rejected(self):
+        """A negative --top would slice from the end and mislabel the tables."""
+        r = self._invoke("--top=-5")
+        self.assertNotEqual(r.exit_code, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
