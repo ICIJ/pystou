@@ -2,7 +2,6 @@
 
 import logging
 import os
-import re
 import shlex
 import shutil
 import sqlite3
@@ -106,7 +105,7 @@ def dedup_command(
 
     for group_key, dir_paths in groups.items():
         parent_dir, base_name = group_key
-        base_dir, duplicate_dirs = identify_base_and_duplicates(dir_paths)
+        base_dir, duplicate_dirs = identify_base_and_duplicates(dir_paths, base_name)
 
         tree = Tree(str(base_dir))
         for dup in duplicate_dirs:
@@ -178,28 +177,17 @@ def dedup_command(
     close_database(conn)
 
 
-def identify_base_and_duplicates(dir_paths: list[Path]) -> tuple[Path, list[Path]]:
+def identify_base_and_duplicates(dir_paths: list[Path], base_name: str) -> tuple[Path, list[Path]]:
     """Identifies the base directory and duplicates from a list of directories.
 
     Args:
         dir_paths (List[Path]): List of directory paths.
+        base_name (str): Group base name; the directory bearing it is the base.
 
     Returns:
         Tuple[Path, List[Path]]: Base directory and list of duplicate directories.
     """
-    suffix_pattern = re.compile(r".* \(\d+\)$")
-    base_dir: Optional[Path] = None
-    for dir_path in dir_paths:
-        if not suffix_pattern.match(dir_path.name):
-            base_dir = dir_path
-            break
-    if base_dir is None:
-        # No base directory without suffix, pick the one with the lowest suffix number
-        def get_suffix_num(dir_name: str) -> int:
-            match = re.match(r".* \((\d+)\)$", dir_name)
-            return int(match.group(1)) if match else float("inf")
-
-        base_dir = min(dir_paths, key=lambda d: get_suffix_num(d.name))
+    base_dir = next(d for d in dir_paths if d.name == base_name)
     duplicate_dirs = [d for d in dir_paths if d != base_dir]
     return base_dir, duplicate_dirs
 

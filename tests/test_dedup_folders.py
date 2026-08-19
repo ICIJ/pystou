@@ -52,11 +52,11 @@ class TestDedupFolders(unittest.TestCase):
     @patch("builtins.print")
     def test_identify_base_and_duplicates(self, mock_print):
         dir_paths = [
-            Path(self.test_dir) / "folder",
             Path(self.test_dir) / "folder (1)",
+            Path(self.test_dir) / "folder",
             Path(self.test_dir) / "folder (2)",
         ]
-        base_dir, duplicate_dirs = identify_base_and_duplicates(dir_paths)
+        base_dir, duplicate_dirs = identify_base_and_duplicates(dir_paths, "folder")
         self.assertEqual(base_dir.name, "folder")
         self.assertEqual(len(duplicate_dirs), 2)
 
@@ -64,8 +64,8 @@ class TestDedupFolders(unittest.TestCase):
     def test_delete_duplicates_removes_dups(self, mock_print):
         # Exercise the still-present delete_duplicates core logic.
         groups = group_directories(self.conn, self.test_dir)
-        for _group_key, dir_paths in groups.items():
-            _base, dups = identify_base_and_duplicates(dir_paths)
+        for (_parent, base_name), dir_paths in groups.items():
+            _base, dups = identify_base_and_duplicates(dir_paths, base_name)
             delete_duplicates(
                 dups, dry_run=False, conn=self.conn, op_root=self.test_dir, hard_delete=True
             )
@@ -77,8 +77,8 @@ class TestDedupFolders(unittest.TestCase):
     def test_merge_contents_merges_dups(self, mock_print):
         # Exercise the still-present merge_contents core logic.
         groups = group_directories(self.conn, self.test_dir)
-        for _group_key, dir_paths in groups.items():
-            base, dups = identify_base_and_duplicates(dir_paths)
+        for (_parent, base_name), dir_paths in groups.items():
+            base, dups = identify_base_and_duplicates(dir_paths, base_name)
             merge_contents(
                 base, dups, dry_run=False, conn=self.conn, op_root=self.test_dir, hard_delete=True
             )
