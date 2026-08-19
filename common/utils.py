@@ -180,7 +180,7 @@ def extract_archive(archive_path: Path, tolerant: bool = False) -> bool:
         bool: True if extraction was successful, False otherwise.
     """
     try:
-        suffixes = "".join(archive_path.suffixes)
+        suffixes = "".join(archive_path.suffixes).lower()
         if suffixes.endswith(".zip"):
             # Check if this is a split archive
             split_parts = get_split_archive_parts(archive_path)
@@ -343,7 +343,8 @@ def extract_tar_archive(archive_path: Path) -> bool:
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
-    output_dir = make_unique_dir(archive_path.parent / archive_path.stem.removesuffix(".tar"))
+    base_name = re.sub(r"\.tar$", "", archive_path.stem, flags=re.IGNORECASE)
+    output_dir = make_unique_dir(archive_path.parent / base_name)
     try:
         with tarfile.open(archive_path, "r:*") as tar_ref:
             if not safe_extract_tar(tar_ref, output_dir):
@@ -380,7 +381,7 @@ def extract_compressed_file(archive_path: Path) -> bool:
     """
     target_path = None
     try:
-        if archive_path.suffix == ".gz":
+        if archive_path.suffix.lower() == ".gz":
             import gzip
 
             target_path = reserve_unique_file(archive_path.with_suffix(""))
@@ -389,7 +390,7 @@ def extract_compressed_file(archive_path: Path) -> bool:
                 open(target_path, "wb") as f_out,
             ):
                 shutil.copyfileobj(f_in, f_out)
-        elif archive_path.suffix == ".bz2":
+        elif archive_path.suffix.lower() == ".bz2":
             import bz2
 
             target_path = reserve_unique_file(archive_path.with_suffix(""))
@@ -465,7 +466,7 @@ def _extract_zst_with_module(archive_path: Path, zstd: Any) -> bool:
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
-    suffixes = "".join(archive_path.suffixes)
+    suffixes = "".join(archive_path.suffixes).lower()
     is_tar = ".tar.zst" in suffixes or ".tzst" in suffixes
     if is_tar:
         temp_tar_path = reserve_unique_file(archive_path.with_suffix(".tar"))
@@ -524,7 +525,7 @@ def _extract_zst_with_command(archive_path: Path) -> bool:
     Returns:
         bool: True if extraction was successful, False otherwise.
     """
-    suffixes = "".join(archive_path.suffixes)
+    suffixes = "".join(archive_path.suffixes).lower()
     is_tar = ".tar.zst" in suffixes or ".tzst" in suffixes
     output_path = reserve_unique_file(archive_path.with_suffix(""))
     keep_output = False

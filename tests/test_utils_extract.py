@@ -894,5 +894,45 @@ class TestUnexpectedExtractorFailure(unittest.TestCase):
         self.assertFalse((Path(self.test_dir) / "a").exists())
 
 
+class TestExtractUppercaseArchives(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_uppercase_zip_is_extracted(self):
+        archive = Path(self.test_dir) / "MAILBOX.ZIP"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("inner.txt", "hi")
+
+        self.assertTrue(utils.extract_archive(archive))
+
+        self.assertTrue((Path(self.test_dir) / "MAILBOX" / "inner.txt").is_file())
+
+    def test_uppercase_tar_gz_lands_in_a_directory_named_after_the_archive(self):
+        member = Path(self.test_dir) / "src" / "a.txt"
+        member.parent.mkdir()
+        member.write_text("deep")
+        archive = Path(self.test_dir) / "DATA.Tar.Gz"
+        with tarfile.open(archive, "w:gz") as tf:
+            tf.add(member, arcname="a.txt")
+
+        self.assertTrue(utils.extract_archive(archive))
+
+        self.assertTrue((Path(self.test_dir) / "DATA" / "a.txt").is_file())
+
+    def test_uppercase_gz_is_extracted(self):
+        import gzip
+
+        archive = Path(self.test_dir) / "PLAIN.TXT.GZ"
+        with gzip.open(archive, "wb") as f:
+            f.write(b"hi")
+
+        self.assertTrue(utils.extract_archive(archive))
+
+        self.assertEqual((Path(self.test_dir) / "PLAIN.TXT").read_text(), "hi")
+
+
 if __name__ == "__main__":
     unittest.main()
