@@ -63,7 +63,7 @@ class TestDedupFolders(unittest.TestCase):
     @patch("builtins.print")
     def test_delete_duplicates_removes_dups(self, mock_print):
         # Exercise the still-present delete_duplicates core logic.
-        groups = group_directories(self.conn)
+        groups = group_directories(self.conn, self.test_dir)
         for _group_key, dir_paths in groups.items():
             _base, dups = identify_base_and_duplicates(dir_paths)
             delete_duplicates(
@@ -76,7 +76,7 @@ class TestDedupFolders(unittest.TestCase):
     @patch("builtins.print")
     def test_merge_contents_merges_dups(self, mock_print):
         # Exercise the still-present merge_contents core logic.
-        groups = group_directories(self.conn)
+        groups = group_directories(self.conn, self.test_dir)
         for _group_key, dir_paths in groups.items():
             base, dups = identify_base_and_duplicates(dir_paths)
             merge_contents(
