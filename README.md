@@ -48,6 +48,7 @@ pystou restore ~/Downloads --all        # undo the above
 | [`extract`](#extract) | Extract archives, optionally nested and in parallel |
 | [`cleanup`](#cleanup) | Remove OS junk files |
 | [`identify`](#identify) | Detect extension mismatches and encrypted archives |
+| [`normalize`](#normalize) | Rename files whose names are not valid UTF-8 (S3-safe) |
 | [`stats`](#stats) | Report file counts, sizes, and types |
 | [`empty`](#empty) | Find and remove empty directories |
 | [`restore`](#restore) | Put quarantined items back |
@@ -209,6 +210,32 @@ pystou identify [directory] [options]
 pystou identify /data -r --check encrypted
 pystou identify /data -r --check mismatch --extensions ".zip,.pdf,.docx"
 ```
+
+### normalize
+
+Renames files and directories whose names are not valid, portable UTF-8, so
+they can be synced to S3. Every rename is recorded in a JSONL manifest that a
+downstream job can replay against a search index.
+
+```bash
+pystou normalize ~/data -r --dry-run     # preview
+pystou normalize ~/data -r               # rename, writing a manifest
+pystou normalize ~/data -r --rule utf8   # only the S3 blocker
+pystou normalize --undo 20260819T101500Z-3f2a
+```
+
+| Rule | Fixes |
+|------|-------|
+| `utf8` | Bytes that are not decodable UTF-8. Emoji stored as CESU-8 surrogate pairs are repaired back to the real character; anything unrecoverable becomes `_`. |
+| `nfc` | macOS NFD decomposition, normalized to NFC. |
+| `control` | Control characters, and trailing spaces and dots. |
+| `punct` | Characters AWS advises avoiding in keys. |
+
+All rules run by default. `--rule` is repeatable.
+
+Manifests are written to `$XDG_STATE_HOME/pystou/renames` (override with
+`--manifest-dir`). Replay entries in file order: each `file` entry is an exact
+path swap, and each `dir` entry is a prefix rewrite over everything below it.
 
 ### stats
 
