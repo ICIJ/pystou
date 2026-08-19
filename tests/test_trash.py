@@ -312,3 +312,35 @@ class TestPurge(unittest.TestCase):
         removed = trash.purge(self.root, all_runs=True, older_than_days=7)
         self.assertEqual(removed, 1)  # the run is older than 7 days
         self.assertEqual(trash.list_runs(self.root), [])
+
+
+class TestHostileLedger(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _plant_ledger(self, header, items=()):
+        runs_dir = Path(self.root) / ".pystou-trash" / "runs"
+        runs_dir.mkdir(parents=True, exist_ok=True)
+        ledger = runs_dir / "20200101T000000Z-dead.jsonl"
+        with open(ledger, "w", encoding="utf-8") as f:
+            f.write(json.dumps({"_header": True, **header}) + "\n")
+            for item in items:
+                f.write(json.dumps(item) + "\n")
+        return ledger
+
+    def test_purge_ignores_run_id_escaping_the_trash_root(self):
+        victim = Path(self.root) / "victim"
+        (victim / "keep").mkdir(parents=True)
+        self._plant_ledger(
+            {
+                "run_id": "../../victim",
+                "started_at": "2020-01-01T00:00:00Z",
+                "op_root": self.root,
+            }
+        )
+        removed = trash.purge(self.root, all_runs=True)
+        self.assertEqual(removed, 0)
+        self.assertTrue((victim / "keep").is_dir())
