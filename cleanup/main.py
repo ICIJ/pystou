@@ -82,10 +82,8 @@ def cleanup_command(
     )
     validate_directory_or_exit(directory)
 
-    junk_files = JUNK_FILES.copy()
-    junk_dirs = JUNK_DIRS.copy()
-    for pattern in include or []:
-        junk_files.add(pattern)
+    junk_files = JUNK_FILES.union(include or [])
+    junk_dirs = JUNK_DIRS.union(include or [])
 
     junk_items = find_junk(directory, recursive, junk_files, junk_dirs)
     if not junk_items:

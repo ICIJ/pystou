@@ -79,3 +79,12 @@ class TestCleanupCommand(unittest.TestCase):
     def test_no_junk(self):
         r = self.runner.invoke(_app(), [self.dir, "--log-dir", self.dir, "--db-dir", self.dir])
         self.assertEqual(r.exit_code, 0)
+
+    def test_include_removes_matching_directory(self):
+        (Path(self.dir) / "node_modules").mkdir()
+        r = self.runner.invoke(
+            _app(),
+            [self.dir, "-r", "--include", "node_modules", "--log-dir", self.dir],
+        )
+        self.assertEqual(r.exit_code, 0)
+        self.assertFalse((Path(self.dir) / "node_modules").exists())
