@@ -25,7 +25,7 @@ from common.validation import validate_directory_or_exit
 def stats_command(
     directory: DirectoryArg = ".",
     recursive: RecursiveOpt = False,
-    top: Annotated[int, typer.Option("--top", help="Number of top items to show.")] = 10,
+    top: Annotated[int, typer.Option("--top", min=0, help="Number of top items to show.")] = 10,
     by_extension: Annotated[
         bool, typer.Option("--by-extension", help="Show breakdown by extension.")
     ] = False,
