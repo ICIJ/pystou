@@ -64,8 +64,8 @@ def identify_command(
     extensions_filter: Optional[set[str]] = None
     if extensions:
         extensions_filter = {
-            ext.strip().lower() if ext.startswith(".") else f".{ext.strip().lower()}"
-            for ext in extensions.split(",")
+            ext if ext.startswith(".") else f".{ext}"
+            for ext in (raw.strip().lower() for raw in extensions.split(","))
         }
 
     files = collect_files(directory, recursive, extensions_filter)
