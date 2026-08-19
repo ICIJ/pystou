@@ -90,7 +90,7 @@ class TestZstdCommandPath(unittest.TestCase):
         archive = Path(self.test_dir) / "bundle.tar.zst"
         archive.write_bytes(b"placeholder-compressed-bytes")
 
-        # The function computes output_path = unique_path(archive.with_suffix("")),
+        # The function reserves output_path from archive.with_suffix(""),
         # i.e. .../bundle.tar. Our fake zstd writes the real tar there.
         expected_output = archive.with_suffix("")  # bundle.tar
 
@@ -224,7 +224,7 @@ class TestCollapseRedundantRoot(unittest.TestCase):
 
 
 class TestExtractPstCollapsesRoot(unittest.TestCase):
-    """Exercises extract_pst_archive's collapse without a real readpst/PST."""
+    """Exercises extract_outlook_archive's collapse without a real readpst/PST."""
 
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
@@ -256,7 +256,7 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
             patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
             patch.object(utils.subprocess, "run", side_effect=fake_run),
         ):
-            result = utils.extract_pst_archive(archive)
+            result = utils.extract_outlook_archive(archive)
 
         self.assertTrue(result)
         out = archive.parent / "555555"
@@ -287,7 +287,7 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
             patch.object(utils.subprocess, "run", side_effect=fake_run),
             patch.object(utils, "_collapse_redundant_root", side_effect=OSError("boom")),
         ):
-            result = utils.extract_pst_archive(archive)
+            result = utils.extract_outlook_archive(archive)
 
         # Collapse blew up, but the extraction still reports success.
         self.assertTrue(result)
@@ -312,7 +312,7 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
             patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
             patch.object(utils.subprocess, "run", side_effect=fake_run),
         ):
-            result = utils.extract_pst_archive(archive)
+            result = utils.extract_outlook_archive(archive)
 
         self.assertFalse(result)
         # The source archive is left in place for the caller to keep.
@@ -349,7 +349,7 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
             patch.object(utils.subprocess, "run", side_effect=fake_run),
             patch.object(Path, "rename", flaky_rename),
         ):
-            result = utils.extract_pst_archive(archive)
+            result = utils.extract_outlook_archive(archive)
 
         out = archive.parent / "555555"
         # Collapse failed and rolled back, but output exists -> success is honest.
@@ -424,7 +424,7 @@ class TestExtractPstCollapsesRoot(unittest.TestCase):
             patch.object(utils.shutil, "which", return_value="/usr/bin/readpst"),
             patch.object(utils.subprocess, "run", side_effect=fake_run),
         ):
-            result = utils.extract_pst_archive(archive)
+            result = utils.extract_outlook_archive(archive)
 
         self.assertTrue(result)
 

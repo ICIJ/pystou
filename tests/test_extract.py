@@ -5,7 +5,7 @@ from pathlib import Path
 
 from common import trash
 from common.fs_walker import collect_directories
-from common.indexer import initialize_database, load_directories_from_index
+from common.indexer import initialize_database
 from extract.main import delete_archive_file, update_index_after_extraction
 
 
@@ -45,16 +45,19 @@ class TestUpdateIndexAfterExtraction(unittest.TestCase):
         self.conn.close()
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
+    def _indexed_dirs(self) -> set:
+        return {Path(row[0]) for row in self.conn.execute("SELECT path FROM directories")}
+
     def test_existing_index_is_not_wiped(self):
         (self.root / "a").mkdir()
         (self.root / "b").mkdir()
         collect_directories(self.conn, self.test_dir, recursive=True)
-        before = set(load_directories_from_index(self.conn))
+        before = self._indexed_dirs()
         self.assertEqual(before, {self.root / "a", self.root / "b"})
 
         update_index_after_extraction(self.conn, self.root / "a")
 
-        self.assertEqual(set(load_directories_from_index(self.conn)), before)
+        self.assertEqual(self._indexed_dirs(), before)
 
     def test_new_entries_are_indexed(self):
         collect_directories(self.conn, self.test_dir, recursive=True)
@@ -63,7 +66,7 @@ class TestUpdateIndexAfterExtraction(unittest.TestCase):
 
         update_index_after_extraction(self.conn, self.root)
 
-        self.assertIn(self.root / "out", load_directories_from_index(self.conn))
+        self.assertIn(self.root / "out", self._indexed_dirs())
         cursor = self.conn.cursor()
         cursor.execute("SELECT name FROM files WHERE directory_path = ?", (str(self.root),))
         self.assertIn("new.txt", {row[0] for row in cursor})

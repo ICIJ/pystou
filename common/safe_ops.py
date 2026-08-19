@@ -1,10 +1,7 @@
 # common/safe_ops.py
-"""Safe filesystem operation helpers: non-clobbering paths and verified deletion."""
+"""Safe filesystem operation helpers: atomic, non-clobbering path reservation."""
 
-import logging
-import sys
 from pathlib import Path
-from typing import Callable
 
 
 def _unique_candidates(base):
@@ -24,25 +21,11 @@ def _unique_candidates(base):
         counter += 1
 
 
-def unique_path(base) -> Path:
-    """Returns ``base`` if free, otherwise appends ' (n)' until a free path is found.
-
-    Args:
-        base: Desired path.
-
-    Returns:
-        Path: A path that does not currently exist.
-    """
-    return next(candidate for candidate in _unique_candidates(base) if not candidate.exists())
-
-
 def make_unique_dir(base) -> Path:
     """Atomically creates and returns a unique directory.
 
     Tries to create each candidate with ``mkdir``; on ``FileExistsError`` (the
     name is taken by a directory or a file), retries with the next ' (n)' suffix.
-    This closes the check-then-create race that ``unique_path`` leaves open under
-    concurrent extraction.
 
     Args:
         base: Desired directory path.
@@ -66,8 +49,7 @@ def reserve_unique_file(base) -> Path:
     Exclusively creates each candidate as an empty file (``O_CREAT | O_EXCL``);
     on ``FileExistsError`` (the name is taken by a file or a directory), retries
     with the next ' (n)' suffix. The returned path exists as an empty file that
-    the caller can overwrite. This closes the check-then-create race that
-    ``unique_path`` leaves open under concurrent extraction.
+    the caller can overwrite.
 
     Args:
         base: Desired file path.
@@ -83,29 +65,6 @@ def reserve_unique_file(base) -> Path:
             return candidate
         except FileExistsError:
             continue
-
-
-def verify_then_delete(archive: Path, success: bool, delete_fn: Callable[[], None]) -> None:
-    """Deletes a source archive only if its extraction succeeded.
-
-    Args:
-        archive (Path): The source archive.
-        success (bool): Whether extraction succeeded and produced output.
-        delete_fn (Callable[[], None]): Callback that performs the deletion.
-    """
-    if not success:
-        print(
-            f"Keeping archive (extraction failed or produced nothing): {archive}", file=sys.stderr
-        )
-        logging.warning(
-            {
-                "action": "keep_archive",
-                "status": "extraction_failed",
-                "archive": str(archive),
-            }
-        )
-        return
-    delete_fn()
 
 
 def reserve_unique_name(dest_dir, basename, start: int = 0) -> Path:

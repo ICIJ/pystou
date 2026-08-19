@@ -10,11 +10,7 @@ from unittest.mock import patch
 
 import common.fs_walker as fs_walker
 from common.fs_walker import collect_directories, is_excluded_dir
-from common.indexer import (
-    close_database,
-    initialize_database,
-    load_directories_from_index,
-)
+from common.indexer import close_database, initialize_database
 
 
 class TestDeepTree(unittest.TestCase):
@@ -117,7 +113,7 @@ class TestExcludeTrash(unittest.TestCase):
         (root / ".pystou-trash" / "20260613T000000Z-aaaa" / "0" / "victim").mkdir(parents=True)
         conn = initialize_database(self.test_dir)
         collect_directories(conn, str(root), recursive=True)
-        paths = [str(p) for p in load_directories_from_index(conn)]
+        paths = [row[0] for row in conn.execute("SELECT path FROM directories")]
         conn.close()
         self.assertTrue(any(p.endswith("keep") for p in paths))
         self.assertFalse(any(".pystou-trash" in p for p in paths))
