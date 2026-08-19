@@ -4,24 +4,29 @@
 from pathlib import Path
 
 
-def _unique_candidates(base):
+def _unique_candidates(base, *, keep_suffix: bool = False):
     """Yields ``base``, then ``base (1)``, ``base (2)``, ... as Path objects.
 
     Args:
         base: Desired base path.
+        keep_suffix: Place the counter before the file extension
+            (``note (1).txt``) instead of after the whole name
+            (``note.txt (1)``). In-place renames need the extension preserved;
+            trash does not, because quarantined items keep their exact basename.
 
     Yields:
         Path: Successive non-clobbering candidate paths.
     """
     base = Path(base)
     yield base
+    stem, suffix = (base.stem, base.suffix) if keep_suffix else (base.name, "")
     counter = 1
     while True:
-        yield Path(f"{base} ({counter})")
+        yield base.with_name(f"{stem} ({counter}){suffix}")
         counter += 1
 
 
-def make_unique_dir(base) -> Path:
+def make_unique_dir(base, *, keep_suffix: bool = False) -> Path:
     """Atomically creates and returns a unique directory.
 
     Tries to create each candidate with ``mkdir``; on ``FileExistsError`` (the
@@ -29,11 +34,15 @@ def make_unique_dir(base) -> Path:
 
     Args:
         base: Desired directory path.
+        keep_suffix: Place the counter before the file extension
+            (``note (1).txt``) instead of after the whole name
+            (``note.txt (1)``). In-place renames need the extension preserved;
+            trash does not, because quarantined items keep their exact basename.
 
     Returns:
         Path: The freshly created directory.
     """
-    candidates = _unique_candidates(base)
+    candidates = _unique_candidates(base, keep_suffix=keep_suffix)
     while True:
         candidate = next(candidates)
         try:
@@ -43,7 +52,7 @@ def make_unique_dir(base) -> Path:
             continue
 
 
-def reserve_unique_file(base) -> Path:
+def reserve_unique_file(base, *, keep_suffix: bool = False) -> Path:
     """Atomically reserves and returns a unique file path.
 
     Exclusively creates each candidate as an empty file (``O_CREAT | O_EXCL``);
@@ -53,11 +62,15 @@ def reserve_unique_file(base) -> Path:
 
     Args:
         base: Desired file path.
+        keep_suffix: Place the counter before the file extension
+            (``note (1).txt``) instead of after the whole name
+            (``note.txt (1)``). In-place renames need the extension preserved;
+            trash does not, because quarantined items keep their exact basename.
 
     Returns:
         Path: The freshly reserved (empty) file.
     """
-    candidates = _unique_candidates(base)
+    candidates = _unique_candidates(base, keep_suffix=keep_suffix)
     while True:
         candidate = next(candidates)
         try:
