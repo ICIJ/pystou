@@ -272,3 +272,11 @@ class TestIndexDbPath(unittest.TestCase):
         self.assertEqual(path.parent, Path(self.db_dir))
         self.assertTrue(path.name.startswith("photos-"))
         self.assertTrue(path.name.endswith(".db"))
+
+
+class TestUndecodableTarget(unittest.TestCase):
+    def test_index_db_path_accepts_a_target_with_invalid_utf8_bytes(self):
+        # dedup/extract/restore may be pointed at a directory whose own name is
+        # not valid UTF-8, which is exactly what `pystou normalize` exists for.
+        target = os.fsdecode(b"/data/bad_\x9f")
+        self.assertTrue(index_db_path(None, target).endswith(".db"))
