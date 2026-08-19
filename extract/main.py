@@ -378,14 +378,18 @@ def _extract_parallel(
 
 
 def update_index_after_extraction(conn, directory: Path) -> None:
-    """Updates the index after extraction of an archive.
+    """Adds a freshly extracted directory's entries to the index.
+
+    Incremental on purpose: a full re-scan would clear the index and throw away
+    everything the run has already collected.
 
     Args:
         conn: SQLite database connection.
         directory (Path): The directory where the archive was extracted.
     """
-    # Re-scan the directory where the archive was extracted
-    collect_directories(conn, directory, recursive=False)
+    for entry in Path(directory).iterdir():
+        action = "add_directory" if entry.is_dir() else "add_file"
+        update_index_after_change(conn, action, entry)
 
 
 def delete_archive_file(

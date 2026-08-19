@@ -159,14 +159,17 @@ class TestSafeExtractSymlinkedDest(unittest.TestCase):
         with tarfile.open(tar_path, "w") as tf:
             tf.add(payload, arcname="docs/pwned.txt")
 
-        def extractall_without_filter(path, filter=None):
+        def extractall_without_filter(self, path, filter=None):
             raise TypeError("extractall() got an unexpected keyword argument 'filter'")
 
-        with tarfile.open(tar_path, "r") as tf:
-            with patch.object(tf, "extractall", extractall_without_filter):
-                self.assertFalse(safe_extract_tar(tf, self.dest))
+        with (
+            tarfile.open(tar_path, "r") as tf,
+            patch.object(tarfile.TarFile, "extractall", extractall_without_filter),
+        ):
+            self.assertFalse(safe_extract_tar(tf, self.dest))
 
         self.assertFalse((self.outside / "pwned.txt").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
