@@ -52,6 +52,17 @@ class TestRestoreCommand(unittest.TestCase):
         self.assertEqual(r.exit_code, 0)
         self.assertTrue(victim.is_file())
 
+    def test_restore_by_path_only(self):
+        victim = Path(self.dir) / "h.txt"
+        victim.write_text("hi")
+        trash.quarantine([victim], self.dir, operation="cleanup", command="c")
+        r = self.runner.invoke(
+            _app(),
+            [self.dir, "--path", str(victim), "--log-dir", self.dir, "--db-dir", self.dir],
+        )
+        self.assertEqual(r.exit_code, 0)
+        self.assertTrue(victim.is_file())
+
 
 if __name__ == "__main__":
     unittest.main()
