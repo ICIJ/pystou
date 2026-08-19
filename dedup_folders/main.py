@@ -23,13 +23,8 @@ from common.cli import (
     RecursiveOpt,
     TrashDirOpt,
 )
-from common.fs_walker import ScanContext, collect_directories, scan_tree
-from common.indexer import (
-    close_database,
-    index_has_data,
-    initialize_database,
-    update_index_after_change,
-)
+from common.fs_walker import ScanContext, scan_tree
+from common.indexer import close_database, open_or_rescan, update_index_after_change
 from common.logger import setup_logging
 from common.utils import group_directories
 from common.validation import validate_directory_or_exit
@@ -73,28 +68,7 @@ def dedup_command(
     )
     validate_directory_or_exit(directory)
 
-    db_path = os.path.join(db_dir, "filesystem_index.db")
-    index_existed = os.path.exists(db_path)
-    conn = initialize_database(db_dir)
-
-    def rescan() -> None:
-        with console.progress() as p:
-            task = p.add_task("Scanning", total=None)
-            collect_directories(
-                conn,
-                directory,
-                recursive,
-                level,
-                progress_cb=lambda d, f: p.update(
-                    task, description=f"Scanning  dirs {d:,}  files {f:,}"
-                ),
-            )
-
-    if index_existed and index_has_data(conn):
-        if not console.confirm("Use the existing index?", default=True):
-            rescan()
-    else:
-        rescan()
+    conn = open_or_rescan(db_dir, directory, recursive, level)
 
     groups = group_directories(conn, directory)
     if not groups:

@@ -2,13 +2,16 @@ import logging
 import os
 import sqlite3
 from pathlib import Path
+from typing import Optional
 
+from common import console
 from common.errors import PystouError
+from common.fs_walker import collect_directories
+
+DB_NAME = "filesystem_index.db"
 
 
-def initialize_database(
-    db_dir: str = ".", db_name: str = "filesystem_index.db"
-) -> sqlite3.Connection:
+def initialize_database(db_dir: str = ".", db_name: str = DB_NAME) -> sqlite3.Connection:
     """Initializes the SQLite database and creates tables if they don't exist.
 
     Args:
@@ -92,6 +95,42 @@ def index_has_data(conn: sqlite3.Connection) -> bool:
     cursor = conn.cursor()
     cursor.execute("SELECT 1 FROM directories LIMIT 1")
     return cursor.fetchone() is not None
+
+
+def open_or_rescan(
+    db_dir: str, directory: str, recursive: bool, level: Optional[int] = None
+) -> sqlite3.Connection:
+    """Opens the index, scanning the filesystem unless the user keeps a populated one.
+
+    Args:
+        db_dir (str): Directory holding the index database.
+        directory (str): Directory to scan.
+        recursive (bool): Whether to scan recursively.
+        level (Optional[int]): Maximum depth level for recursion.
+
+    Returns:
+        sqlite3.Connection: A connection to a ready-to-query index.
+    """
+    index_existed = os.path.exists(os.path.join(db_dir, DB_NAME))
+    conn = initialize_database(db_dir)
+    if (
+        index_existed
+        and index_has_data(conn)
+        and console.confirm("Use the existing index?", default=True)
+    ):
+        return conn
+    with console.progress() as p:
+        task = p.add_task("Scanning", total=None)
+        collect_directories(
+            conn,
+            directory,
+            recursive,
+            level,
+            progress_cb=lambda d, f: p.update(
+                task, description=f"Scanning  dirs {d:,}  files {f:,}"
+            ),
+        )
+    return conn
 
 
 def _escape_like(text: str) -> str:

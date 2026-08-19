@@ -4,6 +4,7 @@ import shutil
 import sqlite3
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from common.errors import PystouError
@@ -11,8 +12,13 @@ from common.indexer import (
     close_database,
     index_has_data,
     initialize_database,
+    open_or_rescan,
     update_index_after_change,
 )
+
+
+def _indexed_names(conn) -> set:
+    return {Path(row[0]).name for row in conn.execute("SELECT path FROM directories")}
 
 
 def _size_and_count(conn, directory) -> tuple:
@@ -184,3 +190,43 @@ class TestLegacyIndexRetrofit(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOpenOrRescan(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        Path(self.test_dir, "a").mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def _open(self, answer=None):
+        with unittest.mock.patch("common.console.confirm", return_value=answer) as confirm:
+            conn = open_or_rescan(self.test_dir, self.test_dir, recursive=True)
+        return conn, confirm
+
+    def test_missing_index_scans_without_prompting(self):
+        conn, confirm = self._open()
+        try:
+            self.assertTrue(index_has_data(conn))
+            confirm.assert_not_called()
+        finally:
+            close_database(conn)
+
+    def test_populated_index_is_kept_when_accepted(self):
+        close_database(self._open()[0])
+        Path(self.test_dir, "b").mkdir()
+        conn, _ = self._open(answer=True)
+        try:
+            self.assertEqual(_indexed_names(conn), {"a"})
+        finally:
+            close_database(conn)
+
+    def test_populated_index_is_rescanned_when_declined(self):
+        close_database(self._open()[0])
+        Path(self.test_dir, "b").mkdir()
+        conn, _ = self._open(answer=False)
+        try:
+            self.assertEqual(_indexed_names(conn), {"a", "b"})
+        finally:
+            close_database(conn)
