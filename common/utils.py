@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from common.errors import PystouError
+from common.fs_walker import is_excluded_dir
 from common.safe_extract import safe_extract_tar, safe_extract_zip
 from common.safe_ops import make_unique_dir, reserve_unique_file
 
@@ -146,7 +147,8 @@ def get_archive_files(
         return any(filename.lower().endswith(ext) for ext in archive_extensions)
 
     if recursive:
-        for root, _, files in os.walk(directory_path, followlinks=False):
+        for root, dirs, files in os.walk(directory_path, followlinks=False):
+            dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
             for file in files:
                 if is_archive(file):
                     archive_files.append(Path(root) / file)

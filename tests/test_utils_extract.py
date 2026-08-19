@@ -619,5 +619,23 @@ class TestGetArchiveFilesUnknownType(unittest.TestCase):
         self.assertIn(".rar", message)
         self.assertIn(".zip", message)
 
+class TestGetArchiveFilesPrunesTrash(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_quarantined_archives_are_not_rediscovered(self):
+        quarantined = Path(self.test_dir) / ".pystou-trash" / "run-1" / "a.zip"
+        quarantined.parent.mkdir(parents=True)
+        quarantined.write_bytes(b"PK")
+        live = Path(self.test_dir) / "b.zip"
+        live.write_bytes(b"PK")
+
+        found = utils.get_archive_files(self.test_dir, recursive=True)
+
+        self.assertEqual(found, [live])
+
 if __name__ == "__main__":
     unittest.main()
