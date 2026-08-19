@@ -7,6 +7,8 @@ import typer
 from typer.testing import CliRunner
 
 from common import trash
+from common.fs_walker import collect_directories
+from common.indexer import close_database, initialize_database
 from dedup_folders.main import dedup_command
 
 
@@ -72,3 +74,39 @@ class TestDedupCommand(unittest.TestCase):
         self.assertEqual(r.exit_code, 0)
         self.assertTrue((Path(self.dir) / "data (1)").exists())  # nothing removed
         self.assertEqual(trash.list_runs(self.dir), [])
+
+
+class TestDedupScopedToTarget(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.runner = CliRunner()
+        self.elsewhere = Path(self.dir) / "elsewhere"
+        (self.elsewhere / "data").mkdir(parents=True)
+        (self.elsewhere / "data (1)").mkdir()
+        self.target = Path(self.dir) / "target"
+        self.target.mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_stale_index_outside_target_is_left_alone(self):
+        conn = initialize_database(self.dir)
+        collect_directories(conn, str(self.elsewhere), recursive=True)
+        close_database(conn)
+        r = self.runner.invoke(
+            _app(),
+            [
+                str(self.target),
+                "-r",
+                "--action",
+                "delete",
+                "--hard-delete",
+                "--db-dir",
+                self.dir,
+                "--log-dir",
+                self.dir,
+            ],
+            input="y\n",
+        )
+        self.assertEqual(r.exit_code, 0)
+        self.assertTrue((self.elsewhere / "data (1)").exists())

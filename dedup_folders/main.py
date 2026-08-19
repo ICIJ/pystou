@@ -97,7 +97,7 @@ def dedup_command(
     else:
         rescan()
 
-    groups = group_directories(conn)
+    groups = group_directories(conn, directory)
     if not groups:
         console.status("No duplicate directories found.")
         logging.info({"action": "no_duplicates_found"})

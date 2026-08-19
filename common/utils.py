@@ -14,11 +14,12 @@ from common.safe_extract import safe_extract_tar, safe_extract_zip
 from common.safe_ops import make_unique_dir, reserve_unique_file
 
 
-def group_directories(conn) -> dict:
+def group_directories(conn, root) -> dict:
     """Groups duplicate sibling directories based on their base names and parent directories.
 
     Args:
         conn: SQLite database connection.
+        root: Directory the operation runs on; indexed paths outside it are ignored.
 
     Returns:
         dict: A dictionary where keys are group keys and values are lists of directory paths.
@@ -26,10 +27,13 @@ def group_directories(conn) -> dict:
     cursor = conn.cursor()
     pattern = re.compile(r"^(.*?)(?: \((\d+)\))?$")
     cursor.execute("SELECT path, parent_path FROM directories")
+    root_prefix = os.path.abspath(root) + os.sep
     groups = defaultdict(list)
     # Iterate over cursor directly instead of fetchall() to reduce memory usage
     for row in cursor:
         path_str, parent_path_str = row
+        if not os.path.abspath(path_str).startswith(root_prefix):
+            continue
         dir_path = Path(path_str)
         parent_dir = Path(parent_path_str)
         dir_name = dir_path.name
