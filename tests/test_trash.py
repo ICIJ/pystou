@@ -344,3 +344,32 @@ class TestHostileLedger(unittest.TestCase):
         removed = trash.purge(self.root, all_runs=True)
         self.assertEqual(removed, 0)
         self.assertTrue((victim / "keep").is_dir())
+
+    def test_restore_refuses_stored_path_outside_the_trash_root(self):
+        outside = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, outside, True)
+        loot = outside / "loot.txt"
+        loot.write_text("not yours")
+        self._plant_ledger(
+            {"run_id": "20200101T000000Z-dead", "op_root": self.root},
+            [{"original": str(Path(self.root) / "stolen.txt"), "stored": str(loot)}],
+        )
+        restored, conflicted = trash.restore(self.root, all_runs=True)
+        self.assertEqual((restored, conflicted), (0, 1))
+        self.assertTrue(loot.is_file())
+        self.assertFalse((Path(self.root) / "stolen.txt").exists())
+
+    def test_restore_refuses_original_path_outside_the_op_root(self):
+        victim = Path(self.root) / "f.txt"
+        victim.write_text("data")
+        run_id = trash.quarantine([victim], self.root, operation="cleanup", command="c")
+        ledger = Path(self.root) / ".pystou-trash" / "runs" / f"{run_id}.jsonl"
+        lines = [json.loads(x) for x in ledger.read_text().splitlines() if x.strip()]
+        outside = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, outside, True)
+        lines[1]["original"] = str(outside / "pwned.txt")
+        ledger.write_text("\n".join(json.dumps(obj) for obj in lines) + "\n")
+        restored, conflicted = trash.restore(self.root, all_runs=True)
+        self.assertEqual((restored, conflicted), (0, 1))
+        self.assertFalse((outside / "pwned.txt").exists())
+        self.assertTrue((Path(self.root) / ".pystou-trash" / lines[1]["stored"]).is_file())
