@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 
 import common.utils as utils
+from common.errors import PystouError
 
 
 class TestExtractArchiveSafety(unittest.TestCase):
@@ -599,6 +600,24 @@ class TestGetArchiveFilesCaseInsensitive(unittest.TestCase):
         found = utils.get_archive_files(self.test_dir, recursive=False, filter_types=["ZIP"])
 
         self.assertEqual(found, [upper])
+
+class TestGetArchiveFilesUnknownType(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        zip_path = Path(self.test_dir) / "data.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("a.txt", "x")
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_unknown_type_is_an_error(self):
+        with self.assertRaises(PystouError) as ctx:
+            utils.get_archive_files(self.test_dir, recursive=False, filter_types=["rar"])
+
+        message = str(ctx.exception)
+        self.assertIn(".rar", message)
+        self.assertIn(".zip", message)
 
 if __name__ == "__main__":
     unittest.main()
