@@ -19,6 +19,7 @@ from common.cli import (
 )
 from common.fs_walker import is_excluded_dir
 from common.logger import setup_logging
+from common.utils import ARCHIVE_EXTENSIONS
 from common.validation import validate_directory_or_exit
 
 
@@ -122,18 +123,7 @@ def collect_stats(directory: str, recursive: bool, top_n: int = 10) -> dict:
         "empty_directories": [],
     }
 
-    archive_extensions = {
-        ".zip",
-        ".tar",
-        ".gz",
-        ".tgz",
-        ".bz2",
-        ".xz",
-        ".zst",
-        ".rar",
-        ".7z",
-        ".pst",
-    }
+    archive_extensions = ARCHIVE_EXTENSIONS
 
     directory_path = Path(directory)
 

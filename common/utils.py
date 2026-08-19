@@ -13,6 +13,24 @@ from typing import Any, Optional, Union
 from common.safe_extract import safe_extract_tar, safe_extract_zip
 from common.safe_ops import make_unique_dir, reserve_unique_file
 
+ARCHIVE_EXTENSIONS = frozenset(
+    {
+        ".zip",
+        ".tar",
+        ".tar.gz",
+        ".tgz",
+        ".tar.bz2",
+        ".tbz",
+        ".gz",
+        ".bz2",
+        ".tar.zst",
+        ".tzst",
+        ".zst",
+        ".pst",
+        ".ost",
+    }
+)
+
 
 def group_directories(conn) -> dict:
     """Groups duplicate sibling directories based on their base names and parent directories.
@@ -99,28 +117,12 @@ def get_archive_files(
     Returns:
         List[Path]: A list of Paths to archive files.
     """
-    all_extensions = [
-        ".zip",
-        ".tar",
-        ".tar.gz",
-        ".tgz",
-        ".tar.bz2",
-        ".tbz",
-        ".gz",
-        ".bz2",
-        ".tar.zst",
-        ".tzst",
-        ".zst",
-        ".pst",
-        ".ost",
-    ]
-
     if filter_types:
         # Normalize filter types to have leading dot
         normalized = [t if t.startswith(".") else f".{t}" for t in filter_types]
-        archive_extensions = [ext for ext in all_extensions if ext in normalized]
+        archive_extensions = [ext for ext in ARCHIVE_EXTENSIONS if ext in normalized]
     else:
-        archive_extensions = all_extensions
+        archive_extensions = ARCHIVE_EXTENSIONS
     # Pattern to match split archive parts (.z01, .z02, etc.)
     split_part_pattern = re.compile(r"\.z\d+$", re.IGNORECASE)
 
