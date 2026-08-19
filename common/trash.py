@@ -117,6 +117,17 @@ def quarantine(
         return ""
 
     root = _ensure_trash_root(op_root, trash_dir)
+    kept = []
+    for it in items:
+        if _inside(root, it):
+            print(f"Skipping {it}: already quarantined under {root}", file=sys.stderr)
+            logging.warning({"action": "quarantine", "status": "already_in_trash", "path": str(it)})
+            continue
+        kept.append(it)
+    items = kept
+    if not items:
+        return ""
+
     root_dev = os.stat(root).st_dev
     # Preflight: refuse the whole run if anything is cross-device (never copy).
     for it in items:

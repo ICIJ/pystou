@@ -130,6 +130,21 @@ class TestQuarantineEdgeCases(unittest.TestCase):
         finally:
             os.chmod(ro, 0o700)  # restore so tearDown can clean up
 
+    def test_items_already_inside_the_trash_are_skipped(self):
+        trash_dir = str(Path(self.root) / "mytrash")
+        victim = Path(self.root) / "f.txt"
+        victim.write_text("x")
+        run_id = trash.quarantine(
+            [victim], self.root, operation="cleanup", command="c", trash_dir=trash_dir
+        )
+        stored = next((Path(trash_dir) / run_id).rglob("f.txt"))
+        again = trash.quarantine(
+            [stored], self.root, operation="cleanup", command="c", trash_dir=trash_dir
+        )
+        self.assertEqual(again, "")
+        self.assertTrue(stored.is_file())
+        self.assertEqual(trash.restore(self.root, run_id=run_id, trash_dir=trash_dir), (1, 0))
+
     def test_cross_device_raises(self):
         victim = Path(self.root) / "f.txt"
         victim.write_text("x")
