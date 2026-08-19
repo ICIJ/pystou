@@ -147,6 +147,37 @@ class TestGroupDirectoriesRequiresPlainBase(unittest.TestCase):
         self.assertEqual(names, {("Album", "Album (1)")})
 
 
+class TestMergeIndexesMovedDirectories(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.base = Path(self.test_dir) / "data"
+        self.base.mkdir()
+        self.dup = Path(self.test_dir) / "data (1)"
+        (self.dup / "sub").mkdir(parents=True)
+        (self.dup / "sub" / "f.txt").write_text("hello")
+        self.conn = initialize_database(self.test_dir)
+        collect_directories(self.conn, self.test_dir, recursive=True)
+
+    def tearDown(self):
+        close_database(self.conn)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_moved_subdirectory_is_indexed_as_a_directory(self):
+        merge_contents(
+            self.base,
+            [self.dup],
+            dry_run=False,
+            conn=self.conn,
+            op_root=self.test_dir,
+            hard_delete=True,
+        )
+        dirs = {r[0] for r in self.conn.execute("SELECT path FROM directories")}
+        files = {tuple(r) for r in self.conn.execute("SELECT directory_path, name FROM files")}
+        self.assertIn(str(self.base / "sub"), dirs)
+        self.assertNotIn((str(self.base), "sub"), files)
+        self.assertIn((str(self.base / "sub"), "f.txt"), files)
+
+
 class TestDedupQuarantine(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
