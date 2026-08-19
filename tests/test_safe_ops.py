@@ -154,5 +154,38 @@ class TestReserveUniqueName(unittest.TestCase):
         self.assertEqual(len({p.parent for p in results}), 16)
 
 
+class TestKeepSuffix(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_keep_suffix_puts_counter_before_extension(self):
+        base = Path(self.dir) / "note.txt"
+        first = reserve_unique_file(base, keep_suffix=True)
+        second = reserve_unique_file(base, keep_suffix=True)
+        self.assertEqual(first.name, "note.txt")
+        self.assertEqual(second.name, "note (1).txt")
+
+    def test_default_still_suffixes_whole_name(self):
+        base = Path(self.dir) / "note.txt"
+        reserve_unique_file(base)
+        second = reserve_unique_file(base)
+        self.assertEqual(second.name, "note.txt (1)")
+
+    def test_keep_suffix_on_extensionless_name(self):
+        base = Path(self.dir) / "README"
+        reserve_unique_file(base, keep_suffix=True)
+        second = reserve_unique_file(base, keep_suffix=True)
+        self.assertEqual(second.name, "README (1)")
+
+    def test_make_unique_dir_accepts_keep_suffix(self):
+        base = Path(self.dir) / "folder"
+        make_unique_dir(base, keep_suffix=True)
+        second = make_unique_dir(base, keep_suffix=True)
+        self.assertEqual(second.name, "folder (1)")
+
+
 if __name__ == "__main__":
     unittest.main()
