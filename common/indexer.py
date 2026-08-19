@@ -1,7 +1,6 @@
 import logging
 import os
 import sqlite3
-import sys
 from pathlib import Path
 
 from common.errors import PystouError
@@ -81,25 +80,6 @@ def create_tables(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def prompt_use_existing_index() -> bool:
-    """Prompts the user to decide whether to use the existing index.
-
-    Returns:
-        bool: True if the user wants to use the existing index, False otherwise.
-    """
-    while True:
-        choice = (
-            input("An index file was found. Do you want to use the existing index? (Y/n): ")
-            .strip()
-            .lower()
-        )
-        if choice in {"y", "yes", ""}:
-            return True
-        elif choice in {"n", "no"}:
-            return False
-        print("Invalid input. Please enter 'Y' or 'n'.", file=sys.stderr)
-
-
 def index_has_data(conn: sqlite3.Connection) -> bool:
     """Returns True if the index contains at least one directory record.
 
@@ -176,22 +156,6 @@ def update_index_after_change(conn: sqlite3.Connection, action: str, path: Path)
             (str(path), str(path.parent), stat_info.st_mtime),
         )
     conn.commit()
-
-
-def load_directories_from_index(conn: sqlite3.Connection) -> list[Path]:
-    """Loads directory paths from the database.
-
-    Args:
-        conn (sqlite3.Connection): SQLite database connection.
-
-    Returns:
-        List[Path]: List of directory paths.
-    """
-    cursor = conn.cursor()
-    cursor.execute("SELECT path FROM directories")
-    # Iterate over cursor directly for better memory efficiency
-    directories = [Path(row[0]) for row in cursor]
-    return directories
 
 
 def close_database(conn: sqlite3.Connection) -> None:

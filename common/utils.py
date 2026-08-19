@@ -73,46 +73,6 @@ def group_directories(conn, root) -> dict:
     }
 
 
-def get_directory_size(conn, dir_path: Path) -> tuple:
-    """Calculates the total size and number of files in a directory using the database.
-
-    Args:
-        conn: SQLite database connection.
-        dir_path (Path): Path to the directory.
-
-    Returns:
-        tuple: Total size in bytes and number of files.
-    """
-    cursor = conn.cursor()
-    # Use SQL aggregate functions instead of fetching all rows
-    cursor.execute(
-        "SELECT COALESCE(SUM(size), 0), COUNT(*) FROM files WHERE directory_path = ?",
-        (str(dir_path),),
-    )
-    total_size, num_files = cursor.fetchone()
-    return total_size, num_files
-
-
-def summarize_group(group_key, dir_paths: list[Path], conn) -> None:
-    """Prints a summary of a group of duplicate directories.
-
-    Args:
-        group_key: The group key (parent directory and base name).
-        dir_paths (List[Path]): List of directory paths in the group.
-        conn: SQLite database connection.
-    """
-    parent_dir, base_name = group_key
-    print(f"\nFound duplicate directories in '{parent_dir}': '{base_name}'", file=sys.stderr)
-    for dir_path in sorted(dir_paths):
-        size, num_files = get_directory_size(conn, dir_path)
-        formatted_size = f"{size:,}"
-        formatted_num_files = f"{num_files:,}"
-        print(
-            f" - {dir_path.name} : {formatted_num_files} files, {formatted_size} bytes",
-            file=sys.stderr,
-        )
-
-
 def get_archive_files(
     directory: Union[str, Path],
     recursive: bool,
@@ -779,22 +739,6 @@ def extract_outlook_archive(archive_path: Path, tolerant: bool = False) -> bool:
         return False
     print(f"Extracted {label} file to {unique_output_dir}", file=sys.stderr)
     return True
-
-
-def extract_pst_archive(archive_path: Path, tolerant: bool = False) -> bool:
-    """Backward-compatible alias for :func:`extract_outlook_archive`.
-
-    Retained so existing imports/callers keep working. Routes to the shared
-    Outlook extractor.
-
-    Args:
-        archive_path (Path): The path to the PST (or OST) file.
-        tolerant (bool): See :func:`extract_outlook_archive`.
-
-    Returns:
-        bool: True if extraction was successful, False otherwise.
-    """
-    return extract_outlook_archive(archive_path, tolerant=tolerant)
 
 
 def get_split_archive_parts(archive_path: Path) -> list[Path]:

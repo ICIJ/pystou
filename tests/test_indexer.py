@@ -13,7 +13,13 @@ from common.indexer import (
     initialize_database,
     update_index_after_change,
 )
-from common.utils import get_directory_size
+
+
+def _size_and_count(conn, directory) -> tuple:
+    return conn.execute(
+        "SELECT COALESCE(SUM(size), 0), COUNT(*) FROM files WHERE directory_path = ?",
+        (str(directory),),
+    ).fetchone()
 
 
 class TestIndexerDeleteDirectory(unittest.TestCase):
@@ -141,7 +147,7 @@ class TestFilesAreIndexedOnce(unittest.TestCase):
         path.write_text("0123456789")
         for _ in range(3):
             update_index_after_change(self.conn, "add_file", path)
-        self.assertEqual(get_directory_size(self.conn, Path(self.test_dir)), (10, 1))
+        self.assertEqual(_size_and_count(self.conn, self.test_dir), (10, 1))
 
 
 class TestLegacyIndexRetrofit(unittest.TestCase):
@@ -166,7 +172,7 @@ class TestLegacyIndexRetrofit(unittest.TestCase):
     def test_existing_duplicate_rows_are_collapsed(self):
         conn = initialize_database(self.test_dir)
         try:
-            self.assertEqual(get_directory_size(conn, Path("/a")), (10, 1))
+            self.assertEqual(_size_and_count(conn, "/a"), (10, 1))
             with self.assertRaises(sqlite3.IntegrityError):
                 conn.execute(
                     "INSERT INTO files (directory_path, name, size, mtime)"

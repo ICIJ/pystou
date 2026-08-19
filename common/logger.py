@@ -28,21 +28,6 @@ def setup_logging(script_name: str = "script", log_dir: str = ".") -> None:
     logger.addHandler(handler)
 
 
-def log_configuration(args) -> None:
-    """Logs the run configuration, excluding internal/non-serializable keys.
-
-    Args:
-        args: Parsed command-line arguments (argparse.Namespace or similar).
-    """
-    config = {
-        k: v
-        for k, v in vars(args).items()
-        if not k.startswith("_") and k not in ("func", "command")
-    }
-    config["action"] = "configuration"
-    logging.info(config)
-
-
 class JsonFormatter(logging.Formatter):
     """Custom logging formatter to output JSON-formatted logs."""
 

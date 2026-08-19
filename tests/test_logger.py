@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import unittest
 
-from common.logger import log_configuration, setup_logging
+from common.logger import setup_logging
 
 
 class TestLogger(unittest.TestCase):
@@ -22,18 +22,6 @@ class TestLogger(unittest.TestCase):
         setup_logging("x", self.log_dir)
         setup_logging("x", self.log_dir)
         self.assertEqual(len(logging.getLogger().handlers), 1)
-
-    def test_log_configuration_strips_internal_keys(self):
-        setup_logging("x", self.log_dir)
-
-        class Args:
-            directory = "."
-            func = lambda a: None
-            command = "extract"
-            _private = "hidden"
-
-        # Must not raise; func/command/_private are excluded from the logged config.
-        log_configuration(Args())
 
 
 if __name__ == "__main__":
