@@ -119,7 +119,7 @@ def get_archive_files(
     """
     if filter_types:
         # Normalize filter types to have leading dot
-        normalized = [t if t.startswith(".") else f".{t}" for t in filter_types]
+        normalized = [t.lower() if t.startswith(".") else f".{t.lower()}" for t in filter_types]
         archive_extensions = [ext for ext in ARCHIVE_EXTENSIONS if ext in normalized]
     else:
         archive_extensions = ARCHIVE_EXTENSIONS
@@ -133,7 +133,7 @@ def get_archive_files(
         # Skip split archive parts - they'll be processed with their .zip
         if split_part_pattern.search(filename):
             return False
-        return any(filename.endswith(ext) for ext in archive_extensions)
+        return any(filename.lower().endswith(ext) for ext in archive_extensions)
 
     if recursive:
         for root, _, files in os.walk(directory_path, followlinks=False):

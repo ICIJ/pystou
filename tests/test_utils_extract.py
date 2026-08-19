@@ -576,5 +576,29 @@ class TestExtractOutlookNonZeroExit(unittest.TestCase):
             self.assertTrue(utils.extract_archive(lenient, tolerant=True))  # forwarded -> True
 
 
+class TestGetArchiveFilesCaseInsensitive(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_uppercase_extensions_are_discovered(self):
+        names = {"MAILBOX.PST", "archive.ZIP", "data.Tar.Gz"}
+        for name in names:
+            (Path(self.test_dir) / name).write_bytes(b"x")
+
+        found = utils.get_archive_files(self.test_dir, recursive=False)
+
+        self.assertEqual({p.name for p in found}, names)
+
+    def test_type_filter_is_case_insensitive(self):
+        upper = Path(self.test_dir) / "data.ZIP"
+        upper.write_bytes(b"x")
+
+        found = utils.get_archive_files(self.test_dir, recursive=False, filter_types=["ZIP"])
+
+        self.assertEqual(found, [upper])
+
 if __name__ == "__main__":
     unittest.main()
