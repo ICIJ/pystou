@@ -21,6 +21,9 @@ def setup_logging(script_name: str = "script", log_dir: Optional[str] = None) ->
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     directory = log_dir if log_dir else str(paths.log_dir())
+    # paths.log_dir() creates itself; an explicit --log-dir would otherwise die
+    # with a raw FileNotFoundError from the handler.
+    os.makedirs(directory, exist_ok=True)
     log_filename = os.path.join(directory, f"{script_name}.{timestamp}.log")
     handler = handlers.RotatingFileHandler(log_filename, maxBytes=10485760, backupCount=5)
     handler.setFormatter(JsonFormatter())
