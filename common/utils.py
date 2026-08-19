@@ -247,7 +247,7 @@ def extract_zip_archive(archive_path: Path) -> bool:
                 return False
         print(f"Extracted ZIP archive to {output_dir}", file=sys.stderr)
         return True
-    except (zipfile.BadZipFile, OSError) as e:
+    except Exception as e:
         shutil.rmtree(output_dir, ignore_errors=True)
         print(f"Error extracting ZIP archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
@@ -355,7 +355,7 @@ def extract_tar_archive(archive_path: Path) -> bool:
                 return False
         print(f"Extracted TAR archive to {output_dir}", file=sys.stderr)
         return True
-    except (tarfile.TarError, OSError) as e:
+    except Exception as e:
         shutil.rmtree(output_dir, ignore_errors=True)
         print(f"Error extracting TAR archive {archive_path}: {e}", file=sys.stderr)
         logging.error(
