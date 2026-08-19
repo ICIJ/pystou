@@ -56,10 +56,9 @@ def normalize_command(
     """Rename files whose names are not valid, portable UTF-8 (S3-safe)."""
     setup_logging("normalize", log_dir)
     if undo:
-        restored, skipped = undo_run(undo, manifest_dir)
-        console.success(
-            f"Restored {restored} name(s)" + (f", skipped {skipped}" if skipped else "")
-        )
+        restored, skipped = undo_run(undo, manifest_dir, dry_run)
+        verb = "Would restore" if dry_run else "Restored"
+        console.success(f"{verb} {restored} name(s)" + (f", skipped {skipped}" if skipped else ""))
         return
     selected = _selected_rules(rule)
     logging.info(
@@ -224,7 +223,9 @@ def apply_rename(old: Path, new_name: str) -> Path:
     return claimed
 
 
-def undo_run(run_id: str, manifest_dir: Optional[str] = None) -> tuple[int, int]:
+def undo_run(
+    run_id: str, manifest_dir: Optional[str] = None, dry_run: bool = False
+) -> tuple[int, int]:
     """Renames everything in a manifest back to its original name.
 
     Entries are replayed in reverse (directories before the files they
@@ -236,16 +237,24 @@ def undo_run(run_id: str, manifest_dir: Optional[str] = None) -> tuple[int, int]
     Args:
         run_id: Run identifier of the manifest to replay.
         manifest_dir: Optional override for the XDG state location.
+        dry_run: Report what would be restored or skipped without renaming
+            anything.
 
     Returns:
-        tuple[int, int]: ``(restored, skipped)`` counts.
+        tuple[int, int]: ``(restored, skipped)`` counts. In a dry run,
+        ``restored`` counts entries that would be restored.
     """
     path = manifest.manifest_path(run_id, manifest_dir)
     _meta, entries = manifest.read(path)
     restored = 0
     skipped = 0
+    # entries are deepest-first (child-before-parent), which is also the order
+    # these substitutions must apply in: a descendant's recorded ``new`` path
+    # is expressed using its ancestor's *old* name.
+    moves = [(manifest.decode(e["old_b64"]), manifest.decode(e["new_b64"])) for e in entries]
     for entry in reversed(entries):
-        source = Path(manifest.decode(entry["new_b64"]))
+        new_path = manifest.decode(entry["new_b64"])
+        source = Path(_resolve_current_path(new_path, moves) if dry_run else new_path)
         target = Path(manifest.decode(entry["old_b64"]))
         if not os.path.lexists(source):
             skipped += 1
@@ -254,6 +263,9 @@ def undo_run(run_id: str, manifest_dir: Optional[str] = None) -> tuple[int, int]
         if os.path.lexists(target):
             skipped += 1
             console.warn(f"Occupied, cannot undo: {entry['old']}")
+            continue
+        if dry_run:
+            restored += 1
             continue
         try:
             os.rename(source, target)
@@ -269,3 +281,30 @@ def undo_run(run_id: str, manifest_dir: Optional[str] = None) -> tuple[int, int]
             {"action": "undo", "status": "success", "old": entry["new"], "new": entry["old"]}
         )
     return restored, skipped
+
+
+def _resolve_current_path(path: str, moves: list[tuple[str, str]]) -> str:
+    """Rewrites a recorded ``new`` path to where it actually sits on disk.
+
+    A descendant's recorded path is expressed using its ancestor's *old*
+    name, since the ancestor had not been renamed yet when the descendant
+    was. A real undo self-corrects: renaming the ancestor back physically
+    moves the descendant along with it. A dry run changes nothing on disk,
+    so this substitutes the ancestor's actual current (``new``) name in its
+    place instead.
+
+    Args:
+        path: A recorded ``new`` path, decoded.
+        moves: ``(old, new)`` pairs for every entry in the manifest, deepest
+            first, the order in which substitutions must be tried.
+
+    Returns:
+        str: The path as it actually exists on disk right now.
+    """
+    for old_prefix, new_prefix in moves:
+        if path == old_prefix:
+            return new_prefix
+        prefixed = old_prefix + os.sep
+        if path.startswith(prefixed):
+            return new_prefix + os.sep + path[len(prefixed) :]
+    return path

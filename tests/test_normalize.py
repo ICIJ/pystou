@@ -153,6 +153,19 @@ class TestUndo(unittest.TestCase):
             b"squatter",
         )
 
+    def test_dry_run_reports_without_touching_the_tree(self):
+        bad_dir = Path(os.fsdecode(os.fsencode(str(self.root)) + b"/dir_\x9f"))
+        bad_dir.mkdir()
+        make(bad_dir, b"a\x9f.txt", b"body")
+
+        run_id = self._normalize()
+        after_normalize = _listing(self.root)
+
+        restored, skipped = undo_run(run_id, self.state, dry_run=True)
+        self.assertEqual(skipped, 0)
+        self.assertEqual(restored, 2)
+        self.assertEqual(_listing(self.root), after_normalize)
+
 
 def _listing(root: Path) -> list[bytes]:
     """Returns every path under root as raw bytes, so bad names compare exactly."""
