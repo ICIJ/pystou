@@ -224,12 +224,12 @@ def apply_rename(old: Path, new_name: str) -> Path:
         suffix if the desired name was taken.
     """
     target = old.parent / new_name
-    # On a normalization- or case-insensitive filesystem (HFS+, APFS) the NFC
-    # target already *is* the NFD source, so claiming it exclusively would fail
-    # against the very entry being renamed and invent a ' (1)' suffix.
-    if os.path.lexists(target) and os.path.samestat(os.lstat(target), os.lstat(old)):
-        os.rename(old, target)
-        return target
+    # The claim is unconditional on purpose. Short-circuiting when target and
+    # old are the same file (a case- or normalization-insensitive volume, a
+    # sibling hardlink) looks like it avoids a spurious ' (1)', but os.rename
+    # is a no-op when both paths resolve to one file, so it would record a
+    # rename that never happened. A manifest that lies is worse than an ugly
+    # name.
     if old.is_dir() and not old.is_symlink():
         claimed = make_unique_dir(target)
     else:
