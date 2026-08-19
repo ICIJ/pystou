@@ -1,6 +1,262 @@
 # CHANGELOG
 
 
+## v0.4.1 (2026-08-19)
+
+### Bug Fixes
+
+- **cleanup**: Apply --include patterns to junk directories
+  ([`91e84e8`](https://github.com/ICIJ/pystou/commit/91e84e81441acab03b8d18bda0405c8cc5254ec8))
+
+--include documented extra file/dir names but only extended the junk file set, so a directory name
+  passed to it was never matched.
+
+- **cleanup**: Report quarantine OSError instead of aborting the run
+  ([`18c157a`](https://github.com/ICIJ/pystou/commit/18c157ae759a5ce92d323615612c438ffea0f71d))
+
+A PermissionError from os.rename escaped remove_junk and crashed the command after part of the batch
+  had already been moved and ledgered.
+
+- **cli**: Drop --db-dir from commands that never open the index
+  ([`93b4c48`](https://github.com/ICIJ/pystou/commit/93b4c48b802682c14e658a40c6ecac4b22576c5b))
+
+cleanup, empty, identify and stats accepted and documented --db-dir but never referenced it, so
+  pointing it anywhere had no effect.
+
+- **dedup**: Index merged subdirectories as directories
+  ([`285c915`](https://github.com/ICIJ/pystou/commit/285c915590530b1b26247e1fa61a81dd1c3c3fc1))
+
+merge_contents moves whatever os.listdir yields, so a moved subdirectory was recorded as a zero-size
+  file and its contents disappeared from the index.
+
+- **dedup**: Only group a suffixed directory next to its plain base
+  ([`abfea39`](https://github.com/ICIJ/pystou/commit/abfea3966d800d1fad3a1e214b9bc2830de2d690))
+
+'Trip (2019)' and 'Trip (2020)' were treated as copies of 'Trip' and one of them was deleted.
+
+- **dedup**: Scope duplicate grouping to the operation root
+  ([`90c1493`](https://github.com/ICIJ/pystou/commit/90c14937a6aa09ed169e5f6c2043d5fb504dac89))
+
+A stale index built from another tree made dedup delete or quarantine directories the user never
+  named.
+
+- **dedup**: Take the base directory from the group key
+  ([`2220932`](https://github.com/ICIJ/pystou/commit/22209322982297f3e25086a7bf087e9db8fe1a2a))
+
+identify_base_and_duplicates re-parsed the ' (n)' convention with two regexes and returned
+  float('inf') from an int-annotated helper; the base name the grouping already produced identifies
+  the base directory.
+
+- **empty**: Count hidden files as directory content
+  ([`218109c`](https://github.com/ICIJ/pystou/commit/218109cd34673710dcf91c1de692d69c1cfdc4e1))
+
+is_directory_empty ignored hidden entries unless --include-hidden was set, so a directory holding
+  only a .DS_Store was listed as empty and then failed to rmdir. The flag governs which directories
+  are traversed and removed, not what counts as content.
+
+- **empty**: Count symlink entries as directory content
+  ([`e4d6979`](https://github.com/ICIJ/pystou/commit/e4d6979c5ac29aaae027c628d80deb4687dc4c3c))
+
+A directory whose only entry was a symlink was reported as empty and then failed to rmdir with
+  ENOTEMPTY, the same flaw as the hidden-file case.
+
+- **empty**: Detect ENOTEMPTY by errno instead of message text
+  ([`62a7fc3`](https://github.com/ICIJ/pystou/commit/62a7fc35c48068763df19f50dc1def02c0fb60f7))
+
+The hardcoded 39 is Linux-only (macOS/BSD use 66) and the strerror substring is localized, so a
+  benign non-empty directory was escalated to an error under a non-English locale.
+
+- **extract**: Discover archives whose extension is uppercased
+  ([`b65caae`](https://github.com/ICIJ/pystou/commit/b65caae3afbcc82b7d14c2feaa8c0e602d01ce5c))
+
+- **extract**: Dispatch and name output on the case-folded suffix
+  ([`63e1001`](https://github.com/ICIJ/pystou/commit/63e1001798da1b3813d6efe5936d91c957294e16))
+
+- **extract**: Extract each nested archive at most once
+  ([`1dc6c9f`](https://github.com/ICIJ/pystou/commit/1dc6c9f0cedc823135b383039f7591f6e3c277c5))
+
+- **extract**: Extract TAR.ZST archives into a unique directory
+  ([`bb9aa10`](https://github.com/ICIJ/pystou/commit/bb9aa1022420872e10e28a08f0b1092703440f25))
+
+- **extract**: Extract ZIP and TAR archives into a unique directory
+  ([`86abaab`](https://github.com/ICIJ/pystou/commit/86abaabfb24e9f6aeb46accdcee90bdb06d765a2))
+
+- **extract**: Harden the 7z, zstd and readpst invocations
+  ([`40734b6`](https://github.com/ICIJ/pystou/commit/40734b6aa23ed55a1cda82a8616ce362abcfdd50))
+
+- **extract**: Honour --max-depth on the parallel nested path
+  ([`ed7ed5e`](https://github.com/ICIJ/pystou/commit/ed7ed5e7bf4bf61ba1dfb12e4bfc074372b90745))
+
+- **extract**: Keep a corrupt archive from aborting the whole run
+  ([`36de5d4`](https://github.com/ICIJ/pystou/commit/36de5d4ad3671ab51105816dd1230e9118629440))
+
+- **extract**: Prune the trash directory when discovering archives
+  ([`484b2c7`](https://github.com/ICIJ/pystou/commit/484b2c7bf0e33269df3b86ae02a37ec8db3de220))
+
+- **extract**: Reject an unknown --type instead of matching nothing
+  ([`a8fa29b`](https://github.com/ICIJ/pystou/commit/a8fa29bb11f232823f1151aff2a2d36940e40a7a))
+
+- **extract**: Remove the output directory when extraction fails unexpectedly
+  ([`b5179e2`](https://github.com/ICIJ/pystou/commit/b5179e2546a2d5df381ca9a947805389e516eca8))
+
+- **extract**: Update the index incrementally instead of clearing it
+  ([`028d190`](https://github.com/ICIJ/pystou/commit/028d190d3544beb6a75e39f5a118d77c98145fe2))
+
+- **identify**: Stop matching tar magic at byte 0
+  ([`f5ff004`](https://github.com/ICIJ/pystou/commit/f5ff004c7178d4389a273a80daeaa3f1f867974f))
+
+The 'ustar' entry was matched with header.startswith while the real magic lives at offset 257, and
+  the offset probe short-circuited ahead of every genuine header signature.
+
+- **identify**: Strip --extensions tokens before the leading-dot check
+  ([`6fa024b`](https://github.com/ICIJ/pystou/commit/6fa024bc5ea0af551ac05b90513409eea71f5b8c))
+
+' .pdf' was tested unstripped, so a space after the comma produced '..pdf' and silently filtered out
+  every matching file.
+
+- **indexer**: Make (directory_path, name) unique in the files table
+  ([`c84dd76`](https://github.com/ICIJ/pystou/commit/c84dd768bf63b897b1ef1966d2ed512320942248))
+
+Without it every INSERT OR IGNORE added a row, so re-indexing a file multiplied the size and file
+  count shown for its directory. Existing databases get the constraint through a unique index,
+  dropping the duplicate rows they already hold.
+
+- **restore**: Search every run when only --path is given
+  ([`f887840`](https://github.com/ICIJ/pystou/commit/f887840ef172cf4596bc3d5eda9acface6f16d8b))
+
+--path alone selected no run at all, so the CLI reported 'Restored 0 item(s).' and exited 0 while
+  the item stayed in the trash.
+
+- **safe-extract**: Resolve symlinks when checking member containment
+  ([`0041fda`](https://github.com/ICIJ/pystou/commit/0041fda3057f8ac64cb90156aaa90619dd8d9643))
+
+- **stats**: Reject a negative --top
+  ([`aec8d97`](https://github.com/ICIJ/pystou/commit/aec8d9701db0f5c764f83ce2ed73ef44e0ac2fc7))
+
+A negative bound sliced the tables from the end and printed titles like 'Top -5 Extensions by
+  Count'.
+
+- **stats**: Survive --top 0
+  ([`ec12425`](https://github.com/ICIJ/pystou/commit/ec12425f5d8d4909a71f9fc99fc0672492bacdcb))
+
+With top_n <= 0 the first file fell through to the size comparison and indexed the still-empty heap.
+
+- **trash**: Name the searched trash root when nothing is found
+  ([`c4e2598`](https://github.com/ICIJ/pystou/commit/c4e25989ec5fe8cddc13914b7579a0a46a9f2933))
+
+A run made with --trash-dir left 'Trash is empty.' and a silent 'Restored 0 item(s).' behind; the
+  ledger header now records the trash root too.
+
+- **trash**: Never re-quarantine items already inside the trash root
+  ([`1272b75`](https://github.com/ICIJ/pystou/commit/1272b75b596157dbf69ac62f03b6e720537e4053))
+
+A --trash-dir inside the scanned tree is walked as ordinary data, so a second run moved run 1's own
+  items and left its ledger dangling.
+
+- **trash**: Reject ledger run ids that escape the trash root
+  ([`3958e55`](https://github.com/ICIJ/pystou/commit/3958e550e555da3c38d353cd1c8e831c54cc6b59))
+
+A ledger planted inside the trash tree could carry a run_id like '../../victim'; purge joined it
+  onto the trash root and rmtree'd it.
+
+- **trash**: Treat --older-than as a purge selector on its own
+  ([`bef28e0`](https://github.com/ICIJ/pystou/commit/bef28e072086fb2902f8bde18ffa1862864a88c5))
+
+'pystou trash purge DIR --older-than 30' matched the safety gate before the age filter ran, so the
+  documented command was a silent no-op.
+
+- **trash**: Validate ledger paths before restoring them
+  ([`0f2ef37`](https://github.com/ICIJ/pystou/commit/0f2ef3777d31d744a3c2df62f77ad730f36184b6))
+
+An absolute 'stored' silently discarded the trash root and 'original' was never checked against the
+  run's op_root, so a planted ledger could move files in and out of arbitrary locations.
+
+- **types**: Make the unique-name helpers and prompt_choice type-check
+  ([`4aaf55b`](https://github.com/ICIJ/pystou/commit/4aaf55b2c85ad081d332edf8ec5f2d27448e2b4a))
+
+The candidate loops fell off the end of a Path-returning function and prompt_choice accepted a None
+  default no caller passes.
+
+### Build System
+
+- Derive the lint and typecheck package list from the tree
+  ([`654d2f0`](https://github.com/ICIJ/pystou/commit/654d2f0b3ec07dd64241f6a6a071c0e2eb450397))
+
+The hardcoded SRC list had drifted and excluded doctor, restore and trash.
+
+- Raise the mypy target to 3.10
+  ([`0834b96`](https://github.com/ICIJ/pystou/commit/0834b961a8493e3a84f08e3d104be393717ebee4))
+
+mypy 2.x rejects python_version = "3.9" and silently falls back to its default, warning on every
+  run.
+
+### Chores
+
+- Pin python and uv with mise
+  ([`f70ef1d`](https://github.com/ICIJ/pystou/commit/f70ef1d6445022d7176b94d4c91f746fbaadf2ee))
+
+- **stats**: Type the stats accumulator for mypy
+  ([`69b6d06`](https://github.com/ICIJ/pystou/commit/69b6d06091cd6869c94c6d304050cd1854d43152))
+
+The heterogeneous dict literal widened to object, which made every stats[...] access an error.
+
+### Code Style
+
+- Apply ruff format to the touched tests
+  ([`26c0e77`](https://github.com/ICIJ/pystou/commit/26c0e776c82d762c05df8142e06a0d0d7585f31c))
+
+- **indexer**: Let ruff format the unique-index statement
+  ([`29079ef`](https://github.com/ICIJ/pystou/commit/29079efcc2d52b6e7d5abc1461f5d476cdebe6a2))
+
+### Continuous Integration
+
+- Keep the typecheck step out until the existing errors are fixed
+  ([`e4b07cf`](https://github.com/ICIJ/pystou/commit/e4b07cf113ca8a5a351b130c7f98842ff57dfe92))
+
+make typecheck currently reports 32 pre-existing errors in packages this branch does not touch. The
+  step lands with the branch that fixes them.
+
+- Run make lint and add a typecheck step
+  ([`c5a55c0`](https://github.com/ICIJ/pystou/commit/c5a55c0f79c02223a8ff458d9e63db75bcae2561))
+
+The lint job repeated a truncated package list and mypy never ran.
+
+### Documentation
+
+- Correct run-id format, --include semantics and --db-dir scope
+  ([`ebeb771`](https://github.com/ICIJ/pystou/commit/ebeb771bad2fef084c3840c0251e50ce1274057c))
+
+Run ids are minted as %Y%m%dT%H%M%SZ plus a random suffix, --include matches exact names rather than
+  globs, and cleanup and identify never open the index database.
+
+### Performance Improvements
+
+- **identify**: Read each candidate file once
+  ([`8a2bc7b`](https://github.com/ICIJ/pystou/commit/8a2bc7b44baf2a4380b4bfcae64a81b5729fbd5e))
+
+The tar probe re-opened every file to seek to 257; a single 262-byte read covers both the header
+  signatures and the tar magic.
+
+- **trash**: Stop rescanning taken holding dirs on every quarantined item
+  ([`8f3e8e9`](https://github.com/ICIJ/pystou/commit/8f3e8e9c668046205c7ec3a2bbd190da9fc7c2b4))
+
+reserve_unique_name restarted its probe at 0 for each item, so a run of n items issued n(n+1)/2
+  mkdir calls; the caller now carries the counter.
+
+### Refactoring
+
+- **extract**: Call delete_archive_file directly on the parallel path
+  ([`52d2702`](https://github.com/ICIJ/pystou/commit/52d2702335cb9fd5a734384590efcbbfaf625c8f))
+
+- **utils**: Share one canonical archive extension list with stats
+  ([`63558cc`](https://github.com/ICIJ/pystou/commit/63558cc8905744c4025ea7b505cb744a74f501c3))
+
+### Testing
+
+- **empty**: Cover the symlink guard in remove_empty_directories
+  ([`e422853`](https://github.com/ICIJ/pystou/commit/e422853b9316e13d28595215a1a8b02a0834a3ac))
+
+
 ## v0.4.0 (2026-06-15)
 
 ### Bug Fixes
