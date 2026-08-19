@@ -321,6 +321,27 @@ class TestPurge(unittest.TestCase):
         self.assertEqual(removed, 1)  # the run is older than 7 days
         self.assertEqual(trash.list_runs(self.root), [])
 
+    def test_older_than_alone_selects_old_runs(self):
+        a = Path(self.root) / "a.txt"
+        a.write_text("x")
+        run_id = trash.quarantine([a], self.root, operation="cleanup", command="c")
+        ledger = Path(self.root) / ".pystou-trash" / "runs" / f"{run_id}.jsonl"
+        lines = [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
+        old = datetime.now(timezone.utc) - timedelta(days=8)
+        lines[0]["started_at"] = old.strftime("%Y-%m-%dT%H:%M:%SZ")
+        ledger.write_text("\n".join(json.dumps(obj) for obj in lines) + "\n")
+        removed = trash.purge(self.root, older_than_days=7)
+        self.assertEqual(removed, 1)
+        self.assertEqual(trash.list_runs(self.root), [])
+
+    def test_no_selector_purges_nothing(self):
+        a = Path(self.root) / "a.txt"
+        a.write_text("x")
+        trash.quarantine([a], self.root, operation="cleanup", command="c")
+        removed = trash.purge(self.root)
+        self.assertEqual(removed, 0)
+        self.assertEqual(len(trash.list_runs(self.root)), 1)
+
 
 class TestHostileLedger(unittest.TestCase):
     def setUp(self):

@@ -361,7 +361,8 @@ def purge(
         op_root: Operation root that hosts the trash.
         run_id: Purge only this run.
         all_runs: Purge every run (optionally narrowed by ``older_than_days``).
-        older_than_days: Only purge runs at least this many days old.
+        older_than_days: Only purge runs at least this many days old; a selector
+            on its own when neither ``run_id`` nor ``all_runs`` is given.
         trash_dir: Trash root override.
     """
     root = trash_root(op_root, trash_dir)
@@ -370,7 +371,7 @@ def purge(
     for run in runs:
         if run_id is not None and run.run_id != run_id:
             continue
-        if run_id is None and not all_runs:
+        if run_id is None and not all_runs and older_than_days is None:
             continue
         if older_than_days is not None:
             age = _run_age_days(run)
