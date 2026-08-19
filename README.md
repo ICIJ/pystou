@@ -1,9 +1,8 @@
 # PyStou
 
-Command-line toolkit for tidying large filesystems: deduplicate folders, extract archives, remove
-junk files, and report on what is taking up space. Removals are reversible by default.
+Welcome to **PyStou** – your ultimate toolkit for keeping your filesystem tidy and organized! Whether you're a developer drowning in duplicate folders or someone who loves archiving files but hates the clutter, PyStou is here to rescue you from chaos with style and efficiency.
 
-Developed by the [International Consortium of Investigative Journalists (ICIJ)](https://www.icij.org/).
+**PyStou** is proudly developed by the [International Consortium of Investigative Journalists (ICIJ)](https://www.icij.org/), aiming to empower users with tools to manage and maintain large amounts of files.
 
 ## Install
 
