@@ -238,6 +238,14 @@ class TestRestore(unittest.TestCase):
         self.assertTrue(a.is_file())
         self.assertFalse(b.exists())  # only a restored
 
+    def test_restore_by_path_without_run_or_all_searches_every_run(self):
+        a = Path(self.root) / "a.txt"
+        a.write_text("a")
+        trash.quarantine([a], self.root, operation="cleanup", command="c")
+        restored, _ = trash.restore(self.root, original_path=str(a))
+        self.assertEqual(restored, 1)
+        self.assertTrue(a.is_file())
+
 
 class TestRestoreReindex(unittest.TestCase):
     def setUp(self):

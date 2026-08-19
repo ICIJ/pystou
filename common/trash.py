@@ -269,7 +269,9 @@ def restore(
         tuple[int, int]: (restored_count, conflict_count).
     """
     root = trash_root(op_root, trash_dir)
-    runs = _select_runs(list_runs(op_root, trash_dir), run_id, all_runs)
+    runs = _select_runs(
+        list_runs(op_root, trash_dir), run_id, all_runs or original_path is not None
+    )
     target = str(Path(original_path).absolute()) if original_path else None
     restored = conflicted = 0
     for run in runs:
