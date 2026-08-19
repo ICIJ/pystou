@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from common.safe_extract import safe_extract_tar, safe_extract_zip
 
@@ -126,6 +127,46 @@ class TestSafeExtractZipAbsolute(unittest.TestCase):
         with zipfile.ZipFile(zip_path, "r") as zf:
             self.assertFalse(safe_extract_zip(zf, self.dest))
 
+
+class TestSafeExtractSymlinkedDest(unittest.TestCase):
+    """A symlinked subdirectory inside dest must not become an escape hatch."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.dest = Path(self.test_dir) / "out"
+        self.dest.mkdir()
+        self.outside = Path(self.test_dir) / "outside"
+        self.outside.mkdir()
+        (self.dest / "docs").symlink_to(self.outside, target_is_directory=True)
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_zip_member_through_symlinked_subdir_is_rejected(self):
+        zip_path = Path(self.test_dir) / "slip.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("docs/pwned.txt", "pwned")
+
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            self.assertFalse(safe_extract_zip(zf, self.dest))
+
+        self.assertFalse((self.outside / "pwned.txt").exists())
+
+    def test_tar_member_through_symlinked_subdir_is_rejected_without_filter(self):
+        payload = Path(self.test_dir) / "payload"
+        payload.write_text("pwned")
+        tar_path = Path(self.test_dir) / "slip.tar"
+        with tarfile.open(tar_path, "w") as tf:
+            tf.add(payload, arcname="docs/pwned.txt")
+
+        def extractall_without_filter(path, filter=None):
+            raise TypeError("extractall() got an unexpected keyword argument 'filter'")
+
+        with tarfile.open(tar_path, "r") as tf:
+            with patch.object(tf, "extractall", extractall_without_filter):
+                self.assertFalse(safe_extract_tar(tf, self.dest))
+
+        self.assertFalse((self.outside / "pwned.txt").exists())
 
 if __name__ == "__main__":
     unittest.main()

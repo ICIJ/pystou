@@ -10,11 +10,9 @@ from typing import Optional
 def _safe_target(dest: Path, member_name: str) -> Optional[Path]:
     """Returns the resolved target path if it stays inside ``dest``, else None.
 
-    Rejects absolute member names and ``..`` traversal by comparing absolute paths.
-
-    Note: the check is lexical (``os.path.abspath``); if ``dest`` itself is a symlink,
-    the check and the actual extraction share the same relative members, but the
-    resolved base differs — acceptable, documented limitation.
+    Rejects absolute member names, ``..`` traversal, and members routed through a
+    symlinked subdirectory of ``dest``. Symlinks are followed (``os.path.realpath``)
+    so containment is checked against where the write would actually land.
 
     Args:
         dest (Path): Destination directory.
@@ -23,9 +21,9 @@ def _safe_target(dest: Path, member_name: str) -> Optional[Path]:
     Returns:
         Optional[Path]: The safe target path, or None if the member escapes dest.
     """
-    dest_abs = os.path.abspath(dest)
-    target = os.path.abspath(os.path.join(dest_abs, member_name))
-    if target == dest_abs or target.startswith(dest_abs + os.sep):
+    dest_real = os.path.realpath(dest)
+    target = os.path.realpath(os.path.join(dest_real, member_name))
+    if target == dest_real or target.startswith(dest_real + os.sep):
         return Path(target)
     return None
 
