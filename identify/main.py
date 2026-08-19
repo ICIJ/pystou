@@ -106,7 +106,6 @@ FILE_SIGNATURES: dict[bytes, str] = {
     b"\x42\x5a\x68": "bzip2",
     b"\xfd\x37\x7a\x58\x5a\x00": "xz",
     b"\x28\xb5\x2f\xfd": "zstd",
-    b"\x75\x73\x74\x61\x72": "tar",  # "ustar" at offset 257
     b"\x52\x61\x72\x21\x1a\x07": "rar",
     b"\x37\x7a\xbc\xaf\x27\x1c": "7z",
     b"\x21\x42\x44\x4e": "pst",  # MS Outlook PST
@@ -213,21 +212,19 @@ def detect_file_type(file_path: Path) -> Optional[str]:
         if len(header) == 0:
             return None
 
-        # Check for tar (magic at offset 257)
-        if len(header) >= 8:
-            try:
-                with open(file_path, "rb") as f:
-                    f.seek(257)
-                    tar_magic = f.read(5)
-                    if tar_magic == b"ustar":
-                        return "tar"
-            except OSError:
-                pass
-
         # Check against known signatures
         for signature, file_type in FILE_SIGNATURES.items():
             if header.startswith(signature):
                 return file_type
+
+        # tar has no header magic: "ustar" sits at offset 257
+        try:
+            with open(file_path, "rb") as f:
+                f.seek(257)
+                if f.read(5) == b"ustar":
+                    return "tar"
+        except OSError:
+            pass
 
         return None
 

@@ -71,6 +71,20 @@ class TestIdentifyDetectFileType(unittest.TestCase):
         file_type = detect_file_type(pdf_path)
         self.assertEqual(file_type, "pdf")
 
+    def test_detect_pdf_carrying_ustar_at_tar_offset(self):
+        """A PDF that happens to hold 'ustar' at offset 257 is still a PDF."""
+        pdf_path = self.test_path / "carrier.pdf"
+        pdf_path.write_bytes(b"%PDF-1.4" + b"\x00" * 249 + b"ustar" + b"\x00" * 10)
+
+        self.assertEqual(detect_file_type(pdf_path), "pdf")
+
+    def test_detect_file_starting_with_ustar_is_not_tar(self):
+        """The tar magic lives at offset 257, never at byte 0."""
+        text_path = self.test_path / "notes.txt"
+        text_path.write_bytes(b"ustar is a word")
+
+        self.assertIsNone(detect_file_type(text_path))
+
     def test_detect_unknown_file(self):
         """Test detecting an unknown file type."""
         unknown_path = self.test_path / "test.unknown"
