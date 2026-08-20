@@ -1,6 +1,71 @@
 # CHANGELOG
 
 
+## v0.6.0 (2026-08-20)
+
+### Bug Fixes
+
+- **cli**: Create the directory named by --log-dir
+  ([`add47ae`](https://github.com/ICIJ/pystou/commit/add47ae83c2b9e2cbe4f9b1274c5a49f128eae06))
+
+- **index**: Reject and explain paths the index cannot store
+  ([`18580e8`](https://github.com/ICIJ/pystou/commit/18580e8d1a06cbe420df36ba4122bccce20462af))
+
+- **normalize**: Credit the trim that punctuation removal exposes
+  ([`920a6c6`](https://github.com/ICIJ/pystou/commit/920a6c649aa8cb422c6c4d467073227aaa710ba5))
+
+- **normalize**: Drop the same-inode short circuit that faked a rename
+  ([`577c5fa`](https://github.com/ICIJ/pystou/commit/577c5fad33f16c6a532cee26f2448aa4375b9d74))
+
+- **normalize**: Honor --dry-run when combined with --undo
+  ([`347a152`](https://github.com/ICIJ/pystou/commit/347a15247097f11cbc398198790d89dcd8464746))
+
+- **normalize**: Record absolute paths and stop rewriting valid names
+  ([`991d7be`](https://github.com/ICIJ/pystou/commit/991d7be5b119ff9441df83da45cbe1e013c15c09))
+
+- **normalize**: Release the reserved name when a rename fails
+  ([`2585740`](https://github.com/ICIJ/pystou/commit/25857409827156559a4c1c55c0c7dba474bcf24a))
+
+- **normalize**: Resolve all renamed ancestors, not just the first, in dry-run undo
+  ([`0fe7f72`](https://github.com/ICIJ/pystou/commit/0fe7f72f944642dcec448ae6966eef0390b1adae))
+
+- **normalize**: Write the manifest only once there is a rename to record
+  ([`2c27e3a`](https://github.com/ICIJ/pystou/commit/2c27e3a12f47946ad86ef33dfcb4a009923d2983))
+
+### Chores
+
+- Sync uv.lock with the released version
+  ([`fabb3c5`](https://github.com/ICIJ/pystou/commit/fabb3c5155c62cc57de1edadb693a8b48ad0b690))
+
+### Documentation
+
+- **normalize**: Document the options and the manifest location
+  ([`f43a687`](https://github.com/ICIJ/pystou/commit/f43a6877d05478c703f8eb7be9c0f9a46d12ca0c))
+
+### Features
+
+- **normalize**: Add --no-manifest to rename without recording
+  ([`52cfe09`](https://github.com/ICIJ/pystou/commit/52cfe098a8c70695e23696d730f46687a9fb4aae))
+
+- **normalize**: Add filename normalization rules
+  ([`8b0e331`](https://github.com/ICIJ/pystou/commit/8b0e3318ba1a2017641d6d179bdee09d68d0dd91))
+
+- **normalize**: Add the JSONL rename manifest
+  ([`3e8c5f6`](https://github.com/ICIJ/pystou/commit/3e8c5f6f49eb60b6fc25348da7bda7be80269749))
+
+- **normalize**: Add the normalize subcommand
+  ([`ce87aea`](https://github.com/ICIJ/pystou/commit/ce87aea260bf4ce582c9626090755eabcef67fcb))
+
+- **normalize**: Document the command and pin the undo round-trip
+  ([`c0270f8`](https://github.com/ICIJ/pystou/commit/c0270f854479df54ae9397a8b2c9d92f7439fc7a))
+
+- **normalize**: Undo a rename run from its manifest
+  ([`c8fed2b`](https://github.com/ICIJ/pystou/commit/c8fed2b0e8758c41b84c648dd28ba667a23ecd2e))
+
+- **safe-ops**: Keep the file extension when suffixing unique names
+  ([`3819321`](https://github.com/ICIJ/pystou/commit/3819321adb7b8721b9492d8146fbd9aa55bb9c34))
+
+
 ## v0.5.0 (2026-08-19)
 
 ### Chores
