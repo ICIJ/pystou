@@ -8,7 +8,7 @@ import re
 import unicodedata
 from collections.abc import Sequence
 
-RULES: tuple[str, ...] = ("utf8", "nfc", "control", "punct")
+RULES: tuple[str, ...] = ("utf8", "nfc", "control", "punct", "astral")
 FALLBACK = "unnamed"
 
 # Undecodable bytes reach us as lone surrogates via PEP 383 surrogateescape.
@@ -18,6 +18,9 @@ _SURROGATES = re.compile(r"[\udc80-\udcff]+")
 _CESU8 = re.compile(rb"\xed[\xa0-\xaf][\x80-\xbf]\xed[\xb0-\xbf][\x80-\xbf]")
 _CONTROLS = re.compile(r"[\x00-\x1f\x7f-\x9f]+")
 _PUNCT = re.compile(r"[\\{}^%`\[\]~<>#|]+")
+# Above the BMP, so exactly the codepoints a UTF-16 surrogate pair encodes:
+# the ones a CESU-8 writer can turn back into invalid UTF-8 downstream.
+_ASTRAL = re.compile(r"[^\x00-\uffff]+")
 # ASCII only: NBSP and the ideographic space are valid, S3-safe UTF-8 and the
 # control rule never claimed them. A Unicode-aware ``\s`` would rewrite them.
 _ASCII_SPACE = " \t\n\r\f\v"
@@ -93,9 +96,11 @@ def normalize_name(name: str, rules: Sequence[str] = RULES) -> tuple[str, str, l
         result = _record(trim(_CONTROLS.sub(" ", result)), result, "control", applied)
     if "punct" in rules:
         result = _record(_PUNCT.sub("", result), result, "punct", applied)
+    if "astral" in rules:
+        result = _record(_ASTRAL.sub("", result), result, "astral", applied)
     if "control" in rules:
-        # Punctuation removal can expose a trailing space, so the trim runs
-        # last; the rule that owns it must still be credited.
+        # Punctuation and astral removal can expose a trailing space, so the
+        # trim runs last; the rule that owns it must still be credited.
         result = _record(trim(result), result, "control", applied)
 
     if result in ("", ".", ".."):
