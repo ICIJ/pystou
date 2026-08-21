@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.7.0 (2026-08-21)
+
+### Chores
+
+- Sync uv.lock with the released version
+  ([`312fcf5`](https://github.com/ICIJ/pystou/commit/312fcf5392f5e02b651b1e90f12d74d72d006857))
+
+### Features
+
+- **normalize**: Add the astral rule to strip characters above the BMP
+  ([`08aadfa`](https://github.com/ICIJ/pystou/commit/08aadfad0510a55efb0fd809e5cfe04fd1a8ff81))
+
+
 ## v0.6.0 (2026-08-20)
 
 ### Bug Fixes
