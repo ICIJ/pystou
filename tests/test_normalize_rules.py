@@ -11,11 +11,11 @@ def name_from(raw: bytes) -> str:
 
 
 class TestNormalizeName(unittest.TestCase):
-    def test_cesu8_emoji_is_repaired_not_stripped(self):
+    def test_cesu8_emoji_is_repaired_then_removed(self):
         # 'bad_<emoji>.txt' where the emoji is a UTF-16 surrogate pair encoded
         # byte-for-byte (CESU-8), which is what the affected corpus contains.
         name = name_from(b"bad_\xed\xa0\xbd\xed\xb8\x80.txt")
-        self.assertEqual(normalize_name(name), ("bad_\U0001f600.txt", "repaired", ["utf8"]))
+        self.assertEqual(normalize_name(name), ("bad_.txt", "repaired", ["utf8", "astral"]))
 
     def test_unrecoverable_bytes_collapse_to_one_underscore(self):
         name = name_from(b"note_\x9f\x98.txt")
@@ -37,6 +37,25 @@ class TestNormalizeName(unittest.TestCase):
 
     def test_aws_avoid_punctuation_is_removed(self):
         self.assertEqual(normalize_name("Q1 #3 [final].pdf")[0], "Q1 3 final.pdf")
+
+    def test_astral_characters_are_removed(self):
+        self.assertEqual(
+            normalize_name("\U0001f195\U0001f33f Nos infusions.eml")[0], "Nos infusions.eml"
+        )
+
+    def test_bmp_symbols_are_kept(self):
+        # Only codepoints above the BMP encode as surrogate pairs, so a BMP
+        # symbol cannot trigger the CESU-8 path this rule exists for.
+        self.assertEqual(
+            normalize_name("r\u00e9union \u2705.pdf"), ("r\u00e9union \u2705.pdf", "clean", [])
+        )
+
+    def test_astral_rule_can_be_skipped(self):
+        name = name_from(b"bad_\xed\xa0\xbd\xed\xb8\x80.txt")
+        self.assertEqual(normalize_name(name, rules=("utf8",))[0], "bad_\U0001f600.txt")
+
+    def test_name_of_only_astral_characters_gets_the_fallback(self):
+        self.assertEqual(normalize_name("\U0001f195\U0001f33f")[0], "unnamed")
 
     def test_name_reduced_to_nothing_gets_the_fallback(self):
         self.assertEqual(normalize_name("###")[0], "unnamed")

@@ -39,6 +39,7 @@ class Rule(str, Enum):
     nfc = "nfc"
     control = "control"
     punct = "punct"
+    astral = "astral"
     all = "all"
 
 
@@ -50,7 +51,7 @@ def normalize_command(
     ] = None,
     rule: Annotated[
         Optional[list[Rule]],
-        typer.Option("--rule", help="utf8|nfc|control|punct|all (repeatable)."),
+        typer.Option("--rule", help="utf8|nfc|control|punct|astral|all (repeatable)."),
     ] = None,
     dry_run: DryRunOpt = False,
     no_manifest: Annotated[

@@ -230,7 +230,7 @@ pystou normalize --undo 20260819T101500Z-3f2a
 
 | Option | Description |
 |--------|-------------|
-| `--rule utf8\|nfc\|control\|punct\|all` | Which rule to apply (repeatable). Omit to apply all. |
+| `--rule utf8\|nfc\|control\|punct\|astral\|all` | Which rule to apply (repeatable). Omit to apply all. |
 | `-r`, `--recursive` | Recurse into subdirectories. |
 | `-n`, `--dry-run` | Preview the renames without touching anything, and without writing a manifest. |
 | `--undo RUN_ID` | Replay a manifest in reverse, restoring the original names. |
@@ -243,6 +243,7 @@ pystou normalize --undo 20260819T101500Z-3f2a
 | `nfc` | macOS NFD decomposition, normalized to NFC. |
 | `control` | Control characters, and trailing spaces and dots. |
 | `punct` | Characters AWS advises avoiding in keys. |
+| `astral` | Characters above the BMP, such as emoji. Removed, because a client that re-encodes them as CESU-8 surrogate pairs rejects the name as invalid UTF-8. |
 
 All rules run by default. `--rule` is repeatable.
 
