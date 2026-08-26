@@ -1,3 +1,4 @@
+import os
 import shutil
 import tempfile
 import unittest
@@ -99,6 +100,11 @@ class TestStatsCollectStats(unittest.TestCase):
         self.assertTrue(any("empty_dir" in d for d in stats["empty_directories"]))
 
 
+def entry_for(path: Path) -> os.DirEntry:
+    """The DirEntry process_file expects, for a file created by a test."""
+    return next(e for e in os.scandir(path.parent) if e.name == path.name)
+
+
 class TestStatsProcessFile(unittest.TestCase):
     """Tests for individual file processing."""
 
@@ -130,7 +136,7 @@ class TestStatsProcessFile(unittest.TestCase):
         file_path = self.test_path / "test.txt"
         file_path.write_bytes(b"x" * 100)
 
-        process_file(file_path, stats, archive_extensions, top_n=10)
+        process_file(entry_for(file_path), stats, archive_extensions, top_n=10)
 
         self.assertEqual(stats["summary"]["total_files"], 1)
         self.assertEqual(stats["summary"]["total_size"], 100)
@@ -156,7 +162,7 @@ class TestStatsProcessFile(unittest.TestCase):
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("test.txt", "content")
 
-        process_file(zip_path, stats, archive_extensions, top_n=10)
+        process_file(entry_for(zip_path), stats, archive_extensions, top_n=10)
 
         self.assertEqual(stats["summary"]["archive_files"], 1)
 
@@ -226,3 +232,28 @@ class TestStatsArchiveExtensions(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStatsThreadCount(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        for i in range(5):
+            sub = self.root / f"sub{i}"
+            sub.mkdir()
+            (sub / "f.txt").write_text("x" * (i + 1))
+        (self.root / "hollow").mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_one_worker_and_eight_workers_agree(self):
+        one = collect_stats(str(self.root), recursive=True, top_n=10, threads=1)
+        eight = collect_stats(str(self.root), recursive=True, top_n=10, threads=8)
+        self.assertEqual(one["summary"], eight["summary"])
+        self.assertEqual(sorted(one["largest_files"]), sorted(eight["largest_files"]))
+
+    def test_empty_directory_is_counted_without_a_second_listing(self):
+        result = collect_stats(str(self.root), recursive=True, top_n=10, threads=4)
+        self.assertEqual(result["summary"]["empty_dirs"], 1)
+        self.assertEqual(result["summary"]["total_dirs"], 6)
+        self.assertEqual(result["summary"]["total_files"], 5)
