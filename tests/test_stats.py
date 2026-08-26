@@ -252,6 +252,19 @@ class TestStatsThreadCount(unittest.TestCase):
         self.assertEqual(one["summary"], eight["summary"])
         self.assertEqual(sorted(one["largest_files"]), sorted(eight["largest_files"]))
 
+    def test_every_reported_list_keeps_its_order_across_worker_counts(self):
+        # --json prints these verbatim, so a worker count must never reorder them.
+        for i in range(40):
+            branch = self.root / f"branch{i}"
+            branch.mkdir()
+            (branch / f"file.e{i}").write_text("z" * i)
+            (branch / "hollow").mkdir()
+        one = collect_stats(str(self.root), recursive=True, top_n=50, threads=1)
+        eight = collect_stats(str(self.root), recursive=True, top_n=50, threads=8)
+        self.assertEqual(list(one["by_extension"].items()), list(eight["by_extension"].items()))
+        self.assertEqual(one["empty_directories"], eight["empty_directories"])
+        self.assertEqual(one["largest_files"], eight["largest_files"])
+
     def test_empty_directory_is_counted_without_a_second_listing(self):
         result = collect_stats(str(self.root), recursive=True, top_n=10, threads=4)
         self.assertEqual(result["summary"]["empty_dirs"], 1)

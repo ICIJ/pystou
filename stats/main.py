@@ -186,6 +186,10 @@ def collect_stats(
     stats["largest_files"] = [
         (path, size) for size, path in sorted(stats["largest_files"], reverse=True)
     ]
+    # --json prints these verbatim, and the scan reaches directories in whatever
+    # order the workers finish, so both are ordered here to keep runs comparable.
+    stats["by_extension"] = dict(sorted(stats["by_extension"].items()))
+    stats["empty_directories"].sort()
 
     return stats
 
