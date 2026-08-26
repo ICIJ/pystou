@@ -247,3 +247,30 @@ class TestCleanupQuarantine(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCleanupThreadCount(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        for i in range(5):
+            sub = self.root / f"sub{i}"
+            sub.mkdir()
+            (sub / ".DS_Store").write_text("x")
+            (sub / "keep.txt").write_text("y")
+        junk_dir = self.root / "__MACOSX"
+        junk_dir.mkdir()
+        (junk_dir / "inside.txt").write_text("z")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_result_is_sorted_and_independent_of_worker_count(self):
+        one = find_junk(str(self.root), True, JUNK_FILES, JUNK_DIRS, threads=1)
+        eight = find_junk(str(self.root), True, JUNK_FILES, JUNK_DIRS, threads=8)
+        self.assertEqual(one, eight)
+        self.assertEqual(one, sorted(one))
+
+    def test_junk_directory_is_reported_but_never_descended(self):
+        found = find_junk(str(self.root), True, JUNK_FILES, JUNK_DIRS, threads=4)
+        self.assertIn(self.root / "__MACOSX", found)
+        self.assertNotIn(self.root / "__MACOSX" / "inside.txt", found)

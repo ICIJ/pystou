@@ -18,9 +18,10 @@ from common.cli import (
     HardDeleteOpt,
     LogDirOpt,
     RecursiveOpt,
+    ThreadsOpt,
     TrashDirOpt,
 )
-from common.fs_walker import is_excluded_dir
+from common.fs_walker import is_excluded_dir, walk
 from common.logger import setup_logging
 from common.validation import validate_directory_or_exit
 
@@ -54,6 +55,7 @@ JUNK_DIRS: set[str] = {
 def cleanup_command(
     directory: DirectoryArg = ".",
     recursive: RecursiveOpt = False,
+    threads: ThreadsOpt = None,
     include: Annotated[
         Optional[list[str]], typer.Option("--include", help="Extra file/dir names to remove.")
     ] = None,
@@ -73,6 +75,7 @@ def cleanup_command(
             "command": "cleanup",
             "directory": directory,
             "recursive": recursive,
+            "threads": threads,
             "list_only": list_only,
             "dry_run": dry_run,
             "hard_delete": hard_delete,
@@ -83,7 +86,7 @@ def cleanup_command(
     junk_files = JUNK_FILES.union(include or [])
     junk_dirs = JUNK_DIRS.union(include or [])
 
-    junk_items = find_junk(directory, recursive, junk_files, junk_dirs)
+    junk_items = find_junk(directory, recursive, junk_files, junk_dirs, threads)
     if not junk_items:
         console.status("No junk files found.")
         return
@@ -120,6 +123,7 @@ def find_junk(
     recursive: bool,
     junk_files: set[str],
     junk_dirs: set[str],
+    threads: Optional[int] = None,
 ) -> list[Path]:
     """Finds junk files and directories.
 
@@ -128,6 +132,7 @@ def find_junk(
         recursive: Whether to search recursively.
         junk_files: Set of junk file names.
         junk_dirs: Set of junk directory names.
+        threads: Scan workers; None picks the default.
 
     Returns:
         List of paths to junk items.
@@ -136,31 +141,21 @@ def find_junk(
     directory_path = Path(directory)
 
     if recursive:
-        # followlinks=False prevents infinite loops from symlink cycles
-        for root, dirs, files in os.walk(directory_path, followlinks=False):
-            root_path = Path(root)
-
-            # Check for junk directories
-            for dir_name in dirs[:]:  # Copy to allow modification
-                if is_excluded_dir(dir_name):
-                    dirs.remove(dir_name)  # Don't descend into excluded dirs
+        for scan in walk(directory_path, threads=threads, prune=lambda e: e.name in junk_dirs):
+            if scan.error is not None:
+                logging.warning(
+                    {"action": "scan_error", "path": str(scan.path), "error": str(scan.error)}
+                )
+                continue
+            for entry in scan.entries:
+                if entry.is_symlink():
                     continue
-                dir_path = root_path / dir_name
-                # Skip symlinks to avoid issues
-                if dir_path.is_symlink():
-                    continue
-                if dir_name in junk_dirs:
-                    junk_items.append(dir_path)
-                    dirs.remove(dir_name)  # Don't descend into junk dirs
-
-            # Check for junk files
-            for file_name in files:
-                file_path = root_path / file_name
-                # Skip symlinks
-                if file_path.is_symlink():
-                    continue
-                if is_junk_file(file_name, junk_files):
-                    junk_items.append(file_path)
+                if entry.is_dir(follow_symlinks=False):
+                    if entry.name in junk_dirs:
+                        junk_items.append(scan.path / entry.name)
+                elif is_junk_file(entry.name, junk_files):
+                    junk_items.append(scan.path / entry.name)
+        junk_items.sort()
     else:
         try:
             for entry in os.scandir(directory_path):
