@@ -1,6 +1,61 @@
 # CHANGELOG
 
 
+## v0.8.0 (2026-08-26)
+
+### Bug Fixes
+
+- **stats**: Keep --json output stable regardless of scan worker count
+  ([`7aeade1`](https://github.com/ICIJ/pystou/commit/7aeade1bccd903299af8ee962f93bd12fd8a7ad5))
+
+### Chores
+
+- Sync uv.lock with the released version
+  ([`69dfd9e`](https://github.com/ICIJ/pystou/commit/69dfd9e9d63ae896adff3a470ae5616d76443054))
+
+### Continuous Integration
+
+- Run semantic-release with GitPython pinned below 3.1.60
+  ([`ed7989e`](https://github.com/ICIJ/pystou/commit/ed7989e7ecbe96d7a2cbe56c69b7462436c0e4e2))
+
+### Documentation
+
+- Document -j/--threads
+  ([`bac613e`](https://github.com/ICIJ/pystou/commit/bac613e53cba50fb24b90738ce427662b7551541))
+
+### Features
+
+- **cleanup**: Find junk in parallel and sort the result
+  ([`216cb24`](https://github.com/ICIJ/pystou/commit/216cb24b7aadf158b605a9a38a56d29bb6fb9d69))
+
+- **dedup,extract**: Scan the index in parallel behind -j/--threads
+  ([`0e9eeaf`](https://github.com/ICIJ/pystou/commit/0e9eeafa3e26d9146143f9566a7ef1e63853d5de))
+
+- **empty**: Find empty directories in parallel
+  ([`0dfe723`](https://github.com/ICIJ/pystou/commit/0dfe72336e4cdc727e2b293a741dc5149923826e))
+
+- **extract**: Discover archives in parallel and sort the result
+  ([`7f53c0d`](https://github.com/ICIJ/pystou/commit/7f53c0ddc430df5986be4e082379cbe8f5cb4963))
+
+- **fs_walker**: Add a thread-pool directory walker
+  ([`911365a`](https://github.com/ICIJ/pystou/commit/911365a431b039a6636d8cad78930c78082274c7))
+
+- **identify**: Collect files in parallel and sort the result
+  ([`bfce2fe`](https://github.com/ICIJ/pystou/commit/bfce2fe7a5b489da8105d196f784c79f8381ee16))
+
+- **normalize**: Add -s/--summary to print counts instead of every path
+  ([`35db9b0`](https://github.com/ICIJ/pystou/commit/35db9b0d5755a3500f47e8bacee95ea6ef6b6266))
+
+- **normalize**: Walk the tree in parallel before renaming
+  ([`fce53bf`](https://github.com/ICIJ/pystou/commit/fce53bfcbdaf7ee10a6bc801f2e2119e316255fd))
+
+- **stats**: Scan in parallel and derive empty dirs from the walk
+  ([`1d0e241`](https://github.com/ICIJ/pystou/commit/1d0e241af8a1fd032f4559903aa1d9c8b7a94c69))
+
+- **trash**: Size quarantined directories with the parallel walker
+  ([`4319fdc`](https://github.com/ICIJ/pystou/commit/4319fdc999714e49a2cc20a80c88a8a7b759bde6))
+
+
 ## v0.7.0 (2026-08-21)
 
 ### Chores
