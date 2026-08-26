@@ -106,6 +106,7 @@ pystou --quiet extract /data -r --action extract
 | Flag | Description | Available on |
 |------|-------------|--------------|
 | `-r`, `--recursive` | Recurse into subdirectories. | `dedup` `extract` `cleanup` `identify` `stats` `empty` `normalize` |
+| `-j`, `--threads N` | Directory scan workers (default: auto, tuned for network mounts). | `dedup` `extract` `cleanup` `identify` `stats` `empty` `normalize` |
 | `-n`, `--dry-run` | Do not make any changes. | `dedup` `extract` `cleanup` `empty` `normalize` |
 | `--hard-delete` | Permanently delete instead of quarantining. | `dedup` `extract` `cleanup` |
 | `--trash-dir PATH` | Override the trash location (must be the same filesystem). | `dedup` `extract` `cleanup` `restore` `trash` |
@@ -155,7 +156,7 @@ main `.zip`).
 |--------|-------------|
 | `--action extract\|skip` | Apply to every archive; omit to prompt per archive. |
 | `--remove-archives` / `--keep-archives` | Quarantine source archives after success, or keep them (default: keep). |
-| `-p`, `--parallel N` | Parallel extraction workers (default: 1). |
+| `-p`, `--parallel N` | Archive extraction workers (default: 1). Independent of `-j`, which only sets how many directories are listed at once. |
 | `--nested` | Recursively extract archives found in extracted content. |
 | `--max-depth N` | Maximum nesting depth for `--nested` (default: 10). |
 | `--type T` | Only process this archive type (repeatable). |
