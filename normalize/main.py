@@ -6,6 +6,7 @@ import logging
 import os
 import shlex
 import sys
+from collections.abc import Iterator
 from enum import Enum
 from pathlib import Path
 from typing import Annotated, Optional
@@ -223,37 +224,48 @@ def _run(
 
 def walk_bottom_up(
     root: Path, recursive: bool, threads: Optional[int] = None
-) -> list[tuple[Path, str]]:
-    """Lists everything under ``root``, deepest first, excluding ``root`` itself.
+) -> Iterator[tuple[Path, str]]:
+    """Yields everything under ``root``, child before parent, excluding ``root``.
 
     Children must be renamed while their parent still carries its old name, so
-    the manifest replays correctly. Sorting by descending depth gives that; the
-    path breaks ties so two runs over the same tree agree.
+    the manifest replays correctly. Files satisfy that the moment their
+    directory is scanned, so they stream out as the walk finds them; only
+    directory paths are held back, then yielded deepest first. Materializing
+    files too used to hold one Path per entry and OOM-kill runs on very large
+    trees.
+
+    Files within one directory come out name-sorted, but the interleaving of
+    directories follows the walk's completion order.
 
     Args:
         root: Directory to walk. Never included in the result.
         recursive: Whether to descend past the top level.
         threads: Scan workers; None picks the default.
 
-    Returns:
-        list[tuple[Path, str]]: ``(path, kind)`` pairs, kind being ``file`` or
+    Yields:
+        tuple[Path, str]: ``(path, kind)`` pairs, kind being ``file`` or
         ``dir``, ordered so every child precedes its parent.
     """
-    entries: list[tuple[Path, str]] = []
+    directories: list[str] = []
     for scan in walk(root, recursive=recursive, threads=threads):
         if scan.error is not None:
             logging.warning(
                 {"action": "scan_error", "path": str(scan.path), "error": str(scan.error)}
             )
             continue
-        for entry in scan.entries:
+        for entry in sorted(scan.entries, key=lambda e: e.name):
             if is_excluded_dir(entry.name):
                 continue
             # A symlink to a directory is renamed as a leaf, never descended into.
-            kind = "dir" if entry.is_dir(follow_symlinks=False) else "file"
-            entries.append((scan.path / entry.name, kind))
-    entries.sort(key=lambda item: (-len(item[0].parts), str(item[0])))
-    return entries
+            if entry.is_dir(follow_symlinks=False):
+                directories.append(str(scan.path / entry.name))
+            else:
+                yield scan.path / entry.name, "file"
+    # Separator count stands in for len(Path.parts): root is absolute and the
+    # walk never emits redundant separators, so the two orderings agree.
+    directories.sort(key=lambda path: (-path.count(os.sep), path))
+    for path in directories:
+        yield Path(path), "dir"
 
 
 def apply_rename(old: Path, new_name: str) -> Path:

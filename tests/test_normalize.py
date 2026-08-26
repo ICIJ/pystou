@@ -324,18 +324,23 @@ class TestWalkBottomUpThreadCount(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.root, ignore_errors=True)
 
-    def test_result_is_independent_of_worker_count(self):
-        one = walk_bottom_up(self.root, True, threads=1)
-        eight = walk_bottom_up(self.root, True, threads=8)
+    def test_entries_are_the_same_for_any_worker_count(self):
+        one = sorted(walk_bottom_up(self.root, True, threads=1))
+        eight = sorted(walk_bottom_up(self.root, True, threads=8))
+        self.assertEqual(one, eight)
+
+    def test_directory_order_is_independent_of_worker_count(self):
+        one = [p for p, kind in walk_bottom_up(self.root, True, threads=1) if kind == "dir"]
+        eight = [p for p, kind in walk_bottom_up(self.root, True, threads=8) if kind == "dir"]
         self.assertEqual(one, eight)
 
     def test_every_child_precedes_its_parent(self):
-        entries = walk_bottom_up(self.root, True, threads=4)
+        entries = list(walk_bottom_up(self.root, True, threads=4))
         position = {path: i for i, (path, _kind) in enumerate(entries)}
         for path, _kind in entries:
             if path.parent in position:
                 self.assertLess(position[path], position[path.parent])
 
     def test_non_recursive_stops_at_the_top_level(self):
-        entries = walk_bottom_up(self.root, False, threads=4)
+        entries = list(walk_bottom_up(self.root, False, threads=4))
         self.assertEqual(sorted(p.name for p, _kind in entries), ["sub0", "sub1", "sub2", "sub3"])
