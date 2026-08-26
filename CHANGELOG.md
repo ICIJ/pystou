@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.8.1 (2026-08-26)
+
+### Bug Fixes
+
+- **normalize**: Stream files during the walk instead of materializing the tree
+  ([`b1e68e4`](https://github.com/ICIJ/pystou/commit/b1e68e43fa6ee6fc3a71a7dc1dbb77ee6bdc45cf))
+
+
 ## v0.8.0 (2026-08-26)
 
 ### Bug Fixes
