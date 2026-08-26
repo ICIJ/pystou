@@ -201,7 +201,9 @@ class TestDryRunTable(unittest.TestCase):
 
     def test_both_columns_hold_the_full_printable_path(self):
         old = make(self.root, b"note_\x9f.txt")
-        _renamed, _failed, table = _run(self.root, False, RULES, True, contextlib.nullcontext())
+        _renamed, _failed, table = _run(
+            self.root, False, RULES, True, False, contextlib.nullcontext()
+        )
         cells = [list(column.cells) for column in table.columns]
         self.assertEqual(cells[0], [manifest.printable(str(old))])
         self.assertEqual(cells[1], [str(self.root / "note__.txt")])

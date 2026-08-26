@@ -225,6 +225,7 @@ pystou normalize ~/data -r --dry-run     # preview
 pystou normalize ~/data -r               # rename, writing a manifest
 pystou normalize ~/data -r --rule utf8   # only the S3 blocker
 pystou normalize ~/data -r --no-manifest # rename without recording anything
+pystou normalize ~/data -r -s            # print counts, not one row per path
 pystou normalize --undo 20260819T101500Z-3f2a
 ```
 
@@ -233,6 +234,7 @@ pystou normalize --undo 20260819T101500Z-3f2a
 | `--rule utf8\|nfc\|control\|punct\|astral\|all` | Which rule to apply (repeatable). Omit to apply all. |
 | `-r`, `--recursive` | Recurse into subdirectories. |
 | `-n`, `--dry-run` | Preview the renames without touching anything, and without writing a manifest. |
+| `-s`, `--summary` | Print a table of counts instead of one row per renamed path. |
 | `--undo RUN_ID` | Replay a manifest in reverse, restoring the original names. |
 | `--manifest-dir PATH` | Directory for rename manifests (default: XDG state dir). |
 | `--no-manifest` | Rename without recording anything. The run cannot be undone. |
@@ -250,6 +252,12 @@ All rules run by default. `--rule` is repeatable.
 Manifests are written to `$XDG_STATE_HOME/pystou/renames` (override with
 `--manifest-dir`). Replay entries in file order: each `file` entry is an exact
 path swap, and each `dir` entry is a prefix rewrite over everything below it.
+
+`-s` replaces the per-path table with a count of what was renamed, or restored
+when combined with `--undo`. On a tree with millions of bad names the per-path
+table is not just unreadable, it is held in memory before it is printed, so `-s`
+skips building it at all. Failures are still reported individually: they are
+errors, not progress. Use `-q` to silence the status lines as well.
 
 `--no-manifest` skips the record entirely, for trees nothing has indexed. Note
 that `--undo` replays a manifest, so a run without one cannot be reversed;

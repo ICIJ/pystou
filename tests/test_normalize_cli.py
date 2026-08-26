@@ -1,3 +1,4 @@
+import contextlib
 import io
 import os
 import shutil
@@ -14,6 +15,7 @@ from common import console
 from common.errors import PystouError
 from normalize import manifest
 from normalize.main import normalize_command
+from normalize.rules import RULES
 
 
 def _app():
@@ -288,3 +290,89 @@ class TestNoManifest(unittest.TestCase):
         self.assertEqual(result.exit_code, 1)
         self.assertIsInstance(result.exception, PystouError)
         self.assertIn("--no-manifest", str(result.exception))
+
+
+class TestSummary(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.state = tempfile.mkdtemp()
+        self.runner = CliRunner()
+        self.out = io.StringIO()
+        self.err = io.StringIO()
+        console.configure(no_color=True, quiet=False, out_file=self.out, err_file=self.err)
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+        shutil.rmtree(self.state, ignore_errors=True)
+        console.configure()
+
+    def _invoke(self, *args):
+        return self.runner.invoke(
+            _app(),
+            [self.dir, "--log-dir", self.state, "--manifest-dir", self.state, *args],
+        )
+
+    def test_counts_replace_the_per_path_rows(self):
+        make(self.dir, b"note_\x9f.txt")
+        result = self._invoke("-s")
+        self.assertEqual(result.exit_code, 0)
+        self.assertNotIn("note_", self.out.getvalue())
+        self.assertIn("Renamed", self.out.getvalue())
+        self.assertIn("1", self.out.getvalue())
+
+    def test_dry_run_counts_what_would_be_renamed(self):
+        make(self.dir, b"note_\x9f.txt")
+        result = self._invoke("--summary", "--dry-run")
+        self.assertEqual(result.exit_code, 0)
+        self.assertNotIn("note_", self.out.getvalue())
+        self.assertIn("Would rename", self.out.getvalue())
+
+    def test_failures_are_counted_too(self):
+        make(self.dir, b"a_\x9f.txt")
+        make(self.dir, b"b_\x9f.txt")
+        real = normalize.main.apply_rename
+
+        def flaky(old, new_name):
+            if old.name.startswith("b_"):
+                raise PermissionError(13, "Permission denied")
+            return real(old, new_name)
+
+        with mock.patch("normalize.main.apply_rename", flaky):
+            result = self._invoke("-s")
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("Failed", self.out.getvalue())
+
+    def test_no_row_is_added_while_walking(self):
+        # The point of -s: a million-entry tree must not accumulate a million
+        # rich rows in memory just to throw them away at print time.
+        make(self.dir, b"note_\x9f.txt")
+        renamed, _failed, table = normalize.main._run(
+            Path(self.dir), False, RULES, True, True, contextlib.nullcontext()
+        )
+        self.assertEqual(renamed, 1)
+        self.assertEqual(table.row_count, 0)
+
+    def test_undo_counts_instead_of_warning_per_entry(self):
+        make(self.dir, b"a_\x9f.txt")
+        make(self.dir, b"b_\x9f.txt")
+        self.assertEqual(self._invoke().exit_code, 0)
+        (Path(self.dir) / "b__.txt").unlink()
+
+        run_id = sorted(Path(self.state).glob("*.jsonl"))[0].stem
+        self.err.truncate(0)
+        self.err.seek(0)
+        result = self._invoke("-s", "--undo", run_id)
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertNotIn("cannot undo", self.err.getvalue())
+        self.assertIn("Restored", self.out.getvalue())
+        self.assertIn("Skipped", self.out.getvalue())
+
+    def test_undo_dry_run_counts_what_would_be_restored(self):
+        make(self.dir, b"a_\x9f.txt")
+        self.assertEqual(self._invoke().exit_code, 0)
+        run_id = sorted(Path(self.state).glob("*.jsonl"))[0].stem
+        result = self._invoke("-s", "--undo", run_id, "--dry-run")
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("Would restore", self.out.getvalue())

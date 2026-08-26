@@ -54,6 +54,10 @@ def normalize_command(
         typer.Option("--rule", help="utf8|nfc|control|punct|astral|all (repeatable)."),
     ] = None,
     dry_run: DryRunOpt = False,
+    summary: Annotated[
+        bool,
+        typer.Option("-s", "--summary", help="Print counts instead of one row per path."),
+    ] = False,
     no_manifest: Annotated[
         bool,
         typer.Option("--no-manifest", help="Skip the rename manifest; the run cannot be undone."),
@@ -72,6 +76,7 @@ def normalize_command(
             "recursive": recursive,
             "rules": list(selected),
             "dry_run": dry_run,
+            "summary": summary,
             "no_manifest": no_manifest,
             "undo": undo,
         }
@@ -79,8 +84,10 @@ def normalize_command(
     if no_manifest and manifest_dir:
         raise PystouError("--no-manifest and --manifest-dir contradict each other.")
     if undo:
-        restored, skipped = undo_run(undo, manifest_dir, dry_run)
+        restored, skipped = undo_run(undo, manifest_dir, dry_run, summary)
         verb = "Would restore" if dry_run else "Restored"
+        if summary:
+            console.print_table(_summary_table("Undo", verb, restored, "Skipped", skipped))
         console.success(f"{verb} {restored} name(s)" + (f", skipped {skipped}" if skipped else ""))
         return
     # Absolute, because the manifest is replayed against Elasticsearch and an
@@ -104,11 +111,14 @@ def normalize_command(
     records = not dry_run and not no_manifest
     writing = manifest.ManifestWriter(path, meta) if records else contextlib.nullcontext()
 
-    renamed, failed, table = _run(root, recursive, selected, dry_run, writing)
+    renamed, failed, table = _run(root, recursive, selected, dry_run, summary, writing)
 
     if not renamed and not failed:
         console.status("No filenames need normalizing.")
         return
+    if summary:
+        verb = "Would rename" if dry_run else "Renamed"
+        table = _summary_table("Normalize", verb, renamed, "Failed", failed)
     console.print_table(table)
     if dry_run:
         console.status(
@@ -125,6 +135,15 @@ def normalize_command(
     console.warn("No manifest was written: this run cannot be undone.")
 
 
+def _summary_table(title: str, verb: str, count: int, failed_label: str, failed: int) -> Table:
+    """Builds the two-metric table ``-s`` prints in place of one row per path."""
+    table = console.table(title, ["Metric", "Count"])
+    table.add_row(verb, f"{count:,}")
+    if failed:
+        table.add_row(failed_label, f"{failed:,}")
+    return table
+
+
 def _selected_rules(rule: Optional[list[Rule]]) -> tuple[str, ...]:
     """Expands the repeatable --rule option, defaulting to every rule."""
     if not rule or Rule.all in rule:
@@ -137,12 +156,17 @@ def _run(
     recursive: bool,
     rules: tuple[str, ...],
     dry_run: bool,
+    summary: bool,
     writing,
 ) -> tuple[int, int, Table]:
     """Walks, renames, and records into ``writing``. Returns (renamed, failed, table).
 
     ``writing`` is the caller's manifest context: a ``ManifestWriter`` when the
     run records, or a null context when it does not.
+
+    Under ``summary`` the table is left empty rather than filled and discarded:
+    a tree with a million renames would otherwise hold a million rows the
+    caller never prints.
     """
     table = console.table("Renames", ["Old", "New", "Mode"])
     renamed = 0
@@ -153,11 +177,12 @@ def _run(
             if new_name == old.name:
                 continue
             if dry_run:
-                table.add_row(
-                    manifest.printable(str(old)),
-                    manifest.printable(str(old.parent / new_name)),
-                    mode,
-                )
+                if not summary:
+                    table.add_row(
+                        manifest.printable(str(old)),
+                        manifest.printable(str(old.parent / new_name)),
+                        mode,
+                    )
                 renamed += 1
                 continue
             try:
@@ -176,7 +201,8 @@ def _run(
                 continue
             if writer is not None:
                 writer.record(kind, str(old), str(new), mode, applied)
-            table.add_row(manifest.printable(str(old)), manifest.printable(str(new)), mode)
+            if not summary:
+                table.add_row(manifest.printable(str(old)), manifest.printable(str(new)), mode)
             renamed += 1
             logging.info(
                 {
@@ -313,7 +339,10 @@ def _rename_through_staging(old: Path, target: Path, is_directory: bool) -> Path
 
 
 def undo_run(
-    run_id: str, manifest_dir: Optional[str] = None, dry_run: bool = False
+    run_id: str,
+    manifest_dir: Optional[str] = None,
+    dry_run: bool = False,
+    summary: bool = False,
 ) -> tuple[int, int]:
     """Renames everything in a manifest back to its original name.
 
@@ -328,6 +357,7 @@ def undo_run(
         manifest_dir: Optional override for the XDG state location.
         dry_run: Report what would be restored or skipped without renaming
             anything.
+        summary: Count skipped entries instead of naming each one.
 
     Returns:
         tuple[int, int]: ``(restored, skipped)`` counts. In a dry run,
@@ -352,11 +382,13 @@ def undo_run(
         target = Path(manifest.decode(entry["old_b64"]))
         if not os.path.lexists(source):
             skipped += 1
-            console.warn(f"Missing, cannot undo: {entry['new']}")
+            if not summary:
+                console.warn(f"Missing, cannot undo: {entry['new']}")
             continue
         if os.path.lexists(target):
             skipped += 1
-            console.warn(f"Occupied, cannot undo: {entry['old']}")
+            if not summary:
+                console.warn(f"Occupied, cannot undo: {entry['old']}")
             continue
         if dry_run:
             restored += 1
