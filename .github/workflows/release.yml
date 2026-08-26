@@ -23,11 +23,24 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Not the upstream action: it resolves its dependencies when its Docker
+      # image is built, so every run now pulls GitPython 3.1.60, which dropped
+      # Actor.name_email_regex and crashes semantic-release on startup. Running
+      # the CLI directly is what lets us hold GitPython back. Restore the action
+      # once python-semantic-release stops using that attribute.
+      - name: Install Python Semantic Release
+        run: pip install 'python-semantic-release==9.21.2' 'gitpython<3.1.60'
+
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@v9
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: semantic-release -v version
 
       - name: Upload distributions
         if: steps.release.outputs.released == 'true'
