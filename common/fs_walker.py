@@ -186,6 +186,7 @@ def collect_directories(
     recursive: bool,
     level: Optional[int] = None,
     progress_cb: Optional[Callable[[int, int], None]] = None,
+    threads: Optional[int] = None,
 ) -> None:
     """Scans the filesystem and populates the database.
 
@@ -197,10 +198,11 @@ def collect_directories(
         progress_cb: Optional callback invoked as ``progress_cb(dir_count, file_count)``
             at regular intervals during the scan and once on completion.  When
             *None* (the default) no progress output is produced.
+        threads (Optional[int]): Scan workers; None picks the default.
     """
     ctx = ScanContext(update_interval=100, progress_cb=progress_cb)
     clear_database(conn)
-    scan_tree(Path(directory), conn, recursive, level, ctx)
+    scan_tree(Path(directory), conn, recursive, level, ctx, threads)
     ctx.final_update()
 
 
@@ -210,69 +212,63 @@ def scan_tree(
     recursive: bool,
     level: Optional[int],
     ctx: ScanContext,
+    threads: Optional[int] = None,
 ) -> None:
-    """Scans a tree iteratively (explicit stack avoids RecursionError on deep trees).
+    """Scans a tree in parallel and inserts what it finds.
 
     Args:
         root_dir (Path): Directory to start from.
         conn (sqlite3.Connection): SQLite database connection.
         recursive (bool): Whether to scan recursively.
-        level (Optional[int]): Maximum depth level for recursion.
+        level (Optional[int]): Maximum depth level, 1 being the root alone.
         ctx (ScanContext): Scanning context for counters and output.
+        threads (Optional[int]): Scan workers; None picks the default.
     """
-    stack: list[tuple[Path, int]] = [(root_dir, 1)]
-    while stack:
-        current_dir, current_level = stack.pop()
-        try:
-            with os.scandir(current_dir) as entries:
-                dir_entries: list[tuple[str, str, float]] = []
-                file_entries: list[tuple[str, str, int, float]] = []
-                subdirs: list[Path] = []
-                for entry in entries:
-                    full_path = Path(entry.path)
-                    try:
-                        if entry.is_dir(follow_symlinks=False):
-                            if is_excluded_dir(entry.name):
-                                continue
-                            stat_info = entry.stat(follow_symlinks=False)
-                            dir_entries.append(
-                                (str(full_path), str(current_dir), stat_info.st_mtime)
-                            )
-                            ctx.increment_dirs()
-                            if recursive and (level is None or current_level < level):
-                                subdirs.append(full_path)
-                        elif entry.is_file(follow_symlinks=False):
-                            stat_info = entry.stat(follow_symlinks=False)
-                            file_entries.append(
-                                (
-                                    str(current_dir),
-                                    entry.name,
-                                    stat_info.st_size,
-                                    stat_info.st_mtime,
-                                )
-                            )
-                            ctx.increment_files()
-                    except OSError as e:
-                        # One bad entry must not abort its siblings.
-                        logging.warning(
-                            {
-                                "action": "scan_entry_error",
-                                "path": str(full_path),
-                                "error": str(e),
-                            }
-                        )
-                insert_entries(conn, dir_entries, file_entries)
-                # reversed() so siblings are popped in scandir order (matches the
-                # original recursive traversal).
-                for subdir in reversed(subdirs):
-                    stack.append((subdir, current_level + 1))
-        except PermissionError as e:
-            print(f"\nPermission denied: {current_dir}", file=sys.stderr)
-            logging.error({"action": "scan_error", "directory": str(current_dir), "error": str(e)})
-        except OSError as e:
-            logging.warning(
-                {"action": "scan_error", "directory": str(current_dir), "error": str(e)}
-            )
+    # level is 1-based and counts the root; walk's max_depth counts levels below it.
+    max_depth = None if level is None else level - 1
+    for scan in walk(root_dir, recursive=recursive, max_depth=max_depth, threads=threads):
+        if scan.error is not None:
+            if isinstance(scan.error, PermissionError):
+                print(f"\nPermission denied: {scan.path}", file=sys.stderr)
+                logging.error(
+                    {
+                        "action": "scan_error",
+                        "directory": str(scan.path),
+                        "error": str(scan.error),
+                    }
+                )
+            else:
+                logging.warning(
+                    {
+                        "action": "scan_error",
+                        "directory": str(scan.path),
+                        "error": str(scan.error),
+                    }
+                )
+            continue
+        dir_entries: list[tuple[str, str, float]] = []
+        file_entries: list[tuple[str, str, int, float]] = []
+        for entry in scan.entries:
+            full_path = scan.path / entry.name
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    if is_excluded_dir(entry.name):
+                        continue
+                    stat_info = entry.stat(follow_symlinks=False)
+                    dir_entries.append((str(full_path), str(scan.path), stat_info.st_mtime))
+                    ctx.increment_dirs()
+                elif entry.is_file(follow_symlinks=False):
+                    stat_info = entry.stat(follow_symlinks=False)
+                    file_entries.append(
+                        (str(scan.path), entry.name, stat_info.st_size, stat_info.st_mtime)
+                    )
+                    ctx.increment_files()
+            except OSError as e:
+                # One bad entry must not abort its siblings.
+                logging.warning(
+                    {"action": "scan_entry_error", "path": str(full_path), "error": str(e)}
+                )
+        insert_entries(conn, dir_entries, file_entries)
 
 
 def _reject_undecodable(

@@ -18,6 +18,7 @@ from common.cli import (
     HardDeleteOpt,
     LogDirOpt,
     RecursiveOpt,
+    ThreadsOpt,
     TrashDirOpt,
 )
 from common.indexer import close_database, open_or_rescan, update_index_after_change
@@ -34,6 +35,7 @@ class ExtractAction(str, Enum):
 def extract_command(
     directory: DirectoryArg = ".",
     recursive: RecursiveOpt = False,
+    threads: ThreadsOpt = None,
     action: Annotated[
         Optional[ExtractAction],
         typer.Option("--action", help="extract|skip; omit to prompt per archive."),
@@ -78,6 +80,7 @@ def extract_command(
             "command": "extract",
             "directory": directory,
             "recursive": recursive,
+            "threads": threads,
             "extract_action": action.value if action is not None else None,
             "remove_archives": remove_archives,
             "parallel": parallel,
@@ -91,7 +94,7 @@ def extract_command(
     )
     validate_directory_or_exit(directory)
 
-    conn = open_or_rescan(db_dir, directory, recursive)
+    conn = open_or_rescan(db_dir, directory, recursive, threads=threads)
 
     archives = get_archive_files(directory, recursive, types)
     logging.info({"action": "archives_found", "total_archives": len(archives)})

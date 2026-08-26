@@ -27,3 +27,12 @@ TrashDirOpt = Annotated[
 HardDeleteOpt = Annotated[
     bool, typer.Option("--hard-delete", help="Permanently delete instead of quarantining.")
 ]
+ThreadsOpt = Annotated[
+    Optional[int],
+    typer.Option(
+        "-j",
+        "--threads",
+        min=1,
+        help="Directory scan workers [default: auto].",
+    ),
+]

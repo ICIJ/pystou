@@ -21,6 +21,7 @@ from common.cli import (
     HardDeleteOpt,
     LogDirOpt,
     RecursiveOpt,
+    ThreadsOpt,
     TrashDirOpt,
 )
 from common.fs_walker import ScanContext, scan_tree
@@ -39,6 +40,7 @@ class DedupAction(str, Enum):
 def dedup_command(
     directory: DirectoryArg = ".",
     recursive: RecursiveOpt = False,
+    threads: ThreadsOpt = None,
     level: Annotated[
         Optional[int], typer.Option("-l", "--level", help="Max recursion depth.")
     ] = None,
@@ -60,6 +62,7 @@ def dedup_command(
             "command": "dedup",
             "directory": directory,
             "recursive": recursive,
+            "threads": threads,
             "level": level,
             "dedup_action": action.value if action is not None else None,
             "dry_run": dry_run,
@@ -68,7 +71,7 @@ def dedup_command(
     )
     validate_directory_or_exit(directory)
 
-    conn = open_or_rescan(db_dir, directory, recursive, level)
+    conn = open_or_rescan(db_dir, directory, recursive, level, threads)
 
     groups = group_directories(conn, directory)
     if not groups:

@@ -115,7 +115,11 @@ def index_has_data(conn: sqlite3.Connection) -> bool:
 
 
 def open_or_rescan(
-    db_dir: Optional[str], directory: str, recursive: bool, level: Optional[int] = None
+    db_dir: Optional[str],
+    directory: str,
+    recursive: bool,
+    level: Optional[int] = None,
+    threads: Optional[int] = None,
 ) -> sqlite3.Connection:
     """Opens the index, scanning the filesystem unless the user keeps a populated one.
 
@@ -125,6 +129,7 @@ def open_or_rescan(
         directory (str): Directory to scan.
         recursive (bool): Whether to scan recursively.
         level (Optional[int]): Maximum depth level for recursion.
+        threads (Optional[int]): Scan workers; None picks the default.
 
     Returns:
         sqlite3.Connection: A connection to a ready-to-query index.
@@ -148,6 +153,7 @@ def open_or_rescan(
             progress_cb=lambda d, f: p.update(
                 task, description=f"Scanning  dirs {d:,}  files {f:,}"
             ),
+            threads=threads,
         )
     return conn
 

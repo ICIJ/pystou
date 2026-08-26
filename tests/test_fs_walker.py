@@ -166,3 +166,47 @@ class TestUndecodableNames(unittest.TestCase):
             collect_directories(self.conn, str(tree), recursive=True)
         self.assertIn("note_", str(caught.exception))
         self.assertIn("normalize", str(caught.exception))
+
+
+class TestThreadCountDoesNotChangeTheIndex(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        # The index lives outside the scanned tree, or one run would index the other's db.
+        self.db_dir = Path(tempfile.mkdtemp())
+        for i in range(5):
+            sub = self.root / f"sub{i}"
+            sub.mkdir()
+            (sub / "f.txt").write_text("x" * i)
+            (sub / "nested").mkdir()
+            (sub / "nested" / "g.txt").write_text("y")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+        shutil.rmtree(self.db_dir, ignore_errors=True)
+
+    def _index(self, threads):
+        conn = initialize_database(str(self.db_dir / f"index-{threads}.db"))
+        try:
+            collect_directories(conn, str(self.root), recursive=True, threads=threads)
+            dirs = sorted(r[0] for r in conn.execute("SELECT path FROM directories"))
+            files = sorted(
+                (r[0], r[1], r[2])
+                for r in conn.execute("SELECT directory_path, name, size FROM files")
+            )
+            return dirs, files
+        finally:
+            conn.close()
+
+    def test_one_worker_and_eight_workers_agree(self):
+        self.assertEqual(self._index(1), self._index(8))
+
+    def test_level_still_limits_depth(self):
+        conn = initialize_database(str(self.db_dir / "level.db"))
+        try:
+            collect_directories(conn, str(self.root), recursive=True, level=1, threads=4)
+            paths = [r[0] for r in conn.execute("SELECT path FROM directories")]
+        finally:
+            conn.close()
+        # level=1 records the root's children but never descends into them.
+        self.assertTrue(any(p.endswith("sub0") for p in paths))
+        self.assertFalse(any(p.endswith("nested") for p in paths))
