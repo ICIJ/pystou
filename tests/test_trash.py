@@ -445,3 +445,19 @@ class TestHostileLedger(unittest.TestCase):
         self.assertEqual((restored, conflicted), (0, 1))
         self.assertFalse((outside / "pwned.txt").exists())
         self.assertTrue((Path(self.root) / ".pystou-trash" / lines[1]["stored"]).is_file())
+
+
+class TestDirSize(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        (self.root / "a").mkdir()
+        (self.root / "a" / "f.bin").write_bytes(b"x" * 100)
+        (self.root / "b").mkdir()
+        (self.root / "b" / "g.bin").write_bytes(b"y" * 50)
+        (self.root / "b" / "link").symlink_to(self.root / "a" / "f.bin")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_sums_regular_files_and_ignores_symlinks(self):
+        self.assertEqual(trash._dir_size(self.root), 150)

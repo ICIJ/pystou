@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 from common.errors import CrossDeviceTrashError, TrashUnavailableError
+from common.fs_walker import walk
 from common.indexer import update_index_after_change
 from common.safe_ops import reserve_unique_name
 
@@ -65,10 +66,11 @@ def _append_jsonl(path: Path, obj: dict) -> None:
 
 def _dir_size(path: Path) -> int:
     total = 0
-    for cur, _dirs, files in os.walk(path):
-        for name in files:
-            with contextlib.suppress(OSError):
-                total += os.lstat(os.path.join(cur, name)).st_size
+    for scan in walk(path):
+        for entry in scan.entries:
+            if entry.is_file(follow_symlinks=False):
+                with contextlib.suppress(OSError):
+                    total += entry.stat(follow_symlinks=False).st_size
     return total
 
 
