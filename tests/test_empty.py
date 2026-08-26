@@ -286,3 +286,35 @@ class TestEmptySkipsTrash(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEmptyThreadCount(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        (self.root / "full").mkdir()
+        (self.root / "full" / "f.txt").write_text("x")
+        for i in range(5):
+            (self.root / f"hollow{i}").mkdir()
+        (self.root / "full" / "deep").mkdir()
+        (self.root / ".hidden").mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_result_is_stable_and_independent_of_worker_count(self):
+        one = find_empty_directories(str(self.root), True, False, threads=1)
+        eight = find_empty_directories(str(self.root), True, False, threads=8)
+        self.assertEqual(one, eight)
+
+    def test_deepest_directories_come_first(self):
+        found = find_empty_directories(str(self.root), True, False, threads=4)
+        depths = [len(p.parts) for p in found]
+        self.assertEqual(depths, sorted(depths, reverse=True))
+        self.assertIn(self.root / "full" / "deep", found)
+        self.assertNotIn(self.root / "full", found)
+
+    def test_hidden_directories_are_excluded_unless_asked_for(self):
+        without = find_empty_directories(str(self.root), True, False, threads=4)
+        with_hidden = find_empty_directories(str(self.root), True, True, threads=4)
+        self.assertNotIn(self.root / ".hidden", without)
+        self.assertIn(self.root / ".hidden", with_hidden)

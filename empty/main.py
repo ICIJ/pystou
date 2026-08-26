@@ -5,7 +5,7 @@ import errno
 import logging
 import os
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
 
@@ -15,8 +15,9 @@ from common.cli import (
     DryRunOpt,
     LogDirOpt,
     RecursiveOpt,
+    ThreadsOpt,
 )
-from common.fs_walker import is_excluded_dir
+from common.fs_walker import is_excluded_dir, walk
 from common.logger import setup_logging
 from common.validation import validate_directory_or_exit
 
@@ -24,6 +25,7 @@ from common.validation import validate_directory_or_exit
 def empty_command(
     directory: DirectoryArg = ".",
     recursive: RecursiveOpt = False,
+    threads: ThreadsOpt = None,
     list_only: Annotated[
         bool, typer.Option("--list-only", help="List empty dirs without removing.")
     ] = False,
@@ -41,6 +43,7 @@ def empty_command(
             "command": "empty",
             "directory": directory,
             "recursive": recursive,
+            "threads": threads,
             "list_only": list_only,
             "include_hidden": include_hidden,
             "dry_run": dry_run,
@@ -48,7 +51,7 @@ def empty_command(
     )
     validate_directory_or_exit(directory)
 
-    empty_dirs = find_empty_directories(directory, recursive, include_hidden)
+    empty_dirs = find_empty_directories(directory, recursive, include_hidden, threads)
 
     if not empty_dirs:
         console.status("No empty directories found.")
@@ -94,6 +97,7 @@ def find_empty_directories(
     directory: str,
     recursive: bool,
     include_hidden: bool,
+    threads: Optional[int] = None,
 ) -> list[Path]:
     """Finds empty directories.
 
@@ -101,6 +105,7 @@ def find_empty_directories(
         directory: Directory to search.
         recursive: Whether to search recursively.
         include_hidden: Whether to include hidden directories.
+        threads: Scan workers; None picks the default.
 
     Returns:
         List of paths to empty directories, sorted deepest first.
@@ -109,32 +114,17 @@ def find_empty_directories(
     directory_path = Path(directory)
 
     if recursive:
-        # Walk bottom-up so we can detect directories that become empty
-        # after removing their empty subdirectories
-        # followlinks=False prevents infinite loops from symlink cycles
-        for root, _dirs, _files in os.walk(directory_path, topdown=False, followlinks=False):
-            root_path = Path(root)
-
-            # Skip the root directory itself
-            if root_path == directory_path:
+        for scan in walk(directory_path, threads=threads):
+            if scan.error is not None:
+                logging.warning(
+                    {"action": "scan_error", "path": str(scan.path), "error": str(scan.error)}
+                )
                 continue
-
-            # Skip symlinks
-            if root_path.is_symlink():
+            if scan.path == directory_path or scan.entries:
                 continue
-
-            # Skip the trash directory and anything inside it. Bottom-up walks
-            # cannot prune via dirs[:], so guard at the collection point.
-            if any(is_excluded_dir(p) for p in root_path.parts):
+            if not include_hidden and scan.path.name.startswith("."):
                 continue
-
-            # Skip hidden directories if not included
-            if not include_hidden and root_path.name.startswith("."):
-                continue
-
-            # Check if directory is empty (no files and no non-empty subdirs)
-            if is_directory_empty(root_path):
-                empty_dirs.append(root_path)
+            empty_dirs.append(scan.path)
     else:
         try:
             for entry in os.scandir(directory_path):
@@ -159,8 +149,8 @@ def find_empty_directories(
             console.error(f"Permission denied: {directory_path}")
             logging.warning({"action": "scan_error", "path": str(directory_path), "error": str(e)})
 
-    # Sort by depth (deepest first) for safe removal
-    empty_dirs.sort(key=lambda p: len(p.parts), reverse=True)
+    # Deepest first for safe removal; the path breaks ties so runs are repeatable.
+    empty_dirs.sort(key=lambda p: (-len(p.parts), str(p)))
 
     return empty_dirs
 
