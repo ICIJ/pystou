@@ -328,3 +328,26 @@ class TestIdentifySkipsTrash(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestIdentifyThreadCount(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        for i in range(5):
+            sub = self.root / f"sub{i}"
+            sub.mkdir()
+            (sub / f"f{i}.zip").write_text("x")
+            (sub / f"g{i}.txt").write_text("y")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_result_is_sorted_and_independent_of_worker_count(self):
+        one = collect_files(str(self.root), recursive=True, threads=1)
+        eight = collect_files(str(self.root), recursive=True, threads=8)
+        self.assertEqual(one, eight)
+        self.assertEqual(one, sorted(one))
+
+    def test_extension_filter_still_applies(self):
+        found = collect_files(str(self.root), recursive=True, extensions_filter={".zip"}, threads=4)
+        self.assertEqual([p.suffix for p in found], [".zip"] * 5)

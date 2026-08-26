@@ -14,8 +14,9 @@ from common.cli import (
     DirectoryArg,
     LogDirOpt,
     RecursiveOpt,
+    ThreadsOpt,
 )
-from common.fs_walker import is_excluded_dir
+from common.fs_walker import is_excluded_dir, walk
 from common.logger import setup_logging
 from common.validation import validate_directory_or_exit
 
@@ -29,6 +30,7 @@ class CheckKind(str, Enum):
 def identify_command(
     directory: DirectoryArg = ".",
     recursive: RecursiveOpt = False,
+    threads: ThreadsOpt = None,
     check: Annotated[
         Optional[list[CheckKind]],
         typer.Option("--check", help="mismatch|encrypted|all (repeatable)."),
@@ -47,6 +49,7 @@ def identify_command(
             "command": "identify",
             "directory": directory,
             "recursive": recursive,
+            "threads": threads,
             "check": [c.value for c in check] if check else None,
             "extensions": extensions,
         }
@@ -66,7 +69,7 @@ def identify_command(
             for ext in (raw.strip().lower() for raw in extensions.split(","))
         }
 
-    files = collect_files(directory, recursive, extensions_filter)
+    files = collect_files(directory, recursive, extensions_filter, threads)
     logging.info({"action": "files_found", "count": len(files)})
 
     issues: list[tuple[Path, str]] = []
@@ -146,6 +149,7 @@ def collect_files(
     directory: str,
     recursive: bool,
     extensions_filter: Optional[set[str]] = None,
+    threads: Optional[int] = None,
 ) -> list[Path]:
     """Collects files from the directory.
 
@@ -153,6 +157,7 @@ def collect_files(
         directory: Directory to scan.
         recursive: Whether to scan recursively.
         extensions_filter: Optional set of extensions to filter by.
+        threads: Scan workers; None picks the default.
 
     Returns:
         List of file paths.
@@ -161,19 +166,19 @@ def collect_files(
     directory_path = Path(directory)
 
     if recursive:
-        # followlinks=False prevents infinite loops from symlink cycles
-        for root, dirs, filenames in os.walk(directory_path, followlinks=False):
-            # Prune the trash directory: removes it from results and prevents descent.
-            dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
-            root_path = Path(root)
-
-            for filename in filenames:
-                file_path = root_path / filename
-                # Skip symlinks
-                if file_path.is_symlink():
+        for scan in walk(directory_path, threads=threads):
+            if scan.error is not None:
+                logging.warning(
+                    {"action": "scan_error", "path": str(scan.path), "error": str(scan.error)}
+                )
+                continue
+            for entry in scan.entries:
+                if entry.is_symlink() or not entry.is_file(follow_symlinks=False):
                     continue
+                file_path = scan.path / entry.name
                 if extensions_filter is None or file_path.suffix.lower() in extensions_filter:
                     files.append(file_path)
+        files.sort()
     else:
         try:
             for entry in os.scandir(directory_path):
