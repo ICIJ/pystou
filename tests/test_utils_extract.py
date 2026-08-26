@@ -1009,3 +1009,23 @@ class TestTarZstIntoUniqueDirectory(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestArchiveDiscoveryThreadCount(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        for i in range(5):
+            sub = self.root / f"sub{i}"
+            sub.mkdir()
+            (sub / f"a{i}.zip").write_text("x")
+            (sub / f"b{i}.txt").write_text("y")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_result_is_sorted_and_independent_of_worker_count(self):
+        one = utils.get_archive_files(str(self.root), recursive=True, threads=1)
+        eight = utils.get_archive_files(str(self.root), recursive=True, threads=8)
+        self.assertEqual(one, eight)
+        self.assertEqual(one, sorted(one))
+        self.assertEqual(len(one), 5)

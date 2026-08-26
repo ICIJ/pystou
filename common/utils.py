@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from common.errors import PystouError
-from common.fs_walker import is_excluded_dir
+from common.fs_walker import walk
 from common.safe_extract import safe_extract_tar, safe_extract_zip
 from common.safe_ops import make_unique_dir, reserve_unique_file
 
@@ -77,6 +77,7 @@ def get_archive_files(
     directory: Union[str, Path],
     recursive: bool,
     filter_types: Optional[list[str]] = None,
+    threads: Optional[int] = None,
 ) -> list[Path]:
     """Returns a list of archive files in the directory.
 
@@ -85,6 +86,7 @@ def get_archive_files(
         recursive (bool): Whether to search recursively.
         filter_types (List[str], optional): List of archive types to include
             (e.g., ["pst", "zip", "tar.gz"]). If None, all types are included.
+        threads (int, optional): Scan workers; None picks the default.
 
     Returns:
         List[Path]: A list of Paths to archive files.
@@ -119,11 +121,18 @@ def get_archive_files(
         return any(filename.lower().endswith(ext) for ext in archive_extensions)
 
     if recursive:
-        for root, dirs, files in os.walk(directory_path, followlinks=False):
-            dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
-            for file in files:
-                if is_archive(file):
-                    archive_files.append(Path(root) / file)
+        for scan in walk(directory_path, threads=threads):
+            if scan.error is not None:
+                logging.warning(
+                    {"action": "scan_error", "path": str(scan.path), "error": str(scan.error)}
+                )
+                continue
+            for entry in scan.entries:
+                # is_dir() follows symlinks, so a symlinked archive is still found,
+                # exactly as os.walk listed it before.
+                if not entry.is_dir() and is_archive(entry.name):
+                    archive_files.append(scan.path / entry.name)
+        archive_files.sort()
     else:
         for file in os.listdir(directory_path):
             file_path = directory_path / file

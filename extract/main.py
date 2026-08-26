@@ -96,7 +96,7 @@ def extract_command(
 
     conn = open_or_rescan(db_dir, directory, recursive, threads=threads)
 
-    archives = get_archive_files(directory, recursive, types)
+    archives = get_archive_files(directory, recursive, types, threads)
     logging.info({"action": "archives_found", "total_archives": len(archives)})
     if not archives:
         console.status("No archive files found.")
