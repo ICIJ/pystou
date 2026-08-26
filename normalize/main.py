@@ -20,9 +20,10 @@ from common.cli import (
     LogDirOpt,
     ManifestDirOpt,
     RecursiveOpt,
+    ThreadsOpt,
 )
 from common.errors import PystouError
-from common.fs_walker import is_excluded_dir
+from common.fs_walker import is_excluded_dir, walk
 from common.logger import setup_logging
 from common.safe_ops import make_unique_dir, reserve_unique_file
 from common.trash import RUN_ID_RE, new_run_id
@@ -46,6 +47,7 @@ class Rule(str, Enum):
 def normalize_command(
     directory: DirectoryArg = ".",
     recursive: RecursiveOpt = False,
+    threads: ThreadsOpt = None,
     undo: Annotated[
         Optional[str], typer.Option("--undo", help="Undo a previous run by its run id.")
     ] = None,
@@ -74,6 +76,7 @@ def normalize_command(
             "command": "normalize",
             "directory": directory,
             "recursive": recursive,
+            "threads": threads,
             "rules": list(selected),
             "dry_run": dry_run,
             "summary": summary,
@@ -111,7 +114,7 @@ def normalize_command(
     records = not dry_run and not no_manifest
     writing = manifest.ManifestWriter(path, meta) if records else contextlib.nullcontext()
 
-    renamed, failed, table = _run(root, recursive, selected, dry_run, summary, writing)
+    renamed, failed, table = _run(root, recursive, selected, dry_run, summary, writing, threads)
 
     if not renamed and not failed:
         console.status("No filenames need normalizing.")
@@ -158,6 +161,7 @@ def _run(
     dry_run: bool,
     summary: bool,
     writing,
+    threads: Optional[int] = None,
 ) -> tuple[int, int, Table]:
     """Walks, renames, and records into ``writing``. Returns (renamed, failed, table).
 
@@ -172,7 +176,7 @@ def _run(
     renamed = 0
     failed = 0
     with writing as writer:
-        for old, kind in walk_bottom_up(root, recursive):
+        for old, kind in walk_bottom_up(root, recursive, threads):
             new_name, mode, applied = normalize_name(old.name, rules)
             if new_name == old.name:
                 continue
@@ -217,38 +221,38 @@ def _run(
     return renamed, failed, table
 
 
-def walk_bottom_up(root: Path, recursive: bool) -> list[tuple[Path, str]]:
+def walk_bottom_up(
+    root: Path, recursive: bool, threads: Optional[int] = None
+) -> list[tuple[Path, str]]:
     """Lists everything under ``root``, deepest first, excluding ``root`` itself.
 
     Children must be renamed while their parent still carries its old name, so
-    the manifest replays correctly. ``os.walk(topdown=False)`` cannot be used
-    directly because pruning ``dirs`` has no effect once the walk is bottom-up,
-    which would descend into ``.pystou-trash``. Walking top-down to prune and
-    then reversing gives both.
+    the manifest replays correctly. Sorting by descending depth gives that; the
+    path breaks ties so two runs over the same tree agree.
 
     Args:
         root: Directory to walk. Never included in the result.
         recursive: Whether to descend past the top level.
+        threads: Scan workers; None picks the default.
 
     Returns:
         list[tuple[Path, str]]: ``(path, kind)`` pairs, kind being ``file`` or
         ``dir``, ordered so every child precedes its parent.
     """
-    walked: list[tuple[Path, list[str], list[str]]] = []
-    for current, dirs, files in os.walk(root, followlinks=False):
-        dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
-        children = list(dirs)
-        if not recursive:
-            dirs[:] = []
-        walked.append((Path(current), children, files))
-
     entries: list[tuple[Path, str]] = []
-    for folder, dirs, files in reversed(walked):
-        for name in files:
-            entries.append((folder / name, "file"))
-        for name in dirs:
-            path = folder / name
-            entries.append((path, "file" if path.is_symlink() else "dir"))
+    for scan in walk(root, recursive=recursive, threads=threads):
+        if scan.error is not None:
+            logging.warning(
+                {"action": "scan_error", "path": str(scan.path), "error": str(scan.error)}
+            )
+            continue
+        for entry in scan.entries:
+            if is_excluded_dir(entry.name):
+                continue
+            # A symlink to a directory is renamed as a leaf, never descended into.
+            kind = "dir" if entry.is_dir(follow_symlinks=False) else "file"
+            entries.append((scan.path / entry.name, kind))
+    entries.sort(key=lambda item: (-len(item[0].parts), str(item[0])))
     return entries
 
 
